@@ -7,6 +7,7 @@ import {
   recordPayment,
   resetDatabase,
   seedDemo,
+  updateBorrower as apiUpdateBorrower,
 } from "@/api/endpoints";
 import { queryKeys } from "@/api/query-keys";
 import type { BorrowerFormValues } from "@/schemas/borrower.schema";
@@ -29,6 +30,27 @@ export function useCreateBorrowerMutation() {
   return useMutation({
     mutationFn: (values: BorrowerFormValues) => apiCreateBorrower(values),
     onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateBorrowerMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      values,
+    }: {
+      id: string;
+      values: BorrowerFormValues;
+    }) => apiUpdateBorrower(id, values),
+    onSuccess: (_data, variables) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.borrowers.all }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.borrowers.detail(variables.id),
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.stats.all }),
+      ]),
   });
 }
 

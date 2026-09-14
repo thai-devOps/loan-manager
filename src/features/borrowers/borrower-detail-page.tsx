@@ -1,5 +1,15 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowDownLeft, Banknote, CircleDollarSign, HandCoins } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  ArrowDownLeft,
+  ArrowLeft,
+  Banknote,
+  CircleDollarSign,
+  HandCoins,
+  Pencil,
+} from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { DetailPageSkeleton } from "@/components/common/loading-skeletons";
 import {
@@ -16,6 +26,16 @@ import {
   TransactionTypeBadge,
 } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -25,6 +45,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useUpdateBorrowerMutation } from "@/api/mutations";
 import {
   useBorrowerQuery,
   useLoansQuery,
@@ -38,13 +59,31 @@ import {
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
 import { EMPTY_ARRAY } from "@/lib/empty";
+import {
+  borrowerSchema,
+  type BorrowerFormValues,
+} from "@/schemas/borrower.schema";
 
 export function BorrowerDetailPage() {
   const { id = "" } = useParams<{ id: string }>();
+  const [editOpen, setEditOpen] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const updateBorrowerMutation = useUpdateBorrowerMutation();
 
   const borrowerQ = useBorrowerQuery(id);
   const loansQ = useLoansQuery();
   const transactionsQ = useTransactionsQuery();
+
+  const form = useForm<BorrowerFormValues>({
+    resolver: zodResolver(borrowerSchema),
+    defaultValues: {
+      name: "",
+      phone: "",
+      identityNumber: "",
+      address: "",
+      note: "",
+    },
+  });
 
   const isLoading =
     borrowerQ.isLoading || loansQ.isLoading || transactionsQ.isLoading;
@@ -88,6 +127,30 @@ export function BorrowerDetailPage() {
 
   const totalInterest = getInterestPaid(transactions);
 
+  function openEdit() {
+    setSaveError(null);
+    form.reset({
+      name: borrower.name,
+      phone: borrower.phone ?? "",
+      identityNumber: borrower.identityNumber ?? "",
+      address: borrower.address ?? "",
+      note: borrower.note ?? "",
+    });
+    setEditOpen(true);
+  }
+
+  async function onSave(values: BorrowerFormValues) {
+    setSaveError(null);
+    try {
+      await updateBorrowerMutation.mutateAsync({ id: borrower.id, values });
+      setEditOpen(false);
+    } catch (e) {
+      setSaveError(
+        e instanceof Error ? e.message : "Không thể cập nhật người vay",
+      );
+    }
+  }
+
   return (
     <PageShell
       header={
@@ -95,12 +158,18 @@ export function BorrowerDetailPage() {
           title={borrower.name}
           description="Chi tiết người vay"
           actions={
-            <Button asChild variant="outline">
-              <Link to="/borrowers">
-                <ArrowLeft className="size-4" />
-                Quay lại
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={openEdit}>
+                <Pencil className="size-4" />
+                Chỉnh sửa
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/borrowers">
+                  <ArrowLeft className="size-4" />
+                  Quay lại
+                </Link>
+              </Button>
+            </div>
           }
         />
       }
@@ -114,8 +183,12 @@ export function BorrowerDetailPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Thông tin cá nhân</CardTitle>
+          <Button variant="outline" size="sm" onClick={openEdit}>
+            <Pencil className="size-4" />
+            Cập nhật
+          </Button>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
           <InfoItem label="Họ tên" value={borrower.name} />
@@ -278,6 +351,64 @@ export function BorrowerDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cập nhật người vay</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={form.handleSubmit(onSave)}>
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Tên *</Label>
+              <Input id="edit-name" {...form.register("name")} />
+              {form.formState.errors.name && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.name.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Số điện thoại</Label>
+              <Input id="edit-phone" {...form.register("phone")} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-identityNumber">CCCD/CMND</Label>
+              <Input
+                id="edit-identityNumber"
+                {...form.register("identityNumber")}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-address">Địa chỉ</Label>
+              <Input id="edit-address" {...form.register("address")} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-note">Ghi chú</Label>
+              <Textarea id="edit-note" {...form.register("note")} />
+            </div>
+            {saveError && (
+              <p className="text-sm text-destructive">{saveError}</p>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditOpen(false)}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateBorrowerMutation.isPending}
+              >
+                {updateBorrowerMutation.isPending
+                  ? "Đang lưu..."
+                  : "Lưu thay đổi"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }

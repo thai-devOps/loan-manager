@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Search, UserRound } from "lucide-react";
+import { Pencil, Plus, Search, UserRound } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { TablePageSkeleton } from "@/components/common/loading-skeletons";
 import {
@@ -34,7 +34,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCreateBorrowerMutation } from "@/api/mutations";
+import {
+  useCreateBorrowerMutation,
+  useUpdateBorrowerMutation,
+} from "@/api/mutations";
 import {
   useBorrowersQuery,
   useLoansQuery,
@@ -46,11 +49,23 @@ import {
   borrowerSchema,
   type BorrowerFormValues,
 } from "@/schemas/borrower.schema";
+import type { Borrower } from "@/types/borrower";
+
+const emptyForm: BorrowerFormValues = {
+  name: "",
+  phone: "",
+  identityNumber: "",
+  address: "",
+  note: "",
+};
 
 export function BorrowersPage() {
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Borrower | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const createBorrowerMutation = useCreateBorrowerMutation();
+  const updateBorrowerMutation = useUpdateBorrowerMutation();
 
   const borrowersQ = useBorrowersQuery();
   const loansQ = useLoansQuery();
@@ -64,13 +79,7 @@ export function BorrowersPage() {
 
   const form = useForm<BorrowerFormValues>({
     resolver: zodResolver(borrowerSchema),
-    defaultValues: {
-      name: "",
-      phone: "",
-      identityNumber: "",
-      address: "",
-      note: "",
-    },
+    defaultValues: emptyForm,
   });
 
   const rows = useMemo(() => {
@@ -103,10 +112,56 @@ export function BorrowersPage() {
       });
   }, [borrowers, loans, transactions, search]);
 
+  const saving =
+    createBorrowerMutation.isPending || updateBorrowerMutation.isPending;
+
+  function openCreate() {
+    setEditing(null);
+    setSaveError(null);
+    form.reset(emptyForm);
+    setDialogOpen(true);
+  }
+
+  function openEdit(borrower: Borrower) {
+    setEditing(borrower);
+    setSaveError(null);
+    form.reset({
+      name: borrower.name,
+      phone: borrower.phone ?? "",
+      identityNumber: borrower.identityNumber ?? "",
+      address: borrower.address ?? "",
+      note: borrower.note ?? "",
+    });
+    setDialogOpen(true);
+  }
+
+  function closeDialog(open: boolean) {
+    setDialogOpen(open);
+    if (!open) {
+      setEditing(null);
+      setSaveError(null);
+    }
+  }
+
   async function onSubmit(values: BorrowerFormValues) {
-    await createBorrowerMutation.mutateAsync(values);
-    form.reset();
-    setOpen(false);
+    setSaveError(null);
+    try {
+      if (editing) {
+        await updateBorrowerMutation.mutateAsync({
+          id: editing.id,
+          values,
+        });
+      } else {
+        await createBorrowerMutation.mutateAsync(values);
+      }
+      form.reset(emptyForm);
+      setEditing(null);
+      setDialogOpen(false);
+    } catch (e) {
+      setSaveError(
+        e instanceof Error ? e.message : "Không thể lưu người vay",
+      );
+    }
   }
 
   return (
@@ -116,7 +171,7 @@ export function BorrowersPage() {
           title="Người vay"
           description="Quản lý danh sách người vay"
           actions={
-            <Button onClick={() => setOpen(true)}>
+            <Button onClick={openCreate}>
               <Plus className="size-4" />
               Thêm người vay
             </Button>
@@ -143,7 +198,7 @@ export function BorrowersPage() {
           title="Chưa có người vay"
           description="Thêm người vay đầu tiên để bắt đầu quản lý khoản vay."
           action={
-            <Button onClick={() => setOpen(true)}>
+            <Button onClick={openCreate}>
               <Plus className="size-4" />
               Thêm người vay
             </Button>
@@ -155,7 +210,6 @@ export function BorrowersPage() {
             {rows.map(({ borrower, loanCount, remaining, status }) => (
               <MobileListCard
                 key={borrower.id}
-                to={`/borrowers/${borrower.id}`}
                 tone={
                   status === "ACTIVE"
                     ? "success"
@@ -175,6 +229,23 @@ export function BorrowersPage() {
                 }
                 primaryValue={formatCurrency(remaining)}
                 meta={`${loanCount} khoản vay`}
+                footer={
+                  <div className="flex gap-2">
+                    <Button asChild size="sm" variant="outline" className="flex-1">
+                      <Link to={`/borrowers/${borrower.id}`}>Chi tiết</Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={() => openEdit(borrower)}
+                    >
+                      <Pencil className="size-3.5" />
+                      Cập nhật
+                    </Button>
+                  </div>
+                }
               />
             ))}
           </MobileList>
@@ -188,6 +259,7 @@ export function BorrowersPage() {
                   <TableHead>Tổng khoản vay</TableHead>
                   <TableHead>Dư nợ</TableHead>
                   <TableHead>Trạng thái</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -215,6 +287,17 @@ export function BorrowersPage() {
                         />
                       )}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openEdit(borrower)}
+                      >
+                        <Pencil className="size-3.5" />
+                        Cập nhật
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -223,15 +306,14 @@ export function BorrowersPage() {
         </>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={dialogOpen} onOpenChange={closeDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Thêm người vay</DialogTitle>
+            <DialogTitle>
+              {editing ? "Cập nhật người vay" : "Thêm người vay"}
+            </DialogTitle>
           </DialogHeader>
-          <form
-            className="space-y-4"
-            onSubmit={form.handleSubmit(onSubmit)}
-          >
+          <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
             <div className="space-y-2">
               <Label htmlFor="name">Tên *</Label>
               <Input id="name" {...form.register("name")} />
@@ -260,19 +342,23 @@ export function BorrowersPage() {
               <Label htmlFor="note">Ghi chú</Label>
               <Textarea id="note" {...form.register("note")} />
             </div>
+            {saveError && (
+              <p className="text-sm text-destructive">{saveError}</p>
+            )}
             <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => closeDialog(false)}
               >
                 Hủy
               </Button>
-              <Button
-                type="submit"
-                disabled={createBorrowerMutation.isPending}
-              >
-                Lưu
+              <Button type="submit" disabled={saving}>
+                {saving
+                  ? "Đang lưu..."
+                  : editing
+                    ? "Lưu thay đổi"
+                    : "Lưu"}
               </Button>
             </DialogFooter>
           </form>
