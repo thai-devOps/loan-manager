@@ -1,5 +1,5 @@
 import { Menu, PanelLeftClose, PanelLeft, LogOut } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -7,7 +7,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { LogoutButton, SidebarNav } from "@/components/layout/sidebar";
+import {
+  LogoutButton,
+  SidebarNav,
+} from "@/components/layout/sidebar";
+import { getFeatureFromPath } from "@/components/layout/nav-items";
 import { useUiStore } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
 
@@ -19,6 +23,8 @@ interface AppHeaderProps {
 
 export function AppHeader({ title, description, actions }: AppHeaderProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const feature = getFeatureFromPath(location.pathname);
   const mobileNavOpen = useUiStore((s) => s.mobileNavOpen);
   const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
@@ -82,15 +88,18 @@ export function AppHeader({ title, description, actions }: AppHeaderProps) {
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
         <SheetContent side="left" className="flex w-[280px] flex-col p-0">
           <SheetHeader className="border-b px-4 py-4">
-            <SheetTitle>Loan Manager</SheetTitle>
+            <SheetTitle>{feature?.title ?? "Loan Manager"}</SheetTitle>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto">
-            <SidebarNav onNavigate={() => setMobileNavOpen(false)} />
+            {feature && (
+              <SidebarNav
+                items={feature.nav}
+                onNavigate={() => setMobileNavOpen(false)}
+              />
+            )}
           </div>
           <div className="border-t">
-            <LogoutButton
-              onNavigate={() => setMobileNavOpen(false)}
-            />
+            <LogoutButton onNavigate={() => setMobileNavOpen(false)} />
           </div>
         </SheetContent>
       </Sheet>

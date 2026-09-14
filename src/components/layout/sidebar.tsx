@@ -1,26 +1,35 @@
-import { NavLink, useNavigate } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { LayoutGrid, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "@/components/layout/nav-items";
+import {
+  getFeatureFromPath,
+  type AppFeature,
+  type NavItem,
+} from "@/components/layout/nav-items";
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
 
 interface SidebarNavProps {
+  items: NavItem[];
   collapsed?: boolean;
   onNavigate?: () => void;
 }
 
-export function SidebarNav({ collapsed = false, onNavigate }: SidebarNavProps) {
+export function SidebarNav({
+  items,
+  collapsed = false,
+  onNavigate,
+}: SidebarNavProps) {
   return (
     <nav className="flex flex-col gap-1 p-2">
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const Icon = item.icon;
         return (
           <NavLink
             key={item.href}
             to={item.href}
-            end={item.href === "/"}
+            end={item.end ?? false}
             onClick={onNavigate}
             className={({ isActive }) =>
               cn(
@@ -38,6 +47,34 @@ export function SidebarNav({ collapsed = false, onNavigate }: SidebarNavProps) {
         );
       })}
     </nav>
+  );
+}
+
+export function SwitchFeatureButton({
+  collapsed = false,
+  onNavigate,
+}: {
+  collapsed?: boolean;
+  onNavigate?: () => void;
+}) {
+  const navigate = useNavigate();
+
+  return (
+    <Button
+      variant="ghost"
+      className={cn(
+        "w-full justify-start gap-3 text-sidebar-foreground",
+        collapsed && "justify-center px-2",
+      )}
+      onClick={() => {
+        onNavigate?.();
+        void navigate("/apps");
+      }}
+      title="Đổi tính năng"
+    >
+      <LayoutGrid className="size-4 shrink-0" />
+      {!collapsed && <span>Đổi tính năng</span>}
+    </Button>
   );
 }
 
@@ -67,6 +104,7 @@ export function LogoutButton({
           Đăng nhập: {username}
         </p>
       )}
+      <SwitchFeatureButton collapsed={collapsed} onNavigate={onNavigate} />
       <Button
         variant="ghost"
         className={cn(
@@ -83,8 +121,43 @@ export function LogoutButton({
   );
 }
 
+function SidebarBrand({
+  feature,
+  collapsed,
+}: {
+  feature: AppFeature;
+  collapsed: boolean;
+}) {
+  const Icon = feature.icon;
+
+  return (
+    <div
+      className={cn(
+        "flex h-14 items-center border-b border-sidebar-border px-4",
+        collapsed && "justify-center px-2",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <Icon className="size-4" />
+        </div>
+        {!collapsed && (
+          <div>
+            <p className="text-sm font-semibold leading-none">{feature.title}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Loan Manager</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function DesktopSidebar() {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
+  const location = useLocation();
+  const feature = getFeatureFromPath(location.pathname);
+
+  if (!feature) return null;
 
   return (
     <aside
@@ -93,28 +166,9 @@ export function DesktopSidebar() {
         collapsed ? "w-[72px]" : "w-60",
       )}
     >
-      <div
-        className={cn(
-          "flex h-14 items-center border-b border-sidebar-border px-4",
-          collapsed && "justify-center px-2",
-        )}
-      >
-        <div className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
-            LM
-          </div>
-          {!collapsed && (
-            <div>
-              <p className="text-sm font-semibold leading-none">Loan Manager</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Quản lý cho vay
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      <SidebarBrand feature={feature} collapsed={collapsed} />
       <div className="flex-1 overflow-y-auto">
-        <SidebarNav collapsed={collapsed} />
+        <SidebarNav items={feature.nav} collapsed={collapsed} />
       </div>
       <div className="border-t border-sidebar-border">
         <LogoutButton collapsed={collapsed} />

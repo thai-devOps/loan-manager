@@ -22,4 +22,9 @@ export const queryKeys = {
   stats: {
     all: ["stats"] as const,
   },
+  finance: {
+    all: ["finance"] as const,
+    month: (month: string) => ["finance", { month }] as const,
+    range: (from: string, to: string) => ["finance", { from, to }] as const,
+  },
 };

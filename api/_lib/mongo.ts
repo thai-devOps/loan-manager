@@ -3,6 +3,7 @@ import type { Borrower } from "./types.js";
 import type { Loan } from "./types.js";
 import type { InterestSchedule } from "./types.js";
 import type { Transaction } from "./types.js";
+import type { FinanceTransaction } from "./types.js";
 
 const uri = process.env.MONGODB_URI;
 const DB_NAME = "loan-db";
@@ -43,6 +44,8 @@ async function ensureIndexes(db: Db): Promise<void> {
     db.collection("interestSchedules").createIndex({ status: 1 }),
     db.collection("transactions").createIndex({ loanId: 1, type: 1 }),
     db.collection("transactions").createIndex({ transactionDate: 1 }),
+    db.collection("finance_transactions").createIndex({ date: 1 }),
+    db.collection("finance_transactions").createIndex({ type: 1 }),
   ]);
   indexesReady = true;
 }
@@ -61,6 +64,12 @@ export async function schedulesCol(): Promise<Collection<InterestSchedule>> {
 
 export async function transactionsCol(): Promise<Collection<Transaction>> {
   return (await getDb()).collection<Transaction>("transactions");
+}
+
+export async function financeTransactionsCol(): Promise<
+  Collection<FinanceTransaction>
+> {
+  return (await getDb()).collection<FinanceTransaction>("finance_transactions");
 }
 
 /** Strip MongoDB-only fields for API responses */

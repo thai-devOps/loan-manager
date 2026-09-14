@@ -2,16 +2,20 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   cancelLoan as apiCancelLoan,
   createBorrower as apiCreateBorrower,
+  createFinanceTransaction,
   createLoan as apiCreateLoan,
+  deleteFinanceTransaction,
   importBackup,
   recordPayment,
   resetDatabase,
   seedDemo,
   updateBorrower as apiUpdateBorrower,
+  updateFinanceTransaction,
 } from "@/api/endpoints";
 import { queryKeys } from "@/api/query-keys";
 import type { BorrowerFormValues } from "@/schemas/borrower.schema";
 import type { LoanFormValues } from "@/schemas/loan.schema";
+import type { FinanceTransaction } from "@/types/finance";
 
 function useInvalidateAllData() {
   const queryClient = useQueryClient();
@@ -111,9 +115,14 @@ export function useSeedDemoMutation() {
 
 export function useResetDatabaseMutation() {
   const invalidate = useInvalidateAllData();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => resetDatabase(),
-    onSuccess: () => invalidate(),
+    onSuccess: () =>
+      Promise.all([
+        invalidate(),
+        queryClient.invalidateQueries({ queryKey: queryKeys.finance.all }),
+      ]),
   });
 }
 
@@ -121,6 +130,44 @@ export function useImportBackupMutation() {
   const invalidate = useInvalidateAllData();
   return useMutation({
     mutationFn: (payload: unknown) => importBackup(payload),
+    onSuccess: () => invalidate(),
+  });
+}
+
+function useInvalidateFinance() {
+  const queryClient = useQueryClient();
+  return () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.finance.all });
+}
+
+export function useCreateFinanceTransactionMutation() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: (
+      body: Omit<FinanceTransaction, "id" | "createdAt" | "updatedAt">,
+    ) => createFinanceTransaction(body),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateFinanceTransactionMutation() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: ({
+      id,
+      values,
+    }: {
+      id: string;
+      values: Omit<FinanceTransaction, "id" | "createdAt" | "updatedAt">;
+    }) => updateFinanceTransaction(id, values),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteFinanceTransactionMutation() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: (id: string) => deleteFinanceTransaction(id),
     onSuccess: () => invalidate(),
   });
 }

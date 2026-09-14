@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   fetchBorrower,
   fetchBorrowers,
+  fetchFinanceTransactions,
   fetchLoanDetail,
   fetchLoans,
   fetchSchedules,
@@ -62,5 +63,21 @@ export function useStatsQuery() {
   return useQuery({
     queryKey: queryKeys.stats.all,
     queryFn: fetchStats,
+  });
+}
+
+export function useFinanceTransactionsQuery(params?: {
+  month?: string;
+  from?: string;
+  to?: string;
+}) {
+  const key = params?.month
+    ? queryKeys.finance.month(params.month)
+    : params?.from && params?.to
+      ? queryKeys.finance.range(params.from, params.to)
+      : queryKeys.finance.all;
+  return useQuery({
+    queryKey: key,
+    queryFn: () => fetchFinanceTransactions(params),
   });
 }

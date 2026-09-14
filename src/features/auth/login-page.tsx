@@ -12,6 +12,13 @@ import {
 } from "@/schemas/login.schema";
 import { useAuthStore } from "@/stores/auth.store";
 
+function resolvePostLoginPath(from?: string): string {
+  if (!from || from === "/" || from === "/login" || from === "/apps") {
+    return "/apps";
+  }
+  return from;
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -26,8 +33,8 @@ export function LoginPage() {
   });
 
   if (isAuthenticated) {
-    const from = (location.state as { from?: string } | null)?.from ?? "/";
-    return <Navigate to={from} replace />;
+    const from = (location.state as { from?: string } | null)?.from;
+    return <Navigate to={resolvePostLoginPath(from)} replace />;
   }
 
   async function onSubmit(values: LoginFormValues) {
@@ -39,12 +46,13 @@ export function LoginPage() {
         setError(result.message);
         return;
       }
-      const from = (location.state as { from?: string } | null)?.from ?? "/";
-      void navigate(from, { replace: true });
+      const from = (location.state as { from?: string } | null)?.from;
+      void navigate(resolvePostLoginPath(from), { replace: true });
     } finally {
       setSubmitting(false);
     }
   }
+
 
   return (
     <div className="login-page grid min-h-full lg:grid-cols-2">

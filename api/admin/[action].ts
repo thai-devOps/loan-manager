@@ -6,6 +6,7 @@ import { generateInterestSchedules } from "../_lib/calculations.js";
 import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http.js";
 import {
   borrowersCol,
+  financeTransactionsCol,
   loansCol,
   schedulesCol,
   stripDoc,
@@ -281,5 +282,6 @@ async function clearAll() {
     (await loansCol()).deleteMany({}),
     (await transactionsCol()).deleteMany({}),
     (await schedulesCol()).deleteMany({}),
+    (await financeTransactionsCol()).deleteMany({}),
   ]);
 }

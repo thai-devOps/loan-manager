@@ -1,4 +1,5 @@
 import { apiFetch } from "@/api/client";
+import type { FinanceTransaction } from "@/types/finance";
 import type { Borrower } from "@/types/borrower";
 import type { Loan } from "@/types/loan";
 import type { InterestSchedule } from "@/types/interest-schedule";
@@ -126,4 +127,59 @@ export function importBackup(payload: unknown) {
     method: "POST",
     body: payload,
   });
+}
+
+export function fetchFinanceTransactions(params?: {
+  month?: string;
+  from?: string;
+  to?: string;
+}) {
+  const search = new URLSearchParams();
+  if (params?.month) search.set("month", params.month);
+  if (params?.from) search.set("from", params.from);
+  if (params?.to) search.set("to", params.to);
+  const q = search.toString();
+  return apiFetch<FinanceTransaction[]>(
+    `/api/finance${q ? `?${q}` : ""}`,
+  );
+}
+
+export function createFinanceTransaction(body: {
+  type: "income" | "expense";
+  category: string;
+  amount: number;
+  date: string;
+  description: string;
+  note?: string;
+  paymentMethod?: string;
+}) {
+  return apiFetch<FinanceTransaction>("/api/finance", {
+    method: "POST",
+    body,
+  });
+}
+
+export function updateFinanceTransaction(
+  id: string,
+  body: {
+    type: "income" | "expense";
+    category: string;
+    amount: number;
+    date: string;
+    description: string;
+    note?: string;
+    paymentMethod?: string;
+  },
+) {
+  return apiFetch<FinanceTransaction>(
+    `/api/finance?id=${encodeURIComponent(id)}`,
+    { method: "PATCH", body },
+  );
+}
+
+export function deleteFinanceTransaction(id: string) {
+  return apiFetch<{ ok: boolean }>(
+    `/api/finance?id=${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
 }

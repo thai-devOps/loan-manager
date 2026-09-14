@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { RequireAuth } from "@/features/auth/require-auth";
 import { LoginPage } from "@/features/auth/login-page";
+import { AppsHubPage } from "@/features/apps/apps-hub-page";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { BorrowersPage } from "@/features/borrowers/borrowers-page";
 import { BorrowerDetailPage } from "@/features/borrowers/borrower-detail-page";
@@ -12,6 +13,11 @@ import { SchedulesPage } from "@/features/payments/schedules-page";
 import { TransactionsPage } from "@/features/transactions/transactions-page";
 import { ReportsPage } from "@/features/reports/reports-page";
 import { SettingsPage } from "@/features/settings/settings-page";
+import { FinanceLayout } from "@/features/finance/finance-layout";
+import { FinanceOverviewPage } from "@/features/finance/finance-overview-page";
+import { FinanceIncomePage } from "@/features/finance/finance-income-page";
+import { FinanceExpensesPage } from "@/features/finance/finance-expenses-page";
+import { FinanceTransactionsPage } from "@/features/finance/finance-transactions-page";
 
 export const router = createBrowserRouter([
   {
@@ -22,6 +28,7 @@ export const router = createBrowserRouter([
     path: "/",
     element: <RequireAuth />,
     children: [
+      { path: "apps", element: <AppsHubPage /> },
       {
         element: <AppLayout />,
         children: [
@@ -33,6 +40,16 @@ export const router = createBrowserRouter([
           { path: "payments", element: <PaymentsPage /> },
           { path: "schedules", element: <SchedulesPage /> },
           { path: "transactions", element: <TransactionsPage /> },
+          {
+            path: "finance",
+            element: <FinanceLayout />,
+            children: [
+              { index: true, element: <FinanceOverviewPage /> },
+              { path: "income", element: <FinanceIncomePage /> },
+              { path: "expenses", element: <FinanceExpensesPage /> },
+              { path: "transactions", element: <FinanceTransactionsPage /> },
+            ],
+          },
           { path: "reports", element: <ReportsPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
@@ -41,6 +58,6 @@ export const router = createBrowserRouter([
   },
   {
     path: "*",
-    element: <Navigate to="/" replace />,
+    element: <Navigate to="/apps" replace />,
   },
 ]);
