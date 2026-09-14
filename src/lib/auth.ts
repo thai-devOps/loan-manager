@@ -1,3 +1,12 @@
+/**
+ * Credentials are injected by Vite at build time from:
+ * - VITE_ADMIN_USERNAME
+ * - VITE_ADMIN_PASSWORD
+ *
+ * On Vercel: set both in Project Settings → Environment Variables,
+ * then Redeploy (Vite bakes values into the JS bundle at build time).
+ */
+
 export const AUTH_STORAGE_KEY = "loan-manager.auth";
 export const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours of inactivity
 
@@ -7,20 +16,19 @@ export interface AuthSession {
   lastActiveAt: string;
 }
 
-/**
- * Credentials are injected by Vite at build time from:
- * - VITE_ADMIN_USERNAME
- * - VITE_ADMIN_PASSWORD
- *
- * On Vercel these must be set in Project Settings → Environment Variables,
- * then the project must be redeployed.
- */
+function readEnv(value: string | undefined): string {
+  // Avoid String(...) wrappers around import.meta.env — keep a plain
+  // reference so Vite/Rolldown inlines the value reliably.
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
 export function getAdminCredentials(): {
   username: string;
   password: string;
 } | null {
-  const username = String(import.meta.env.VITE_ADMIN_USERNAME ?? "").trim();
-  const password = String(import.meta.env.VITE_ADMIN_PASSWORD ?? "").trim();
+  const username = readEnv(import.meta.env.VITE_ADMIN_USERNAME);
+  const password = readEnv(import.meta.env.VITE_ADMIN_PASSWORD);
 
   if (!username || !password) {
     return null;
@@ -93,7 +101,7 @@ export function attemptLogin(
 
   if (
     username.trim() !== expected.username ||
-    password !== expected.password
+    password.trim() !== expected.password
   ) {
     return {
       ok: false,
