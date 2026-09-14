@@ -1,0 +1,342 @@
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useLiveQuery } from "dexie-react-hooks";
+import { EMPTY_ARRAY } from "@/lib/empty";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AppHeader } from "@/components/layout/app-header";
+import { EmptyState, PageShell } from "@/components/common/status-badges";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { db } from "@/db/database";
+import {
+  recordCombinedPayment,
+  recordInterestPayment,
+  recordPrincipalPayment,
+} from "@/features/loans/loan.service";
+import {
+  getCurrentInterestSchedule,
+  getRemainingPrincipal,
+  getScheduleRemaining,
+} from "@/lib/calculations";
+import { formatCurrency, parseCurrencyInput } from "@/lib/currency";
+import { formatPeriod, todayDateInput } from "@/lib/date";
+import {
+  paymentSchema,
+  type PaymentFormValues,
+} from "@/schemas/payment.schema";
+
+export function PaymentsPage() {
+  const [searchParams] = useSearchParams();
+  const presetLoanId = searchParams.get("loanId") ?? "";
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const borrowers = useLiveQuery(() => db.borrowers.toArray(), []) ?? EMPTY_ARRAY;
+  const loans =
+    useLiveQuery(() => db.loans.where("status").equals("ACTIVE").toArray(), []) ?? EMPTY_ARRAY;
+  const transactions =
+    useLiveQuery(() => db.transactions.toArray(), []) ?? EMPTY_ARRAY;
+  const schedules =
+    useLiveQuery(() => db.interestSchedules.toArray(), []) ?? EMPTY_ARRAY;
+
+  const borrowerMap = useMemo(
+    () => new Map(borrowers.map((b) => [b.id, b])),
+    [borrowers],
+  );
+
+  const form = useForm<PaymentFormValues>({
+    resolver: zodResolver(paymentSchema),
+    defaultValues: {
+      loanId: presetLoanId,
+      paymentType: "INTEREST_PAYMENT",
+      amount: 0,
+      interestAmount: 0,
+      principalAmount: 0,
+      transactionDate: todayDateInput(),
+      note: "",
+    },
+  });
+
+  useEffect(() => {
+    if (presetLoanId) {
+      form.setValue("loanId", presetLoanId);
+    }
+  }, [presetLoanId, form]);
+
+  const loanId = form.watch("loanId");
+  const paymentType = form.watch("paymentType");
+  const selectedLoan = loans.find((l) => l.id === loanId);
+  const loanTxs = transactions.filter((t) => t.loanId === loanId);
+  const loanSchedules = schedules.filter((s) => s.loanId === loanId);
+  const remaining = selectedLoan
+    ? getRemainingPrincipal(selectedLoan.principalAmount, loanTxs)
+    : 0;
+  const currentSchedule = getCurrentInterestSchedule(loanSchedules);
+
+  async function onSubmit(values: PaymentFormValues) {
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      if (values.paymentType === "INTEREST_PAYMENT") {
+        await recordInterestPayment({
+          loanId: values.loanId,
+          amount: values.amount ?? values.interestAmount ?? 0,
+          transactionDate: values.transactionDate,
+          note: values.note,
+        });
+      } else if (values.paymentType === "PRINCIPAL_PAYMENT") {
+        await recordPrincipalPayment({
+          loanId: values.loanId,
+          amount: values.amount ?? values.principalAmount ?? 0,
+          transactionDate: values.transactionDate,
+          note: values.note,
+        });
+      } else {
+        await recordCombinedPayment({
+          loanId: values.loanId,
+          interestAmount: values.interestAmount ?? 0,
+          principalAmount: values.principalAmount ?? 0,
+          transactionDate: values.transactionDate,
+          note: values.note,
+        });
+      }
+      setSuccess("Đã ghi nhận thanh toán thành công");
+      form.setValue("amount", 0);
+      form.setValue("interestAmount", 0);
+      form.setValue("principalAmount", 0);
+      form.setValue("note", "");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể ghi nhận");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <PageShell
+      header={
+        <AppHeader
+          title="Thu tiền"
+          description="Ghi nhận thu lời hoặc thu gốc"
+        />
+      }
+    >
+      {loans.length === 0 ? (
+        <EmptyState title="Không có khoản vay đang hoạt động để thu tiền" />
+      ) : (
+        <Card className="mx-auto max-w-xl">
+          <CardHeader>
+            <CardTitle className="text-base">Ghi nhận thanh toán</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form
+              className="space-y-4"
+              onSubmit={form.handleSubmit(onSubmit)}
+            >
+              <div className="space-y-2">
+                <Label>Khoản vay *</Label>
+                <Controller
+                  control={form.control}
+                  name="loanId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn khoản vay" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {loans.map((loan) => (
+                          <SelectItem key={loan.id} value={loan.id}>
+                            {borrowerMap.get(loan.borrowerId)?.name ?? "—"} ·{" "}
+                            {formatCurrency(loan.principalAmount)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {form.formState.errors.loanId && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.loanId.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Loại thanh toán *</Label>
+                <Controller
+                  control={form.control}
+                  name="paymentType"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INTEREST_PAYMENT">
+                          Thu lời
+                        </SelectItem>
+                        <SelectItem value="PRINCIPAL_PAYMENT">
+                          Thu gốc
+                        </SelectItem>
+                        <SelectItem value="BOTH">Thu gốc + lời</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+
+              {selectedLoan && paymentType === "PRINCIPAL_PAYMENT" && (
+                <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1">
+                  <p>Dư nợ hiện tại: {formatCurrency(remaining)}</p>
+                  <p>
+                    Số tiền muốn thu:{" "}
+                    {formatCurrency(form.watch("amount") || 0)}
+                  </p>
+                  <p>
+                    Dư nợ sau khi thu:{" "}
+                    {formatCurrency(
+                      Math.max(remaining - (form.watch("amount") || 0), 0),
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {selectedLoan && paymentType === "INTEREST_PAYMENT" && (
+                <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1">
+                  {currentSchedule ? (
+                    <>
+                      <p>
+                        Kỳ lời hiện tại:{" "}
+                        {formatPeriod(currentSchedule.period)}
+                      </p>
+                      <p>
+                        Số tiền phải thu:{" "}
+                        {formatCurrency(currentSchedule.amount)}
+                      </p>
+                      <p>
+                        Đã thu: {formatCurrency(currentSchedule.paidAmount)}
+                      </p>
+                      <p>
+                        Còn thiếu:{" "}
+                        {formatCurrency(getScheduleRemaining(currentSchedule))}
+                      </p>
+                    </>
+                  ) : (
+                    <p>Không còn kỳ lời chưa thu</p>
+                  )}
+                </div>
+              )}
+
+              {paymentType === "BOTH" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label>Số tiền lời</Label>
+                    <Input
+                      inputMode="numeric"
+                      value={
+                        form.watch("interestAmount")
+                          ? String(form.watch("interestAmount"))
+                          : ""
+                      }
+                      onChange={(e) =>
+                        form.setValue(
+                          "interestAmount",
+                          parseCurrencyInput(e.target.value),
+                          { shouldValidate: true },
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Số tiền gốc</Label>
+                    <Input
+                      inputMode="numeric"
+                      value={
+                        form.watch("principalAmount")
+                          ? String(form.watch("principalAmount"))
+                          : ""
+                      }
+                      onChange={(e) =>
+                        form.setValue(
+                          "principalAmount",
+                          parseCurrencyInput(e.target.value),
+                          { shouldValidate: true },
+                        )
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Dư nợ hiện tại: {formatCurrency(remaining)}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Số tiền *</Label>
+                  <Input
+                    inputMode="numeric"
+                    value={
+                      form.watch("amount") ? String(form.watch("amount")) : ""
+                    }
+                    onChange={(e) =>
+                      form.setValue(
+                        "amount",
+                        parseCurrencyInput(e.target.value),
+                        { shouldValidate: true },
+                      )
+                    }
+                  />
+                  {(form.watch("amount") ?? 0) > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(form.watch("amount") ?? 0)}
+                    </p>
+                  )}
+                  {form.formState.errors.amount && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.amount.message}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Ngày thu *</Label>
+                <Input type="date" {...form.register("transactionDate")} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Ghi chú</Label>
+                <Textarea {...form.register("note")} />
+              </div>
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              {success && <p className="text-sm text-success">{success}</p>}
+
+              <Button type="submit" disabled={submitting} className="w-full">
+                Ghi nhận thanh toán
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+    </PageShell>
+  );
+}
