@@ -7,11 +7,26 @@ export interface AuthSession {
   lastActiveAt: string;
 }
 
-export function getAdminCredentials(): { username: string; password: string } {
-  return {
-    username: import.meta.env.VITE_ADMIN_USERNAME || "admin",
-    password: import.meta.env.VITE_ADMIN_PASSWORD || "admin123",
-  };
+/**
+ * Credentials are injected by Vite at build time from:
+ * - VITE_ADMIN_USERNAME
+ * - VITE_ADMIN_PASSWORD
+ *
+ * On Vercel these must be set in Project Settings → Environment Variables,
+ * then the project must be redeployed.
+ */
+export function getAdminCredentials(): {
+  username: string;
+  password: string;
+} | null {
+  const username = String(import.meta.env.VITE_ADMIN_USERNAME ?? "").trim();
+  const password = String(import.meta.env.VITE_ADMIN_PASSWORD ?? "").trim();
+
+  if (!username || !password) {
+    return null;
+  }
+
+  return { username, password };
 }
 
 export function getSession(): AuthSession | null {
@@ -32,7 +47,9 @@ export function getSession(): AuthSession | null {
   }
 }
 
-export function isSessionValid(session: AuthSession | null = getSession()): boolean {
+export function isSessionValid(
+  session: AuthSession | null = getSession(),
+): boolean {
   if (!session) return false;
   const lastActive = Date.parse(session.lastActiveAt);
   if (Number.isNaN(lastActive)) return false;
@@ -66,6 +83,14 @@ export function attemptLogin(
   password: string,
 ): { ok: true; session: AuthSession } | { ok: false; message: string } {
   const expected = getAdminCredentials();
+  if (!expected) {
+    return {
+      ok: false,
+      message:
+        "Cấu hình đăng nhập chưa sẵn sàng. Kiểm tra biến môi trường trên server rồi redeploy.",
+    };
+  }
+
   if (
     username.trim() !== expected.username ||
     password !== expected.password
