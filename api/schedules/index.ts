@@ -3,6 +3,7 @@ import { requireAuth } from "../_lib/auth.js";
 import { resolveScheduleStatus } from "../_lib/calculations.js";
 import { methodNotAllowed, withHandler } from "../_lib/http.js";
 import { schedulesCol, stripDoc } from "../_lib/mongo.js";
+import { syncAllSchedules } from "../_lib/sync.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
@@ -24,6 +25,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    methodNotAllowed(res, ["GET"]);
+    if (req.method === "POST") {
+      await syncAllSchedules();
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    methodNotAllowed(res, ["GET", "POST"]);
   });
 }

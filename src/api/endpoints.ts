@@ -79,7 +79,7 @@ export function fetchSchedules(status?: string) {
 }
 
 export function syncSchedules() {
-  return apiFetch<{ ok: boolean }>("/api/schedules/sync", { method: "POST" });
+  return apiFetch<{ ok: boolean }>("/api/schedules", { method: "POST" });
 }
 
 export function fetchTransactions(params?: { type?: string; loanId?: string }) {

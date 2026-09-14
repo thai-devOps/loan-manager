@@ -74,10 +74,6 @@ const routes: Route[] = [
     params: (m) => ({ id: m[1] }),
   },
   {
-    pattern: /^\/api\/schedules\/sync\/?$/,
-    load: () => import("../api/schedules/sync.ts"),
-  },
-  {
     pattern: /^\/api\/schedules\/?$/,
     load: () => import("../api/schedules/index.ts"),
   },
@@ -90,16 +86,9 @@ const routes: Route[] = [
     load: () => import("../api/stats/index.ts"),
   },
   {
-    pattern: /^\/api\/admin\/seed\/?$/,
-    load: () => import("../api/admin/seed.ts"),
-  },
-  {
-    pattern: /^\/api\/admin\/reset\/?$/,
-    load: () => import("../api/admin/reset.ts"),
-  },
-  {
-    pattern: /^\/api\/admin\/backup\/?$/,
-    load: () => import("../api/admin/backup.ts"),
+    pattern: /^\/api\/admin\/([^/]+)\/?$/,
+    load: () => import("../api/admin/[action].ts"),
+    params: (m) => ({ action: m[1] }),
   },
 ];
 
