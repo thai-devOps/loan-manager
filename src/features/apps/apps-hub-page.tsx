@@ -1,9 +1,35 @@
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, LogOut } from "lucide-react";
-import { APP_FEATURES } from "@/components/layout/nav-items";
+import { APP_FEATURES, type AppFeatureId } from "@/components/layout/nav-items";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth.store";
 import { cn } from "@/lib/utils";
+
+const FEATURE_ACCENT: Record<
+  AppFeatureId,
+  { glow: string; icon: string; ring: string }
+> = {
+  loans: {
+    glow: "from-teal-500/20 via-teal-600/5 to-transparent",
+    icon: "bg-teal-700 text-teal-50 group-hover:bg-teal-600",
+    ring: "group-hover:border-teal-600/40 group-hover:shadow-teal-900/10",
+  },
+  finance: {
+    glow: "from-emerald-500/20 via-emerald-600/5 to-transparent",
+    icon: "bg-emerald-800 text-emerald-50 group-hover:bg-emerald-700",
+    ring: "group-hover:border-emerald-600/40 group-hover:shadow-emerald-900/10",
+  },
+  assets: {
+    glow: "from-amber-500/25 via-amber-600/5 to-transparent",
+    icon: "bg-amber-800 text-amber-50 group-hover:bg-amber-700",
+    ring: "group-hover:border-amber-600/40 group-hover:shadow-amber-900/10",
+  },
+  analytics: {
+    glow: "from-slate-500/20 via-slate-600/5 to-transparent",
+    icon: "bg-slate-800 text-slate-50 group-hover:bg-slate-700",
+    ring: "group-hover:border-slate-500/40 group-hover:shadow-slate-900/10",
+  },
+};
 
 export function AppsHubPage() {
   const navigate = useNavigate();
@@ -16,75 +42,106 @@ export function AppsHubPage() {
   }
 
   return (
-    <div className="relative flex min-h-full flex-col overflow-hidden bg-background">
+    <div className="apps-hub relative flex min-h-full flex-col overflow-hidden bg-[#f3f7f6]">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.4]"
+        className="pointer-events-none absolute inset-0 opacity-[0.45]"
         style={{
           backgroundImage:
-            "radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--foreground) 12%, transparent) 1px, transparent 0)",
-          backgroundSize: "24px 24px",
+            "radial-gradient(circle at 1px 1px, rgb(15 118 110 / 0.16) 1px, transparent 0)",
+          backgroundSize: "22px 22px",
         }}
       />
-      <div className="pointer-events-none absolute -top-28 right-[-6rem] size-80 rounded-full bg-primary/8 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-8rem] left-[-4rem] size-96 rounded-full bg-info/10 blur-3xl" />
+      <div className="pointer-events-none absolute -top-32 right-[-5rem] size-[28rem] rounded-full bg-teal-300/35 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-[-10rem] left-[-6rem] size-[30rem] rounded-full bg-emerald-200/50 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/3 left-1/2 size-72 -translate-x-1/2 rounded-full bg-amber-200/20 blur-3xl" />
 
       <header className="relative z-10 flex items-center justify-between gap-3 px-5 py-5 sm:px-8">
         <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
+          <div className="flex size-11 items-center justify-center rounded-2xl bg-[#0f766e] text-sm font-bold tracking-wide text-teal-50 shadow-lg shadow-teal-900/20">
             LM
           </div>
           <div>
-            <p className="text-sm font-semibold leading-none">Loan Manager</p>
+            <p className="text-sm font-semibold leading-none text-[#134e4a]">
+              Loan Manager
+            </p>
             {username && (
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1.5 text-xs text-[#5b716e]">
                 Xin chào, {username}
               </p>
             )}
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={handleLogout}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-[#c9d8d5] bg-white/80 text-[#134e4a] shadow-none hover:bg-white"
+          onClick={handleLogout}
+        >
           <LogOut className="size-4" />
           Đăng xuất
         </Button>
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-5 py-10 sm:px-8">
-        <div className="mb-10 max-w-lg text-center">
-          <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        <div className="mb-10 max-w-xl text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <p className="mb-3 text-xs font-medium tracking-[0.22em] text-teal-800/70 uppercase">
+            Workspace
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-balance text-[#134e4a] sm:text-4xl md:text-[2.75rem] md:leading-tight">
             Chọn tính năng muốn truy cập
           </h1>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Mỗi tính năng có menu riêng. Bạn có thể quay lại đây bất cứ lúc nào
-            để đổi sang tính năng khác.
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#5b716e] sm:text-base">
+            Mỗi tính năng có menu riêng. Quay lại đây bất cứ lúc nào để đổi
+            không gian làm việc.
           </p>
         </div>
 
-        <div className="grid w-full max-w-4xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {APP_FEATURES.map((feature) => {
+        <div className="grid w-full max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {APP_FEATURES.map((feature, index) => {
             const Icon = feature.icon;
+            const accent = FEATURE_ACCENT[feature.id];
             return (
               <Link
                 key={feature.id}
                 to={feature.href}
+                style={{ animationDelay: `${80 + index * 70}ms` }}
                 className={cn(
-                  "group flex flex-col rounded-2xl border bg-card p-5 text-left shadow-sm transition-all",
-                  "hover:border-foreground/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "group relative flex flex-col overflow-hidden rounded-2xl border border-[#d5e3e0] bg-white/85 p-5 text-left shadow-sm backdrop-blur-sm",
+                  "transition-all duration-300 ease-out",
+                  "hover:-translate-y-1 hover:shadow-xl",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40",
+                  "animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500",
+                  accent.ring,
                 )}
               >
-                <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                  <Icon className="size-5" />
+                <div
+                  aria-hidden
+                  className={cn(
+                    "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-100",
+                    accent.glow,
+                  )}
+                />
+                <div className="relative">
+                  <div
+                    className={cn(
+                      "flex size-12 items-center justify-center rounded-2xl shadow-sm transition-colors duration-300",
+                      accent.icon,
+                    )}
+                  >
+                    <Icon className="size-5" />
+                  </div>
+                  <h2 className="mt-5 text-lg font-semibold tracking-tight text-[#134e4a]">
+                    {feature.title}
+                  </h2>
+                  <p className="mt-2 flex-1 text-sm leading-relaxed text-[#5b716e]">
+                    {feature.description}
+                  </p>
+                  <span className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-[#0f766e]">
+                    Vào tính năng
+                    <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
+                  </span>
                 </div>
-                <h2 className="mt-5 text-lg font-semibold tracking-tight">
-                  {feature.title}
-                </h2>
-                <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
-                  {feature.description}
-                </p>
-                <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-foreground">
-                  Vào tính năng
-                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-                </span>
               </Link>
             );
           })}
