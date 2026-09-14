@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getAdminCredentials, signToken } from "../_lib/auth.js";
-import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http.js";
+import { getAdminCredentials, signToken } from "../../server/lib/auth.js";
+import { methodNotAllowed, readJsonBody, withHandler } from "../../server/lib/http.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {

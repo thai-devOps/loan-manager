@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth } from "../_lib/auth.js";
-import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http.js";
-import { borrowersCol, stripDoc } from "../_lib/mongo.js";
+import { requireAuth } from "../../server/lib/auth.js";
+import { methodNotAllowed, readJsonBody, withHandler } from "../../server/lib/http.js";
+import { borrowersCol, stripDoc } from "../../server/lib/mongo.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
