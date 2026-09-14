@@ -1,6 +1,13 @@
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowDownLeft, Banknote, CircleDollarSign, HandCoins } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
+import { DetailPageSkeleton } from "@/components/common/loading-skeletons";
+import {
+  MobileList,
+  MobileListCard,
+  toneFromLoanStatus,
+  toneFromTransactionType,
+} from "@/components/common/mobile-list-card";
 import {
   EmptyState,
   LoanStatusBadge,
@@ -19,11 +26,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  fetchBorrower,
-  fetchLoans,
-  fetchTransactions,
-} from "@/api/endpoints";
-import { useAsyncData } from "@/hooks/use-async-data";
+  useBorrowerQuery,
+  useLoansQuery,
+  useTransactionsQuery,
+} from "@/api/queries";
 import {
   getInterestPaid,
   getRemainingPrincipal,
@@ -31,30 +37,27 @@ import {
 } from "@/lib/calculations";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
+import { EMPTY_ARRAY } from "@/lib/empty";
 
 export function BorrowerDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id = "" } = useParams<{ id: string }>();
 
-  const { data: bundle, loading, error } = useAsyncData(async () => {
-    if (!id) return null;
-    const [borrower, allLoans, allTransactions] = await Promise.all([
-      fetchBorrower(id),
-      fetchLoans(),
-      fetchTransactions(),
-    ]);
-    const loans = allLoans.filter((l) => l.borrowerId === id);
-    return { borrower, loans, allTransactions };
-  }, [id]);
+  const borrowerQ = useBorrowerQuery(id);
+  const loansQ = useLoansQuery();
+  const transactionsQ = useTransactionsQuery();
 
-  if (loading && !bundle) {
+  const isLoading =
+    borrowerQ.isLoading || loansQ.isLoading || transactionsQ.isLoading;
+
+  if (isLoading) {
     return (
       <PageShell header={<AppHeader title="Người vay" />}>
-        <EmptyState title="Đang tải..." />
+        <DetailPageSkeleton />
       </PageShell>
     );
   }
 
-  if (error || !bundle?.borrower) {
+  if (borrowerQ.isError || !borrowerQ.data) {
     return (
       <PageShell header={<AppHeader title="Người vay" />}>
         <EmptyState
@@ -69,7 +72,10 @@ export function BorrowerDetailPage() {
     );
   }
 
-  const { borrower, loans, allTransactions } = bundle;
+  const borrower = borrowerQ.data;
+  const allLoans = loansQ.data ?? EMPTY_ARRAY;
+  const allTransactions = transactionsQ.data ?? EMPTY_ARRAY;
+  const loans = allLoans.filter((l) => l.borrowerId === id);
   const loanIds = new Set(loans.map((l) => l.id));
   const transactions = allTransactions
     .filter((t) => loanIds.has(t.loanId))
@@ -136,7 +142,7 @@ export function BorrowerDetailPage() {
             <EmptyState title="Chưa có khoản vay" />
           ) : (
             <>
-              <div className="space-y-3 md:hidden">
+              <MobileList>
                 {loans.map((loan) => {
                   const txs = allTransactions.filter(
                     (t) => t.loanId === loan.id,
@@ -146,25 +152,19 @@ export function BorrowerDetailPage() {
                     txs,
                   );
                   return (
-                    <Link
+                    <MobileListCard
                       key={loan.id}
                       to={`/loans/${loan.id}`}
-                      className="block rounded-lg border p-3 text-sm"
-                    >
-                      <div className="flex justify-between gap-2">
-                        <p className="font-medium">
-                          {formatCurrency(loan.principalAmount)}
-                        </p>
-                        <LoanStatusBadge status={loan.status} />
-                      </div>
-                      <p className="mt-1 text-muted-foreground">
-                        Dư nợ {formatCurrency(remaining)} · Bắt đầu{" "}
-                        {formatDate(loan.startDate)}
-                      </p>
-                    </Link>
+                      tone={toneFromLoanStatus(loan.status)}
+                      icon={<HandCoins />}
+                      title={formatCurrency(loan.principalAmount)}
+                      badge={<LoanStatusBadge status={loan.status} />}
+                      primaryValue={formatCurrency(remaining)}
+                      meta={`Bắt đầu ${formatDate(loan.startDate)}`}
+                    />
                   );
                 })}
-              </div>
+              </MobileList>
               <div className="hidden md:block">
                 <Table>
                   <TableHeader>
@@ -226,32 +226,55 @@ export function BorrowerDetailPage() {
           {transactions.length === 0 ? (
             <EmptyState title="Chưa có giao dịch" />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ngày</TableHead>
-                    <TableHead>Loại</TableHead>
-                    <TableHead>Số tiền</TableHead>
-                    <TableHead>Ghi chú</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell>{formatDate(tx.transactionDate)}</TableCell>
-                      <TableCell>
-                        <TransactionTypeBadge type={tx.type} />
-                      </TableCell>
-                      <TableCell>{formatCurrency(tx.amount)}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        {tx.note || "—"}
-                      </TableCell>
+            <>
+              <MobileList>
+                {transactions.map((tx) => (
+                  <MobileListCard
+                    key={tx.id}
+                    tone={toneFromTransactionType(tx.type)}
+                    icon={
+                      tx.type === "DISBURSEMENT" ? (
+                        <ArrowDownLeft />
+                      ) : tx.type === "INTEREST_PAYMENT" ? (
+                        <CircleDollarSign />
+                      ) : (
+                        <Banknote />
+                      )
+                    }
+                    title={formatDate(tx.transactionDate)}
+                    badge={<TransactionTypeBadge type={tx.type} />}
+                    primaryValue={formatCurrency(tx.amount)}
+                    meta={tx.note || undefined}
+                  />
+                ))}
+              </MobileList>
+              <div className="hidden overflow-x-auto md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ngày</TableHead>
+                      <TableHead>Loại</TableHead>
+                      <TableHead>Số tiền</TableHead>
+                      <TableHead>Ghi chú</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell>{formatDate(tx.transactionDate)}</TableCell>
+                        <TableCell>
+                          <TransactionTypeBadge type={tx.type} />
+                        </TableCell>
+                        <TableCell>{formatCurrency(tx.amount)}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">
+                          {tx.note || "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

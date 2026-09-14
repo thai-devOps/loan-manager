@@ -7,6 +7,7 @@ import {
   touchSession,
   type AuthSession,
 } from "@/lib/auth";
+import { queryClient } from "@/lib/query-client";
 
 interface AuthState {
   session: AuthSession | null;
@@ -47,6 +48,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     clearAuth();
+    queryClient.clear();
     set({ session: null, isAuthenticated: false });
   },
 

@@ -3,8 +3,13 @@ import { Link } from "react-router-dom";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, UserRound } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
+import { TablePageSkeleton } from "@/components/common/loading-skeletons";
+import {
+  MobileList,
+  MobileListCard,
+} from "@/components/common/mobile-list-card";
 import {
   EmptyState,
   LoanStatusBadge,
@@ -29,13 +34,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useCreateBorrowerMutation } from "@/api/mutations";
 import {
-  fetchBorrowers,
-  fetchLoans,
-  fetchTransactions,
-} from "@/api/endpoints";
-import { createBorrower } from "@/features/borrowers/borrower.service";
-import { useAsyncData } from "@/hooks/use-async-data";
+  useBorrowersQuery,
+  useLoansQuery,
+  useTransactionsQuery,
+} from "@/api/queries";
 import { getRemainingPrincipal } from "@/lib/calculations";
 import { formatCurrency } from "@/lib/currency";
 import {
@@ -46,20 +50,17 @@ import {
 export function BorrowersPage() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const createBorrowerMutation = useCreateBorrowerMutation();
 
-  const { data: bundle, reload } = useAsyncData(async () => {
-    const [borrowers, loans, transactions] = await Promise.all([
-      fetchBorrowers(),
-      fetchLoans(),
-      fetchTransactions(),
-    ]);
-    return { borrowers, loans, transactions };
-  }, []);
+  const borrowersQ = useBorrowersQuery();
+  const loansQ = useLoansQuery();
+  const transactionsQ = useTransactionsQuery();
+  const isLoading =
+    borrowersQ.isLoading || loansQ.isLoading || transactionsQ.isLoading;
 
-  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
-  const loans = bundle?.loans ?? EMPTY_ARRAY;
-  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
+  const borrowers = borrowersQ.data ?? EMPTY_ARRAY;
+  const loans = loansQ.data ?? EMPTY_ARRAY;
+  const transactions = transactionsQ.data ?? EMPTY_ARRAY;
 
   const form = useForm<BorrowerFormValues>({
     resolver: zodResolver(borrowerSchema),
@@ -103,15 +104,9 @@ export function BorrowersPage() {
   }, [borrowers, loans, transactions, search]);
 
   async function onSubmit(values: BorrowerFormValues) {
-    setSubmitting(true);
-    try {
-      await createBorrower(values);
-      form.reset();
-      setOpen(false);
-      reload();
-    } finally {
-      setSubmitting(false);
-    }
+    await createBorrowerMutation.mutateAsync(values);
+    form.reset();
+    setOpen(false);
   }
 
   return (
@@ -141,7 +136,9 @@ export function BorrowersPage() {
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {isLoading ? (
+        <TablePageSkeleton showSearch={false} />
+      ) : rows.length === 0 ? (
         <EmptyState
           title="Chưa có người vay"
           description="Thêm người vay đầu tiên để bắt đầu quản lý khoản vay."
@@ -154,39 +151,33 @@ export function BorrowersPage() {
         />
       ) : (
         <>
-          <div className="space-y-3 md:hidden">
+          <MobileList>
             {rows.map(({ borrower, loanCount, remaining, status }) => (
-              <Link
+              <MobileListCard
                 key={borrower.id}
                 to={`/borrowers/${borrower.id}`}
-                className="block rounded-xl border bg-card p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium">{borrower.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {borrower.phone || "Không có SĐT"}
-                    </p>
-                  </div>
-                  {status !== "NONE" && (
+                tone={
+                  status === "ACTIVE"
+                    ? "success"
+                    : status === "COMPLETED"
+                      ? "info"
+                      : "accent"
+                }
+                icon={<UserRound />}
+                title={borrower.name}
+                subtitle={borrower.phone || "Không có SĐT"}
+                badge={
+                  status !== "NONE" ? (
                     <LoanStatusBadge
                       status={status === "ACTIVE" ? "ACTIVE" : "COMPLETED"}
                     />
-                  )}
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Khoản vay</p>
-                    <p className="font-medium">{loanCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Dư nợ</p>
-                    <p className="font-medium">{formatCurrency(remaining)}</p>
-                  </div>
-                </div>
-              </Link>
+                  ) : undefined
+                }
+                primaryValue={formatCurrency(remaining)}
+                meta={`${loanCount} khoản vay`}
+              />
             ))}
-          </div>
+          </MobileList>
 
           <div className="hidden overflow-hidden rounded-xl border bg-card shadow-sm md:block">
             <Table>
@@ -277,7 +268,10 @@ export function BorrowersPage() {
               >
                 Hủy
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button
+                type="submit"
+                disabled={createBorrowerMutation.isPending}
+              >
                 Lưu
               </Button>
             </DialogFooter>

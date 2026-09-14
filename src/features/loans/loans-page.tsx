@@ -3,8 +3,14 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus } from "lucide-react";
+import { HandCoins, Plus } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
+import { TablePageSkeleton } from "@/components/common/loading-skeletons";
+import {
+  MobileList,
+  MobileListCard,
+  toneFromLoanStatus,
+} from "@/components/common/mobile-list-card";
 import {
   EmptyState,
   LoanStatusBadge,
@@ -37,13 +43,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCreateLoanMutation } from "@/api/mutations";
 import {
-  fetchBorrowers,
-  fetchLoans,
-  fetchTransactions,
-} from "@/api/endpoints";
-import { createLoan } from "@/features/loans/loan.service";
-import { useAsyncData } from "@/hooks/use-async-data";
+  useBorrowersQuery,
+  useLoansQuery,
+  useTransactionsQuery,
+} from "@/api/queries";
 import {
   getPrincipalPaid,
   getRemainingPrincipal,
@@ -61,25 +66,24 @@ export function LoansPage() {
   const presetBorrowerId = searchParams.get("borrowerId") ?? "";
   const [filter, setFilter] = useState<Filter>("ALL");
   const [open, setOpen] = useState(Boolean(presetBorrowerId));
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const createLoanMutation = useCreateLoanMutation();
 
-  const { data: bundle, reload } = useAsyncData(async () => {
-    const [borrowers, loans, transactions] = await Promise.all([
-      fetchBorrowers(),
-      fetchLoans(),
-      fetchTransactions(),
-    ]);
-    return {
-      borrowers: [...borrowers].sort((a, b) => a.name.localeCompare(b.name)),
-      loans,
-      transactions,
-    };
-  }, []);
+  const borrowersQ = useBorrowersQuery();
+  const loansQ = useLoansQuery();
+  const transactionsQ = useTransactionsQuery();
+  const isLoading =
+    borrowersQ.isLoading || loansQ.isLoading || transactionsQ.isLoading;
 
-  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
-  const loans = bundle?.loans ?? EMPTY_ARRAY;
-  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
+  const borrowers = useMemo(
+    () =>
+      [...(borrowersQ.data ?? EMPTY_ARRAY)].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+    [borrowersQ.data],
+  );
+  const loans = loansQ.data ?? EMPTY_ARRAY;
+  const transactions = transactionsQ.data ?? EMPTY_ARRAY;
 
   const borrowerMap = useMemo(
     () => new Map(borrowers.map((b) => [b.id, b])),
@@ -102,10 +106,9 @@ export function LoansPage() {
   );
 
   async function onSubmit(values: LoanFormValues) {
-    setSubmitting(true);
     setError(null);
     try {
-      const loan = await createLoan(values);
+      const loan = await createLoanMutation.mutateAsync(values);
       form.reset({
         borrowerId: "",
         principalAmount: 0,
@@ -114,12 +117,9 @@ export function LoansPage() {
         note: "",
       });
       setOpen(false);
-      reload();
       navigate(`/loans/${loan.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể tạo khoản vay");
-    } finally {
-      setSubmitting(false);
     }
   }
 
@@ -150,7 +150,9 @@ export function LoansPage() {
         </TabsList>
       </Tabs>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <TablePageSkeleton showSearch={false} />
+      ) : filtered.length === 0 ? (
         <EmptyState
           title="Chưa có khoản vay"
           description="Tạo khoản vay mới để bắt đầu theo dõi gốc và lời."
@@ -163,7 +165,7 @@ export function LoansPage() {
         />
       ) : (
         <>
-          <div className="space-y-3 md:hidden">
+          <MobileList>
             {filtered.map((loan) => {
               const txs = transactions.filter((t) => t.loanId === loan.id);
               const remaining = getRemainingPrincipal(
@@ -171,29 +173,19 @@ export function LoansPage() {
                 txs,
               );
               return (
-                <Link
+                <MobileListCard
                   key={loan.id}
                   to={`/loans/${loan.id}`}
-                  className="block rounded-xl border bg-card p-4 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium">
-                      {borrowerMap.get(loan.borrowerId)?.name ?? "—"}
-                    </p>
-                    <LoanStatusBadge status={loan.status} />
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Gốc {formatCurrency(loan.principalAmount)} · Dư nợ{" "}
-                    {formatCurrency(remaining)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Lời {formatCurrency(loan.monthlyInterestAmount)}/tháng ·{" "}
-                    {formatDate(loan.startDate)}
-                  </p>
-                </Link>
+                  tone={toneFromLoanStatus(loan.status)}
+                  icon={<HandCoins />}
+                  title={borrowerMap.get(loan.borrowerId)?.name ?? "—"}
+                  badge={<LoanStatusBadge status={loan.status} />}
+                  primaryValue={formatCurrency(remaining)}
+                  meta={`Gốc ${formatCurrency(loan.principalAmount)} · Lời ${formatCurrency(loan.monthlyInterestAmount)}/th`}
+                />
               );
             })}
-          </div>
+          </MobileList>
 
           <div className="hidden overflow-hidden rounded-xl border bg-card shadow-sm md:block">
             <Table>
@@ -375,7 +367,7 @@ export function LoansPage() {
               >
                 Hủy
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={createLoanMutation.isPending}>
                 Tạo khoản vay
               </Button>
             </DialogFooter>

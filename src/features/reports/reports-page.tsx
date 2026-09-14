@@ -15,13 +15,16 @@ import {
 } from "recharts";
 import { AppHeader } from "@/components/layout/app-header";
 import {
+  ChartBlockSkeleton,
+  StatCardsSkeleton,
+} from "@/components/common/loading-skeletons";
+import {
   EmptyState,
   PageShell,
   StatCard,
 } from "@/components/common/status-badges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchLoans, fetchTransactions } from "@/api/endpoints";
-import { useAsyncData } from "@/hooks/use-async-data";
+import { useLoansQuery, useTransactionsQuery } from "@/api/queries";
 import {
   getInterestPaid,
   getPrincipalPaid,
@@ -32,16 +35,12 @@ import { formatCurrency } from "@/lib/currency";
 import { getPeriodFromISO } from "@/lib/date";
 
 export function ReportsPage() {
-  const { data: bundle } = useAsyncData(async () => {
-    const [loans, transactions] = await Promise.all([
-      fetchLoans(),
-      fetchTransactions(),
-    ]);
-    return { loans, transactions };
-  }, []);
+  const loansQ = useLoansQuery();
+  const transactionsQ = useTransactionsQuery();
+  const isLoading = loansQ.isLoading || transactionsQ.isLoading;
 
-  const loans = bundle?.loans ?? EMPTY_ARRAY;
-  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
+  const loans = loansQ.data ?? EMPTY_ARRAY;
+  const transactions = transactionsQ.data ?? EMPTY_ARRAY;
 
   const totalDisbursed = transactions
     .filter((t) => t.type === "DISBURSEMENT")
@@ -123,6 +122,16 @@ export function ReportsPage() {
         />
       }
     >
+      {isLoading ? (
+        <div className="space-y-6">
+          <StatCardsSkeleton count={7} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ChartBlockSkeleton />
+            <ChartBlockSkeleton />
+          </div>
+        </div>
+      ) : (
+        <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Tổng vốn đã giải ngân"
@@ -236,6 +245,8 @@ export function ReportsPage() {
           </CardContent>
         </Card>
       </div>
+        </>
+      )}
     </PageShell>
   );
 }

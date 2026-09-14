@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { EMPTY_ARRAY } from "@/lib/empty";
+import { CalendarClock } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
+import { TablePageSkeleton } from "@/components/common/loading-skeletons";
+import {
+  CollectMoneyButton,
+  MobileList,
+  MobileListCard,
+  toneFromScheduleStatus,
+} from "@/components/common/mobile-list-card";
 import {
   EmptyState,
   PageShell,
@@ -24,12 +32,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  fetchBorrowers,
-  fetchLoans,
-  fetchSchedules,
-} from "@/api/endpoints";
-import { syncSchedulesForActiveLoans } from "@/features/loans/loan.service";
-import { useAsyncData } from "@/hooks/use-async-data";
+  useBorrowersQuery,
+  useLoansQuery,
+  useSchedulesQuery,
+} from "@/api/queries";
 import {
   getScheduleRemaining,
   resolveScheduleStatus,
@@ -43,22 +49,15 @@ export function SchedulesPage() {
     "ALL",
   );
 
-  useEffect(() => {
-    void syncSchedulesForActiveLoans();
-  }, []);
+  const borrowersQ = useBorrowersQuery();
+  const loansQ = useLoansQuery();
+  const schedulesQ = useSchedulesQuery();
+  const isLoading =
+    borrowersQ.isLoading || loansQ.isLoading || schedulesQ.isLoading;
 
-  const { data: bundle } = useAsyncData(async () => {
-    const [borrowers, loans, schedules] = await Promise.all([
-      fetchBorrowers(),
-      fetchLoans(),
-      fetchSchedules(),
-    ]);
-    return { borrowers, loans, schedules };
-  }, []);
-
-  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
-  const loans = bundle?.loans ?? EMPTY_ARRAY;
-  const schedules = bundle?.schedules ?? EMPTY_ARRAY;
+  const borrowers = borrowersQ.data ?? EMPTY_ARRAY;
+  const loans = loansQ.data ?? EMPTY_ARRAY;
+  const schedules = schedulesQ.data ?? EMPTY_ARRAY;
 
   const borrowerMap = useMemo(
     () => new Map(borrowers.map((b) => [b.id, b])),
@@ -110,50 +109,39 @@ export function SchedulesPage() {
         </Select>
       </div>
 
-      {rows.length === 0 ? (
+      {isLoading ? (
+        <TablePageSkeleton showSearch={false} />
+      ) : rows.length === 0 ? (
         <EmptyState title="Chưa có lịch thu" />
       ) : (
         <>
-          <div className="space-y-3 md:hidden">
+          <MobileList>
             {rows.map((s) => {
               const loan = loanMap.get(s.loanId);
               const borrower = loan
                 ? borrowerMap.get(loan.borrowerId)
                 : undefined;
               return (
-                <div key={s.id} className="rounded-xl border bg-card p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium">{borrower?.name ?? "—"}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatPeriod(s.period)} · {formatDate(s.dueDate)}
-                      </p>
-                    </div>
-                    <ScheduleStatusBadge status={s.resolvedStatus} />
-                  </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Phải thu</p>
-                      <p>{formatCurrency(s.amount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Đã thu</p>
-                      <p>{formatCurrency(s.paidAmount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Còn thiếu</p>
-                      <p>{formatCurrency(getScheduleRemaining(s))}</p>
-                    </div>
-                  </div>
-                  {s.resolvedStatus !== "PAID" && loan?.status === "ACTIVE" && (
-                    <Button asChild size="sm" className="mt-3 w-full">
-                      <Link to={`/payments?loanId=${s.loanId}`}>Thu tiền</Link>
-                    </Button>
-                  )}
-                </div>
+                <MobileListCard
+                  key={s.id}
+                  tone={toneFromScheduleStatus(s.resolvedStatus)}
+                  icon={<CalendarClock />}
+                  title={borrower?.name ?? "—"}
+                  subtitle={`${formatPeriod(s.period)} · ${formatDate(s.dueDate)}`}
+                  badge={<ScheduleStatusBadge status={s.resolvedStatus} />}
+                  primaryValue={formatCurrency(getScheduleRemaining(s))}
+                  footer={
+                    s.resolvedStatus !== "PAID" && loan?.status === "ACTIVE" ? (
+                      <CollectMoneyButton
+                        loanId={s.loanId}
+                        tone={toneFromScheduleStatus(s.resolvedStatus)}
+                      />
+                    ) : undefined
+                  }
+                />
               );
             })}
-          </div>
+          </MobileList>
 
           <div className="hidden overflow-hidden rounded-xl border bg-card shadow-sm md:block">
             <Table>

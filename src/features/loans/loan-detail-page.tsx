@@ -4,8 +4,15 @@ import { EMPTY_ARRAY } from "@/lib/empty";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft } from "lucide-react";
+import { ArrowDownLeft, ArrowLeft, Banknote, CalendarClock, CircleDollarSign } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
+import { DetailPageSkeleton } from "@/components/common/loading-skeletons";
+import {
+  MobileList,
+  MobileListCard,
+  toneFromScheduleStatus,
+  toneFromTransactionType,
+} from "@/components/common/mobile-list-card";
 import {
   EmptyState,
   LoanStatusBadge,
@@ -34,14 +41,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { fetchLoanDetail } from "@/api/endpoints";
 import {
-  cancelLoan,
-  recordCombinedPayment,
-  recordInterestPayment,
-  recordPrincipalPayment,
-} from "@/features/loans/loan.service";
-import { useAsyncData } from "@/hooks/use-async-data";
+  useCancelLoanMutation,
+  useRecordPaymentMutation,
+} from "@/api/mutations";
+import { useLoanDetailQuery } from "@/api/queries";
 import {
   getCurrentInterestSchedule,
   getInterestPaid,
@@ -65,19 +69,14 @@ type QuickPayValues = z.infer<typeof quickPaySchema>;
 type PayMode = "INTEREST" | "PRINCIPAL" | "BOTH" | null;
 
 export function LoanDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id = "" } = useParams<{ id: string }>();
   const [payMode, setPayMode] = useState<PayMode>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const recordPaymentMutation = useRecordPaymentMutation();
+  const cancelLoanMutation = useCancelLoanMutation();
 
-  const { data: detail, loading, error: loadError, reload } = useAsyncData(
-    async () => {
-      if (!id) return null;
-      return fetchLoanDetail(id);
-    },
-    [id],
-  );
-
+  const detailQ = useLoanDetailQuery(id);
+  const detail = detailQ.data;
   const loan = detail?.loan;
   const borrower = detail?.borrower ?? undefined;
   const transactions = detail?.transactions ?? EMPTY_ARRAY;
@@ -134,19 +133,20 @@ export function LoanDetailPage() {
 
   async function onSubmit(values: QuickPayValues) {
     if (!id || !payMode) return;
-    setSubmitting(true);
     setError(null);
     try {
       if (payMode === "INTEREST") {
-        await recordInterestPayment({
+        await recordPaymentMutation.mutateAsync({
           loanId: id,
+          paymentType: "INTEREST_PAYMENT",
           amount: values.amount,
           transactionDate: values.transactionDate,
           note: values.note,
         });
       } else if (payMode === "PRINCIPAL") {
-        await recordPrincipalPayment({
+        await recordPaymentMutation.mutateAsync({
           loanId: id,
+          paymentType: "PRINCIPAL_PAYMENT",
           amount: values.amount,
           transactionDate: values.transactionDate,
           note: values.note,
@@ -157,8 +157,9 @@ export function LoanDetailPage() {
         if (interest <= 0 && principal <= 0) {
           throw new Error("Cần nhập ít nhất gốc hoặc lời");
         }
-        await recordCombinedPayment({
+        await recordPaymentMutation.mutateAsync({
           loanId: id,
+          paymentType: "BOTH",
           interestAmount: interest,
           principalAmount: principal,
           transactionDate: values.transactionDate,
@@ -166,23 +167,20 @@ export function LoanDetailPage() {
         });
       }
       setPayMode(null);
-      reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể ghi nhận thanh toán");
-    } finally {
-      setSubmitting(false);
     }
   }
 
-  if (loading && !detail) {
+  if (detailQ.isLoading) {
     return (
       <PageShell header={<AppHeader title="Khoản vay" />}>
-        <EmptyState title="Đang tải..." />
+        <DetailPageSkeleton />
       </PageShell>
     );
   }
 
-  if (loadError || !loan) {
+  if (detailQ.isError || !loan) {
     return (
       <PageShell header={<AppHeader title="Khoản vay" />}>
         <EmptyState
@@ -246,8 +244,9 @@ export function LoanDetailPage() {
           <Button
             variant="ghost"
             className="text-destructive"
+            disabled={cancelLoanMutation.isPending}
             onClick={() => {
-              void cancelLoan(loan.id).then(() => reload());
+              void cancelLoanMutation.mutateAsync(loan.id);
             }}
           >
             Hủy khoản vay
@@ -271,38 +270,55 @@ export function LoanDetailPage() {
           {sortedSchedules.length === 0 ? (
             <EmptyState title="Chưa có lịch thu" />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Kỳ</TableHead>
-                    <TableHead>Ngày đến hạn</TableHead>
-                    <TableHead>Số tiền</TableHead>
-                    <TableHead>Đã thu</TableHead>
-                    <TableHead>Còn thiếu</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedSchedules.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell>{formatPeriod(s.period)}</TableCell>
-                      <TableCell>{formatDate(s.dueDate)}</TableCell>
-                      <TableCell>{formatCurrency(s.amount)}</TableCell>
-                      <TableCell>{formatCurrency(s.paidAmount)}</TableCell>
-                      <TableCell>
-                        {formatCurrency(getScheduleRemaining(s))}
-                      </TableCell>
-                      <TableCell>
-                        <ScheduleStatusBadge
-                          status={resolveScheduleStatus(s)}
-                        />
-                      </TableCell>
+            <>
+              <MobileList>
+                {sortedSchedules.map((s) => (
+                  <MobileListCard
+                    key={s.id}
+                    tone={toneFromScheduleStatus(resolveScheduleStatus(s))}
+                    icon={<CalendarClock />}
+                    title={formatPeriod(s.period)}
+                    subtitle={formatDate(s.dueDate)}
+                    badge={
+                      <ScheduleStatusBadge status={resolveScheduleStatus(s)} />
+                    }
+                    primaryValue={formatCurrency(getScheduleRemaining(s))}
+                  />
+                ))}
+              </MobileList>
+              <div className="hidden overflow-x-auto md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Kỳ</TableHead>
+                      <TableHead>Ngày đến hạn</TableHead>
+                      <TableHead>Số tiền</TableHead>
+                      <TableHead>Đã thu</TableHead>
+                      <TableHead>Còn thiếu</TableHead>
+                      <TableHead>Trạng thái</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedSchedules.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell>{formatPeriod(s.period)}</TableCell>
+                        <TableCell>{formatDate(s.dueDate)}</TableCell>
+                        <TableCell>{formatCurrency(s.amount)}</TableCell>
+                        <TableCell>{formatCurrency(s.paidAmount)}</TableCell>
+                        <TableCell>
+                          {formatCurrency(getScheduleRemaining(s))}
+                        </TableCell>
+                        <TableCell>
+                          <ScheduleStatusBadge
+                            status={resolveScheduleStatus(s)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -315,30 +331,53 @@ export function LoanDetailPage() {
           {sortedTx.length === 0 ? (
             <EmptyState title="Chưa có giao dịch" />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ngày</TableHead>
-                    <TableHead>Loại</TableHead>
-                    <TableHead>Số tiền</TableHead>
-                    <TableHead>Ghi chú</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedTx.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell>{formatDate(tx.transactionDate)}</TableCell>
-                      <TableCell>
-                        <TransactionTypeBadge type={tx.type} />
-                      </TableCell>
-                      <TableCell>{formatCurrency(tx.amount)}</TableCell>
-                      <TableCell>{tx.note || "—"}</TableCell>
+            <>
+              <MobileList>
+                {sortedTx.map((tx) => (
+                  <MobileListCard
+                    key={tx.id}
+                    tone={toneFromTransactionType(tx.type)}
+                    icon={
+                      tx.type === "DISBURSEMENT" ? (
+                        <ArrowDownLeft />
+                      ) : tx.type === "INTEREST_PAYMENT" ? (
+                        <CircleDollarSign />
+                      ) : (
+                        <Banknote />
+                      )
+                    }
+                    title={formatDate(tx.transactionDate)}
+                    badge={<TransactionTypeBadge type={tx.type} />}
+                    primaryValue={formatCurrency(tx.amount)}
+                    meta={tx.note || undefined}
+                  />
+                ))}
+              </MobileList>
+              <div className="hidden overflow-x-auto md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ngày</TableHead>
+                      <TableHead>Loại</TableHead>
+                      <TableHead>Số tiền</TableHead>
+                      <TableHead>Ghi chú</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedTx.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell>{formatDate(tx.transactionDate)}</TableCell>
+                        <TableCell>
+                          <TransactionTypeBadge type={tx.type} />
+                        </TableCell>
+                        <TableCell>{formatCurrency(tx.amount)}</TableCell>
+                        <TableCell>{tx.note || "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -463,7 +502,7 @@ export function LoanDetailPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={submitting}
+                disabled={recordPaymentMutation.isPending}
                 onClick={() => {
                   if (payMode === "BOTH") {
                     form.setValue("amount", 1);

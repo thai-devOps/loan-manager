@@ -2,11 +2,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { LockKeyhole } from "lucide-react";
+import { ArrowRight, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   loginSchema,
   type LoginFormValues,
@@ -27,8 +26,7 @@ export function LoginPage() {
   });
 
   if (isAuthenticated) {
-    const from =
-      (location.state as { from?: string } | null)?.from ?? "/";
+    const from = (location.state as { from?: string } | null)?.from ?? "/";
     return <Navigate to={from} replace />;
   }
 
@@ -41,8 +39,7 @@ export function LoginPage() {
         setError(result.message);
         return;
       }
-      const from =
-        (location.state as { from?: string } | null)?.from ?? "/";
+      const from = (location.state as { from?: string } | null)?.from ?? "/";
       void navigate(from, { replace: true });
     } finally {
       setSubmitting(false);
@@ -50,30 +47,85 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm shadow-sm">
-        <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
-            LM
-          </div>
-          <div className="space-y-1">
-            <CardTitle className="text-xl">Loan Manager</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Đăng nhập quản trị viên
+    <div className="login-page grid min-h-full lg:grid-cols-2">
+      <section className="relative hidden overflow-hidden lg:block">
+        <img
+          src="/login-hero.jpg"
+          alt=""
+          className="absolute inset-0 size-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0b3d3a]/92 via-[#0b3d3a]/45 to-[#0b3d3a]/20" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(45_166_154_/_0.35),transparent_55%)]" />
+
+        <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
+          <p className="font-[family-name:var(--font-login-display)] text-sm tracking-[0.2em] text-teal-50/80 uppercase">
+            Loan Manager
+          </p>
+
+          <div className="max-w-md space-y-4">
+            <h1 className="font-[family-name:var(--font-login-display)] text-4xl leading-tight font-semibold text-balance text-teal-50 xl:text-5xl">
+              Quản lý cho vay rõ ràng, mỗi kỳ thu đúng hạn
+            </h1>
+            <p className="max-w-sm text-base leading-relaxed text-teal-50/75">
+              Theo dõi người vay, dư nợ và lịch thu trong một không gian gọn
+              nhẹ dành cho quản trị viên.
             </p>
           </div>
-        </CardHeader>
-        <CardContent>
+
+          <p className="text-xs tracking-wide text-teal-50/55">
+            Bảo mật phiên đăng nhập · Chỉ dành cho admin
+          </p>
+        </div>
+      </section>
+
+      <section className="relative flex min-h-full items-center justify-center overflow-hidden bg-[#f4f7f6] px-5 py-10 sm:px-8">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, rgb(15 118 110 / 0.18) 1px, transparent 0)",
+            backgroundSize: "22px 22px",
+          }}
+        />
+        <div className="pointer-events-none absolute -top-24 right-[-4rem] size-72 rounded-full bg-teal-200/40 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-[-5rem] left-[-3rem] size-80 rounded-full bg-emerald-100/70 blur-3xl" />
+
+        <div className="relative w-full max-w-[24rem]">
+          <div className="mb-8 space-y-3 lg:mb-10">
+            <div className="flex items-center gap-3 lg:hidden">
+              <div className="flex size-11 items-center justify-center rounded-xl bg-[#0f766e] font-[family-name:var(--font-login-display)] text-sm font-semibold tracking-wide text-teal-50">
+                LM
+              </div>
+              <p className="font-[family-name:var(--font-login-display)] text-lg font-semibold text-[#134e4a]">
+                Loan Manager
+              </p>
+            </div>
+
+            <h2 className="font-[family-name:var(--font-login-display)] text-3xl font-semibold tracking-tight text-[#134e4a]">
+              Đăng nhập
+            </h2>
+            <p className="text-sm leading-relaxed text-[#5b716e]">
+              Nhập tài khoản quản trị để tiếp tục làm việc.
+            </p>
+          </div>
+
           <form
-            className="space-y-4"
+            className="space-y-5"
             onSubmit={form.handleSubmit(onSubmit)}
           >
             <div className="space-y-2">
-              <Label htmlFor="username">Tên đăng nhập</Label>
+              <Label
+                htmlFor="username"
+                className="text-[#3d5652]"
+              >
+                Tên đăng nhập
+              </Label>
               <Input
                 id="username"
                 autoComplete="username"
                 autoFocus
+                className="h-11 border-[#c9d8d5] bg-white/90 shadow-none focus-visible:border-teal-600 focus-visible:ring-teal-600/30"
                 {...form.register("username")}
               />
               {form.formState.errors.username && (
@@ -82,12 +134,19 @@ export function LoginPage() {
                 </p>
               )}
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="password">Mật khẩu</Label>
+              <Label
+                htmlFor="password"
+                className="text-[#3d5652]"
+              >
+                Mật khẩu
+              </Label>
               <Input
                 id="password"
                 type="password"
                 autoComplete="current-password"
+                className="h-11 border-[#c9d8d5] bg-white/90 shadow-none focus-visible:border-teal-600 focus-visible:ring-teal-600/30"
                 {...form.register("password")}
               />
               {form.formState.errors.password && (
@@ -96,18 +155,31 @@ export function LoginPage() {
                 </p>
               )}
             </div>
+
             {error && (
-              <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <p className="rounded-lg border border-destructive/25 bg-destructive/8 px-3 py-2.5 text-sm text-destructive">
                 {error}
               </p>
             )}
-            <Button type="submit" className="w-full" disabled={submitting}>
-              <LockKeyhole className="size-4" />
-              {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
+
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="h-11 w-full gap-2 bg-[#0f766e] text-teal-50 shadow-none hover:bg-[#0d9488]"
+            >
+              {submitting ? (
+                "Đang đăng nhập..."
+              ) : (
+                <>
+                  <LockKeyhole className="size-4" />
+                  Đăng nhập
+                  <ArrowRight className="size-4 opacity-80" />
+                </>
+              )}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   );
 }

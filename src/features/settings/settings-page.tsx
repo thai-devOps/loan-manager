@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Download, Upload, Database, Trash2, Sprout } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
+import { StatsBlockSkeleton } from "@/components/common/loading-skeletons";
 import { PageShell, StatCard } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,16 +17,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  fetchStats,
-  resetDatabase as apiReset,
-  seedDemo,
-} from "@/api/endpoints";
-import { useAsyncData } from "@/hooks/use-async-data";
+  useImportBackupMutation,
+  useResetDatabaseMutation,
+  useSeedDemoMutation,
+} from "@/api/mutations";
+import { useStatsQuery } from "@/api/queries";
 import {
   downloadBackupJson,
   exportBackup,
   parseAndValidateBackup,
-  restoreBackup,
 } from "@/lib/backup";
 
 export function SettingsPage() {
@@ -34,11 +34,15 @@ export function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingRestore, setPendingRestore] = useState<string | null>(null);
 
-  const { data: stats, reload } = useAsyncData(() => fetchStats(), []);
-  const borrowers = stats?.borrowers ?? 0;
-  const loans = stats?.loans ?? 0;
-  const transactions = stats?.transactions ?? 0;
-  const schedules = stats?.schedules ?? 0;
+  const statsQ = useStatsQuery();
+  const seedMutation = useSeedDemoMutation();
+  const resetMutation = useResetDatabaseMutation();
+  const importMutation = useImportBackupMutation();
+
+  const borrowers = statsQ.data?.borrowers ?? 0;
+  const loans = statsQ.data?.loans ?? 0;
+  const transactions = statsQ.data?.transactions ?? 0;
+  const schedules = statsQ.data?.schedules ?? 0;
 
   async function handleExport() {
     setError(null);
@@ -72,30 +76,27 @@ export function SettingsPage() {
     if (!pendingRestore) return;
     try {
       const payload = parseAndValidateBackup(pendingRestore);
-      await restoreBackup(payload);
+      await importMutation.mutateAsync(payload);
       setPendingRestore(null);
       setMessage("Đã khôi phục dữ liệu từ backup");
       setError(null);
       if (fileRef.current) fileRef.current.value = "";
-      reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Khôi phục thất bại");
     }
   }
 
   async function handleReset() {
-    await apiReset();
+    await resetMutation.mutateAsync();
     setMessage("Đã xóa toàn bộ dữ liệu");
     setError(null);
-    reload();
   }
 
   async function handleSeed() {
     try {
-      await seedDemo(false);
+      await seedMutation.mutateAsync(false);
       setMessage("Đã tạo dữ liệu mẫu");
       setError(null);
-      reload();
     } catch (e) {
       setError(
         e instanceof Error
@@ -106,10 +107,9 @@ export function SettingsPage() {
   }
 
   async function handleForceSeed() {
-    await seedDemo(true);
+    await seedMutation.mutateAsync(true);
     setMessage("Đã ghi đè và tạo lại dữ liệu mẫu");
     setError(null);
-    reload();
   }
 
   return (
@@ -133,12 +133,16 @@ export function SettingsPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Số người vay" value={String(borrowers)} />
-        <StatCard title="Số khoản vay" value={String(loans)} />
-        <StatCard title="Số giao dịch" value={String(transactions)} />
-        <StatCard title="Số kỳ lịch thu" value={String(schedules)} />
-      </div>
+      {statsQ.isLoading ? (
+        <StatsBlockSkeleton />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard title="Số người vay" value={String(borrowers)} />
+          <StatCard title="Số khoản vay" value={String(loans)} />
+          <StatCard title="Số giao dịch" value={String(transactions)} />
+          <StatCard title="Số kỳ lịch thu" value={String(schedules)} />
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -187,7 +191,10 @@ export function SettingsPage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Hủy</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => void confirmRestore()}>
+                  <AlertDialogAction
+                    disabled={importMutation.isPending}
+                    onClick={() => void confirmRestore()}
+                  >
                     <Upload className="size-4" />
                     Ghi đè & khôi phục
                   </AlertDialogAction>
@@ -206,13 +213,19 @@ export function SettingsPage() {
               Tạo sẵn người vay, khoản vay và giao dịch để kiểm thử UI.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => void handleSeed()}>
+              <Button
+                variant="secondary"
+                disabled={seedMutation.isPending}
+                onClick={() => void handleSeed()}
+              >
                 <Sprout className="size-4" />
                 Seed nếu trống
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="outline">Ghi đè seed</Button>
+                  <Button variant="outline" disabled={seedMutation.isPending}>
+                    Ghi đè seed
+                  </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
@@ -244,7 +257,10 @@ export function SettingsPage() {
             </p>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive">
+                <Button
+                  variant="destructive"
+                  disabled={resetMutation.isPending}
+                >
                   <Trash2 className="size-4" />
                   Reset database
                 </Button>

@@ -142,10 +142,14 @@
   body {
     @apply m-0 bg-background text-foreground antialiased;
     font-family:
+      "Be Vietnam Pro",
       system-ui,
       -apple-system,
       "Segoe UI",
-      Roboto,
       sans-serif;
+  }
+
+  .login-page {
+    --font-login-display: "Be Vietnam Pro", system-ui, sans-serif;
   }
 }

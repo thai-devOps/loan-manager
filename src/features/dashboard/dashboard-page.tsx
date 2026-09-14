@@ -1,7 +1,9 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
+  AlertTriangle,
   Banknote,
+  CalendarClock,
   CircleDollarSign,
   HandCoins,
   Wallet,
@@ -18,6 +20,14 @@ import {
 } from "recharts";
 import { format, parseISO, isSameDay, startOfDay } from "date-fns";
 import { AppHeader } from "@/components/layout/app-header";
+import { DashboardSkeleton } from "@/components/common/loading-skeletons";
+import {
+  CollectMoneyButton,
+  MobileList,
+  MobileListCard,
+  toneFromLoanStatus,
+  toneFromScheduleStatus,
+} from "@/components/common/mobile-list-card";
 import {
   EmptyState,
   LoanStatusBadge,
@@ -36,13 +46,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  fetchBorrowers,
-  fetchLoans,
-  fetchSchedules,
-  fetchTransactions,
-  syncSchedules,
-} from "@/api/endpoints";
-import { useAsyncData } from "@/hooks/use-async-data";
+  useBorrowersQuery,
+  useLoansQuery,
+  useSchedulesQuery,
+  useTransactionsQuery,
+} from "@/api/queries";
 import {
   getInterestPaid,
   getPrincipalPaid,
@@ -56,24 +64,21 @@ import { getDaysOverdue } from "@/lib/date";
 import { EMPTY_ARRAY } from "@/lib/empty";
 
 export function DashboardPage() {
-  useEffect(() => {
-    void syncSchedules().catch(() => undefined);
-  }, []);
+  const borrowersQ = useBorrowersQuery();
+  const loansQ = useLoansQuery();
+  const transactionsQ = useTransactionsQuery();
+  const schedulesQ = useSchedulesQuery();
 
-  const { data: bundle, loading } = useAsyncData(async () => {
-    const [borrowers, loans, transactions, schedules] = await Promise.all([
-      fetchBorrowers(),
-      fetchLoans(),
-      fetchTransactions(),
-      fetchSchedules(),
-    ]);
-    return { borrowers, loans, transactions, schedules };
-  }, []);
+  const isLoading =
+    borrowersQ.isLoading ||
+    loansQ.isLoading ||
+    transactionsQ.isLoading ||
+    schedulesQ.isLoading;
 
-  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
-  const loans = bundle?.loans ?? EMPTY_ARRAY;
-  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
-  const schedules = bundle?.schedules ?? EMPTY_ARRAY;
+  const borrowers = borrowersQ.data ?? EMPTY_ARRAY;
+  const loans = loansQ.data ?? EMPTY_ARRAY;
+  const transactions = transactionsQ.data ?? EMPTY_ARRAY;
+  const schedules = schedulesQ.data ?? EMPTY_ARRAY;
 
   const borrowerMap = useMemo(
     () => new Map(borrowers.map((b) => [b.id, b])),
@@ -166,8 +171,8 @@ export function DashboardPage() {
         />
       }
     >
-      {loading && !bundle ? (
-        <EmptyState title="Đang tải dữ liệu..." />
+      {isLoading ? (
+        <DashboardSkeleton />
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -206,36 +211,37 @@ export function DashboardPage() {
                 {dueToday.length === 0 ? (
                   <EmptyState title="Không có khoản nào đến hạn hôm nay" />
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {dueToday.map((s) => {
                       const loan = loans.find((l) => l.id === s.loanId);
                       const borrower = loan
                         ? borrowerMap.get(loan.borrowerId)
                         : undefined;
                       return (
-                        <div
+                        <MobileListCard
                           key={s.id}
-                          className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
-                        >
-                          <div>
-                            <p className="font-medium">
-                              {borrower?.name ?? "—"}
-                            </p>
-                            <p className="text-muted-foreground">
-                              {formatCurrency(s.amount)}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
+                          tone={toneFromScheduleStatus(
+                            resolveScheduleStatus(s),
+                          )}
+                          icon={<CalendarClock />}
+                          title={borrower?.name ?? "—"}
+                          badge={
                             <ScheduleStatusBadge
                               status={resolveScheduleStatus(s)}
                             />
-                            <Button asChild size="sm" variant="outline">
-                              <Link to={`/payments?loanId=${s.loanId}`}>
-                                Thu tiền
-                              </Link>
-                            </Button>
-                          </div>
-                        </div>
+                          }
+                          primaryValue={formatCurrency(
+                            getScheduleRemaining(s),
+                          )}
+                          footer={
+                            <CollectMoneyButton
+                              loanId={s.loanId}
+                              tone={toneFromScheduleStatus(
+                                resolveScheduleStatus(s),
+                              )}
+                            />
+                          }
+                        />
                       );
                     })}
                   </div>
@@ -251,26 +257,42 @@ export function DashboardPage() {
                 {overdue.length === 0 ? (
                   <EmptyState title="Không có khoản quá hạn" />
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Người vay</TableHead>
-                        <TableHead>Số tiền</TableHead>
-                        <TableHead>Quá hạn</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <>
+                    <MobileList>
                       {overdue.slice(0, 8).map((s) => (
-                        <TableRow key={s.id}>
-                          <TableCell>{s.borrowerName}</TableCell>
-                          <TableCell>
-                            {formatCurrency(getScheduleRemaining(s))}
-                          </TableCell>
-                          <TableCell>{s.daysOverdue} ngày</TableCell>
-                        </TableRow>
+                        <MobileListCard
+                          key={s.id}
+                          tone="danger"
+                          icon={<AlertTriangle />}
+                          title={s.borrowerName}
+                          subtitle={`${s.daysOverdue} ngày quá hạn`}
+                          primaryValue={formatCurrency(getScheduleRemaining(s))}
+                        />
                       ))}
-                    </TableBody>
-                  </Table>
+                    </MobileList>
+                    <div className="hidden md:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Người vay</TableHead>
+                            <TableHead>Số tiền</TableHead>
+                            <TableHead>Quá hạn</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {overdue.slice(0, 8).map((s) => (
+                            <TableRow key={s.id}>
+                              <TableCell>{s.borrowerName}</TableCell>
+                              <TableCell>
+                                {formatCurrency(getScheduleRemaining(s))}
+                              </TableCell>
+                              <TableCell>{s.daysOverdue} ngày</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -296,52 +318,83 @@ export function DashboardPage() {
                   }
                 />
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Người vay</TableHead>
-                      <TableHead>Gốc ban đầu</TableHead>
-                      <TableHead>Đã thu gốc</TableHead>
-                      <TableHead>Còn lại</TableHead>
-                      <TableHead>Lời/tháng</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  <MobileList>
                     {activeLoans.map((loan) => {
                       const txs = txsByLoan.get(loan.id) ?? [];
+                      const remaining = getRemainingPrincipal(
+                        loan.principalAmount,
+                        txs,
+                      );
                       return (
-                        <TableRow key={loan.id}>
-                          <TableCell>
-                            <Link
-                              to={`/loans/${loan.id}`}
-                              className="font-medium hover:underline"
-                            >
-                              {borrowerMap.get(loan.borrowerId)?.name ?? "—"}
-                            </Link>
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(loan.principalAmount)}
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(getPrincipalPaid(txs))}
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(
-                              getRemainingPrincipal(loan.principalAmount, txs),
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(loan.monthlyInterestAmount)}
-                          </TableCell>
-                          <TableCell>
-                            <LoanStatusBadge status={loan.status} />
-                          </TableCell>
-                        </TableRow>
+                        <MobileListCard
+                          key={loan.id}
+                          to={`/loans/${loan.id}`}
+                          tone={toneFromLoanStatus(loan.status)}
+                          icon={<HandCoins />}
+                          title={
+                            borrowerMap.get(loan.borrowerId)?.name ?? "—"
+                          }
+                          badge={<LoanStatusBadge status={loan.status} />}
+                          primaryValue={formatCurrency(remaining)}
+                          meta={`Gốc ${formatCurrency(loan.principalAmount)} · Lời ${formatCurrency(loan.monthlyInterestAmount)}/th`}
+                        />
                       );
                     })}
-                  </TableBody>
-                </Table>
+                  </MobileList>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Người vay</TableHead>
+                          <TableHead>Gốc ban đầu</TableHead>
+                          <TableHead>Đã thu gốc</TableHead>
+                          <TableHead>Còn lại</TableHead>
+                          <TableHead>Lời/tháng</TableHead>
+                          <TableHead>Trạng thái</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {activeLoans.map((loan) => {
+                          const txs = txsByLoan.get(loan.id) ?? [];
+                          return (
+                            <TableRow key={loan.id}>
+                              <TableCell>
+                                <Link
+                                  to={`/loans/${loan.id}`}
+                                  className="font-medium hover:underline"
+                                >
+                                  {borrowerMap.get(loan.borrowerId)?.name ??
+                                    "—"}
+                                </Link>
+                              </TableCell>
+                              <TableCell>
+                                {formatCurrency(loan.principalAmount)}
+                              </TableCell>
+                              <TableCell>
+                                {formatCurrency(getPrincipalPaid(txs))}
+                              </TableCell>
+                              <TableCell>
+                                {formatCurrency(
+                                  getRemainingPrincipal(
+                                    loan.principalAmount,
+                                    txs,
+                                  ),
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {formatCurrency(loan.monthlyInterestAmount)}
+                              </TableCell>
+                              <TableCell>
+                                <LoanStatusBadge status={loan.status} />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

@@ -4,6 +4,7 @@ import { EMPTY_ARRAY } from "@/lib/empty";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AppHeader } from "@/components/layout/app-header";
+import { TablePageSkeleton } from "@/components/common/loading-skeletons";
 import { EmptyState, PageShell } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,18 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useRecordPaymentMutation } from "@/api/mutations";
 import {
-  fetchBorrowers,
-  fetchLoans,
-  fetchSchedules,
-  fetchTransactions,
-} from "@/api/endpoints";
-import {
-  recordCombinedPayment,
-  recordInterestPayment,
-  recordPrincipalPayment,
-} from "@/features/loans/loan.service";
-import { useAsyncData } from "@/hooks/use-async-data";
+  useBorrowersQuery,
+  useLoansQuery,
+  useSchedulesQuery,
+  useTransactionsQuery,
+} from "@/api/queries";
 import {
   getCurrentInterestSchedule,
   getRemainingPrincipal,
@@ -44,24 +40,24 @@ import {
 export function PaymentsPage() {
   const [searchParams] = useSearchParams();
   const presetLoanId = searchParams.get("loanId") ?? "";
-  const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const recordPaymentMutation = useRecordPaymentMutation();
 
-  const { data: bundle, reload } = useAsyncData(async () => {
-    const [borrowers, loans, transactions, schedules] = await Promise.all([
-      fetchBorrowers(),
-      fetchLoans("ACTIVE"),
-      fetchTransactions(),
-      fetchSchedules(),
-    ]);
-    return { borrowers, loans, transactions, schedules };
-  }, []);
+  const borrowersQ = useBorrowersQuery();
+  const loansQ = useLoansQuery("ACTIVE");
+  const transactionsQ = useTransactionsQuery();
+  const schedulesQ = useSchedulesQuery();
+  const isLoading =
+    borrowersQ.isLoading ||
+    loansQ.isLoading ||
+    transactionsQ.isLoading ||
+    schedulesQ.isLoading;
 
-  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
-  const loans = bundle?.loans ?? EMPTY_ARRAY;
-  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
-  const schedules = bundle?.schedules ?? EMPTY_ARRAY;
+  const borrowers = borrowersQ.data ?? EMPTY_ARRAY;
+  const loans = loansQ.data ?? EMPTY_ARRAY;
+  const transactions = transactionsQ.data ?? EMPTY_ARRAY;
+  const schedules = schedulesQ.data ?? EMPTY_ARRAY;
 
   const borrowerMap = useMemo(
     () => new Map(borrowers.map((b) => [b.id, b])),
@@ -98,27 +94,29 @@ export function PaymentsPage() {
   const currentSchedule = getCurrentInterestSchedule(loanSchedules);
 
   async function onSubmit(values: PaymentFormValues) {
-    setSubmitting(true);
     setError(null);
     setSuccess(null);
     try {
       if (values.paymentType === "INTEREST_PAYMENT") {
-        await recordInterestPayment({
+        await recordPaymentMutation.mutateAsync({
           loanId: values.loanId,
+          paymentType: "INTEREST_PAYMENT",
           amount: values.amount ?? values.interestAmount ?? 0,
           transactionDate: values.transactionDate,
           note: values.note,
         });
       } else if (values.paymentType === "PRINCIPAL_PAYMENT") {
-        await recordPrincipalPayment({
+        await recordPaymentMutation.mutateAsync({
           loanId: values.loanId,
+          paymentType: "PRINCIPAL_PAYMENT",
           amount: values.amount ?? values.principalAmount ?? 0,
           transactionDate: values.transactionDate,
           note: values.note,
         });
       } else {
-        await recordCombinedPayment({
+        await recordPaymentMutation.mutateAsync({
           loanId: values.loanId,
+          paymentType: "BOTH",
           interestAmount: values.interestAmount ?? 0,
           principalAmount: values.principalAmount ?? 0,
           transactionDate: values.transactionDate,
@@ -130,11 +128,8 @@ export function PaymentsPage() {
       form.setValue("interestAmount", 0);
       form.setValue("principalAmount", 0);
       form.setValue("note", "");
-      reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể ghi nhận");
-    } finally {
-      setSubmitting(false);
     }
   }
 
@@ -147,7 +142,9 @@ export function PaymentsPage() {
         />
       }
     >
-      {loans.length === 0 ? (
+      {isLoading ? (
+        <TablePageSkeleton showSearch={false} rows={4} />
+      ) : loans.length === 0 ? (
         <EmptyState title="Không có khoản vay đang hoạt động để thu tiền" />
       ) : (
         <Card className="mx-auto max-w-xl">
@@ -343,7 +340,11 @@ export function PaymentsPage() {
               {error && <p className="text-sm text-destructive">{error}</p>}
               {success && <p className="text-sm text-success">{success}</p>}
 
-              <Button type="submit" disabled={submitting} className="w-full">
+              <Button
+                type="submit"
+                disabled={recordPaymentMutation.isPending}
+                className="w-full"
+              >
                 Ghi nhận thanh toán
               </Button>
             </form>

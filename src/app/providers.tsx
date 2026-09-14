@@ -1,4 +1,6 @@
 import { useEffect, type ReactNode } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/query-client";
 import { useAuthStore } from "@/stores/auth.store";
 
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -8,5 +10,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     hydrate();
   }, [hydrate]);
 
-  return <>{children}</>;
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
 }
