@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "tsBuildInfoFile": "../node_modules/.tmp/tsconfig.api.tsbuildinfo",
     "target": "ES2022",
     "lib": ["ES2022"],
     "module": "NodeNext",
@@ -8,10 +9,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "composite": true,
     "isolatedModules": true,
     "types": ["node"],
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["./**/*.ts", "../server/lib/**/*.ts"]
+  "include": ["./**/*.ts"]
 }

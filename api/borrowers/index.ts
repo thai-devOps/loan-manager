@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
-import { requireAuth } from "../../server/lib/auth.js";
-import { methodNotAllowed, readJsonBody, withHandler } from "../../server/lib/http.js";
-import { borrowersCol, stripDoc } from "../../server/lib/mongo.js";
-import type { Borrower } from "../../server/lib/types.js";
+import { requireAuth } from "../_lib/auth.js";
+import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http.js";
+import { borrowersCol, stripDoc } from "../_lib/mongo.js";
+import type { Borrower } from "../_lib/types.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
