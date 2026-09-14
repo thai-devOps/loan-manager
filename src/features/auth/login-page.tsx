@@ -19,6 +19,7 @@ export function LoginPage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const login = useAuthStore((s) => s.login);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -31,16 +32,21 @@ export function LoginPage() {
     return <Navigate to={from} replace />;
   }
 
-  function onSubmit(values: LoginFormValues) {
+  async function onSubmit(values: LoginFormValues) {
     setError(null);
-    const result = login(values.username, values.password);
-    if (!result.ok) {
-      setError(result.message);
-      return;
+    setSubmitting(true);
+    try {
+      const result = await login(values.username, values.password);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      const from =
+        (location.state as { from?: string } | null)?.from ?? "/";
+      void navigate(from, { replace: true });
+    } finally {
+      setSubmitting(false);
     }
-    const from =
-      (location.state as { from?: string } | null)?.from ?? "/";
-    void navigate(from, { replace: true });
   }
 
   return (
@@ -95,9 +101,9 @@ export function LoginPage() {
                 {error}
               </p>
             )}
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={submitting}>
               <LockKeyhole className="size-4" />
-              Đăng nhập
+              {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>
           </form>
         </CardContent>

@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,8 +29,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { db } from "@/db/database";
+import {
+  fetchBorrowers,
+  fetchLoans,
+  fetchTransactions,
+} from "@/api/endpoints";
 import { createBorrower } from "@/features/borrowers/borrower.service";
+import { useAsyncData } from "@/hooks/use-async-data";
 import { getRemainingPrincipal } from "@/lib/calculations";
 import { formatCurrency } from "@/lib/currency";
 import {
@@ -44,10 +48,18 @@ export function BorrowersPage() {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const borrowers = useLiveQuery(() => db.borrowers.toArray(), []) ?? EMPTY_ARRAY;
-  const loans = useLiveQuery(() => db.loans.toArray(), []) ?? EMPTY_ARRAY;
-  const transactions =
-    useLiveQuery(() => db.transactions.toArray(), []) ?? EMPTY_ARRAY;
+  const { data: bundle, reload } = useAsyncData(async () => {
+    const [borrowers, loans, transactions] = await Promise.all([
+      fetchBorrowers(),
+      fetchLoans(),
+      fetchTransactions(),
+    ]);
+    return { borrowers, loans, transactions };
+  }, []);
+
+  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
+  const loans = bundle?.loans ?? EMPTY_ARRAY;
+  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
 
   const form = useForm<BorrowerFormValues>({
     resolver: zodResolver(borrowerSchema),
@@ -96,6 +108,7 @@ export function BorrowersPage() {
       await createBorrower(values);
       form.reset();
       setOpen(false);
+      reload();
     } finally {
       setSubmitting(false);
     }

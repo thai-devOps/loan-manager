@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,8 +37,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { db } from "@/db/database";
+import {
+  fetchBorrowers,
+  fetchLoans,
+  fetchTransactions,
+} from "@/api/endpoints";
 import { createLoan } from "@/features/loans/loan.service";
+import { useAsyncData } from "@/hooks/use-async-data";
 import {
   getPrincipalPaid,
   getRemainingPrincipal,
@@ -52,6 +56,7 @@ import type { LoanStatus } from "@/types/loan";
 type Filter = "ALL" | LoanStatus;
 
 export function LoansPage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const presetBorrowerId = searchParams.get("borrowerId") ?? "";
   const [filter, setFilter] = useState<Filter>("ALL");
@@ -59,10 +64,22 @@ export function LoansPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const borrowers = useLiveQuery(() => db.borrowers.orderBy("name").toArray(), []) ?? EMPTY_ARRAY;
-  const loans = useLiveQuery(() => db.loans.toArray(), []) ?? EMPTY_ARRAY;
-  const transactions =
-    useLiveQuery(() => db.transactions.toArray(), []) ?? EMPTY_ARRAY;
+  const { data: bundle, reload } = useAsyncData(async () => {
+    const [borrowers, loans, transactions] = await Promise.all([
+      fetchBorrowers(),
+      fetchLoans(),
+      fetchTransactions(),
+    ]);
+    return {
+      borrowers: [...borrowers].sort((a, b) => a.name.localeCompare(b.name)),
+      loans,
+      transactions,
+    };
+  }, []);
+
+  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
+  const loans = bundle?.loans ?? EMPTY_ARRAY;
+  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
 
   const borrowerMap = useMemo(
     () => new Map(borrowers.map((b) => [b.id, b])),
@@ -97,9 +114,8 @@ export function LoansPage() {
         note: "",
       });
       setOpen(false);
-      window.location.hash = "";
-      // navigate via link after create - use window for simplicity
-      void loan;
+      reload();
+      navigate(`/loans/${loan.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể tạo khoản vay");
     } finally {

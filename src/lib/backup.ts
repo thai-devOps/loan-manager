@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { db } from "@/db/database";
-import type { Borrower } from "@/types/borrower";
-import type { Loan } from "@/types/loan";
-import type { InterestSchedule } from "@/types/interest-schedule";
-import type { Transaction } from "@/types/transaction";
+import {
+  exportBackup as apiExportBackup,
+  importBackup,
+  resetDatabase as apiResetDatabase,
+} from "@/api/endpoints";
 
 const backupSchema = z.object({
   version: z.literal(1),
@@ -64,21 +64,15 @@ const backupSchema = z.object({
 export type BackupPayload = z.infer<typeof backupSchema>;
 
 export async function exportBackup(): Promise<BackupPayload> {
-  const [borrowers, loans, interestSchedules, transactions] = await Promise.all([
-    db.borrowers.toArray(),
-    db.loans.toArray(),
-    db.interestSchedules.toArray(),
-    db.transactions.toArray(),
-  ]);
-
-  return {
+  const payload = await apiExportBackup();
+  return backupSchema.parse({
     version: 1,
-    exportedAt: new Date().toISOString(),
-    borrowers,
-    loans,
-    interestSchedules,
-    transactions,
-  };
+    exportedAt: payload.exportedAt,
+    borrowers: payload.borrowers,
+    loans: payload.loans,
+    interestSchedules: payload.interestSchedules,
+    transactions: payload.transactions,
+  });
 }
 
 export function downloadBackupJson(payload: BackupPayload): void {
@@ -108,53 +102,9 @@ export function parseAndValidateBackup(raw: string): BackupPayload {
 }
 
 export async function restoreBackup(payload: BackupPayload): Promise<void> {
-  await db.transaction(
-    "rw",
-    db.borrowers,
-    db.loans,
-    db.interestSchedules,
-    db.transactions,
-    async () => {
-      await Promise.all([
-        db.borrowers.clear(),
-        db.loans.clear(),
-        db.interestSchedules.clear(),
-        db.transactions.clear(),
-      ]);
-      await db.borrowers.bulkAdd(payload.borrowers as Borrower[]);
-      await db.loans.bulkAdd(payload.loans as Loan[]);
-      await db.interestSchedules.bulkAdd(
-        payload.interestSchedules as InterestSchedule[],
-      );
-      await db.transactions.bulkAdd(payload.transactions as Transaction[]);
-    },
-  );
-}
-
-export async function getDatabaseStats() {
-  const [borrowers, loans, transactions, schedules] = await Promise.all([
-    db.borrowers.count(),
-    db.loans.count(),
-    db.transactions.count(),
-    db.interestSchedules.count(),
-  ]);
-  return { borrowers, loans, transactions, schedules };
+  await importBackup(payload);
 }
 
 export async function resetDatabase(): Promise<void> {
-  await db.transaction(
-    "rw",
-    db.borrowers,
-    db.loans,
-    db.interestSchedules,
-    db.transactions,
-    async () => {
-      await Promise.all([
-        db.borrowers.clear(),
-        db.loans.clear(),
-        db.interestSchedules.clear(),
-        db.transactions.clear(),
-      ]);
-    },
-  );
+  await apiResetDatabase();
 }

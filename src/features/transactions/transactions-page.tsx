@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { AppHeader } from "@/components/layout/app-header";
 import {
@@ -23,7 +22,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { db } from "@/db/database";
+import {
+  fetchBorrowers,
+  fetchLoans,
+  fetchTransactions,
+} from "@/api/endpoints";
+import { useAsyncData } from "@/hooks/use-async-data";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
 import type { TransactionType } from "@/types/transaction";
@@ -31,10 +35,18 @@ import type { TransactionType } from "@/types/transaction";
 export function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState<"ALL" | TransactionType>("ALL");
 
-  const borrowers = useLiveQuery(() => db.borrowers.toArray(), []) ?? EMPTY_ARRAY;
-  const loans = useLiveQuery(() => db.loans.toArray(), []) ?? EMPTY_ARRAY;
-  const transactions =
-    useLiveQuery(() => db.transactions.toArray(), []) ?? EMPTY_ARRAY;
+  const { data: bundle } = useAsyncData(async () => {
+    const [borrowers, loans, transactions] = await Promise.all([
+      fetchBorrowers(),
+      fetchLoans(),
+      fetchTransactions(),
+    ]);
+    return { borrowers, loans, transactions };
+  }, []);
+
+  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
+  const loans = bundle?.loans ?? EMPTY_ARRAY;
+  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
 
   const borrowerMap = useMemo(
     () => new Map(borrowers.map((b) => [b.id, b])),

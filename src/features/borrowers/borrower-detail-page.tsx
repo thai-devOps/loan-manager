@@ -1,6 +1,4 @@
 import { Link, useParams } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
-import { EMPTY_ARRAY } from "@/lib/empty";
 import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import {
@@ -20,7 +18,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { db } from "@/db/database";
+import {
+  fetchBorrower,
+  fetchLoans,
+  fetchTransactions,
+} from "@/api/endpoints";
+import { useAsyncData } from "@/hooks/use-async-data";
 import {
   getInterestPaid,
   getRemainingPrincipal,
@@ -32,31 +35,18 @@ import { formatDate } from "@/lib/date";
 export function BorrowerDetailPage() {
   const { id } = useParams<{ id: string }>();
 
-  const borrower = useLiveQuery(
-    () => (id ? db.borrowers.get(id) : undefined),
-    [id],
-  );
-  const loans =
-    useLiveQuery(
-      () => (id ? db.loans.where("borrowerId").equals(id).toArray() : []),
-      [id],
-    ) ?? EMPTY_ARRAY;
-  const allTransactions =
-    useLiveQuery(() => db.transactions.toArray(), []) ?? EMPTY_ARRAY;
+  const { data: bundle, loading, error } = useAsyncData(async () => {
+    if (!id) return null;
+    const [borrower, allLoans, allTransactions] = await Promise.all([
+      fetchBorrower(id),
+      fetchLoans(),
+      fetchTransactions(),
+    ]);
+    const loans = allLoans.filter((l) => l.borrowerId === id);
+    return { borrower, loans, allTransactions };
+  }, [id]);
 
-  const loanIds = new Set(loans.map((l) => l.id));
-  const transactions = allTransactions
-    .filter((t) => loanIds.has(t.loanId))
-    .sort((a, b) => b.transactionDate.localeCompare(a.transactionDate));
-
-  const totalRemaining = loans.reduce((sum, loan) => {
-    const txs = allTransactions.filter((t) => t.loanId === loan.id);
-    return sum + getRemainingPrincipal(loan.principalAmount, txs);
-  }, 0);
-
-  const totalInterest = getInterestPaid(transactions);
-
-  if (borrower === undefined) {
+  if (loading && !bundle) {
     return (
       <PageShell header={<AppHeader title="Người vay" />}>
         <EmptyState title="Đang tải..." />
@@ -64,7 +54,7 @@ export function BorrowerDetailPage() {
     );
   }
 
-  if (!borrower) {
+  if (error || !bundle?.borrower) {
     return (
       <PageShell header={<AppHeader title="Người vay" />}>
         <EmptyState
@@ -78,6 +68,19 @@ export function BorrowerDetailPage() {
       </PageShell>
     );
   }
+
+  const { borrower, loans, allTransactions } = bundle;
+  const loanIds = new Set(loans.map((l) => l.id));
+  const transactions = allTransactions
+    .filter((t) => loanIds.has(t.loanId))
+    .sort((a, b) => b.transactionDate.localeCompare(a.transactionDate));
+
+  const totalRemaining = loans.reduce((sum, loan) => {
+    const txs = allTransactions.filter((t) => t.loanId === loan.id);
+    return sum + getRemainingPrincipal(loan.principalAmount, txs);
+  }, 0);
+
+  const totalInterest = getInterestPaid(transactions);
 
   return (
     <PageShell

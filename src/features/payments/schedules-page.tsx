@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { AppHeader } from "@/components/layout/app-header";
 import {
@@ -24,8 +23,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { db } from "@/db/database";
+import {
+  fetchBorrowers,
+  fetchLoans,
+  fetchSchedules,
+} from "@/api/endpoints";
 import { syncSchedulesForActiveLoans } from "@/features/loans/loan.service";
+import { useAsyncData } from "@/hooks/use-async-data";
 import {
   getScheduleRemaining,
   resolveScheduleStatus,
@@ -43,10 +47,18 @@ export function SchedulesPage() {
     void syncSchedulesForActiveLoans();
   }, []);
 
-  const borrowers = useLiveQuery(() => db.borrowers.toArray(), []) ?? EMPTY_ARRAY;
-  const loans = useLiveQuery(() => db.loans.toArray(), []) ?? EMPTY_ARRAY;
-  const schedules =
-    useLiveQuery(() => db.interestSchedules.toArray(), []) ?? EMPTY_ARRAY;
+  const { data: bundle } = useAsyncData(async () => {
+    const [borrowers, loans, schedules] = await Promise.all([
+      fetchBorrowers(),
+      fetchLoans(),
+      fetchSchedules(),
+    ]);
+    return { borrowers, loans, schedules };
+  }, []);
+
+  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
+  const loans = bundle?.loans ?? EMPTY_ARRAY;
+  const schedules = bundle?.schedules ?? EMPTY_ARRAY;
 
   const borrowerMap = useMemo(
     () => new Map(borrowers.map((b) => [b.id, b])),

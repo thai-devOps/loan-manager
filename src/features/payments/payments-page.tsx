@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,12 +17,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { db } from "@/db/database";
+import {
+  fetchBorrowers,
+  fetchLoans,
+  fetchSchedules,
+  fetchTransactions,
+} from "@/api/endpoints";
 import {
   recordCombinedPayment,
   recordInterestPayment,
   recordPrincipalPayment,
 } from "@/features/loans/loan.service";
+import { useAsyncData } from "@/hooks/use-async-data";
 import {
   getCurrentInterestSchedule,
   getRemainingPrincipal,
@@ -43,13 +48,20 @@ export function PaymentsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const borrowers = useLiveQuery(() => db.borrowers.toArray(), []) ?? EMPTY_ARRAY;
-  const loans =
-    useLiveQuery(() => db.loans.where("status").equals("ACTIVE").toArray(), []) ?? EMPTY_ARRAY;
-  const transactions =
-    useLiveQuery(() => db.transactions.toArray(), []) ?? EMPTY_ARRAY;
-  const schedules =
-    useLiveQuery(() => db.interestSchedules.toArray(), []) ?? EMPTY_ARRAY;
+  const { data: bundle, reload } = useAsyncData(async () => {
+    const [borrowers, loans, transactions, schedules] = await Promise.all([
+      fetchBorrowers(),
+      fetchLoans("ACTIVE"),
+      fetchTransactions(),
+      fetchSchedules(),
+    ]);
+    return { borrowers, loans, transactions, schedules };
+  }, []);
+
+  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
+  const loans = bundle?.loans ?? EMPTY_ARRAY;
+  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
+  const schedules = bundle?.schedules ?? EMPTY_ARRAY;
 
   const borrowerMap = useMemo(
     () => new Map(borrowers.map((b) => [b.id, b])),
@@ -118,6 +130,7 @@ export function PaymentsPage() {
       form.setValue("interestAmount", 0);
       form.setValue("principalAmount", 0);
       form.setValue("note", "");
+      reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể ghi nhận");
     } finally {

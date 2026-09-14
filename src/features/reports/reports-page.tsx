@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { format, parseISO } from "date-fns";
 import {
@@ -21,7 +20,8 @@ import {
   StatCard,
 } from "@/components/common/status-badges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { db } from "@/db/database";
+import { fetchLoans, fetchTransactions } from "@/api/endpoints";
+import { useAsyncData } from "@/hooks/use-async-data";
 import {
   getInterestPaid,
   getPrincipalPaid,
@@ -32,9 +32,16 @@ import { formatCurrency } from "@/lib/currency";
 import { getPeriodFromISO } from "@/lib/date";
 
 export function ReportsPage() {
-  const loans = useLiveQuery(() => db.loans.toArray(), []) ?? EMPTY_ARRAY;
-  const transactions =
-    useLiveQuery(() => db.transactions.toArray(), []) ?? EMPTY_ARRAY;
+  const { data: bundle } = useAsyncData(async () => {
+    const [loans, transactions] = await Promise.all([
+      fetchLoans(),
+      fetchTransactions(),
+    ]);
+    return { loans, transactions };
+  }, []);
+
+  const loans = bundle?.loans ?? EMPTY_ARRAY;
+  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
 
   const totalDisbursed = transactions
     .filter((t) => t.type === "DISBURSEMENT")

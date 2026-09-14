@@ -1,75 +1,43 @@
-# React + TypeScript + Vite
+# Loan Manager
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Ứng dụng quản lý cho vay cá nhân (React + Vite + Vercel Serverless API + MongoDB Atlas).
 
-Currently, two official plugins are available:
+## Yêu cầu
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20+
+- Tài khoản [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
+- (Production) Project Vercel
 
-## React Compiler
+## Biến môi trường
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Tạo file `.env` ở root (đã gitignore — **không commit**):
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```env
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-strong-password
+JWT_SECRET=long-random-string
+MONGODB_URI=mongodb+srv://USER:PASS@cluster0....mongodb.net/loan-db?retryWrites=true&w=majority
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Trên Vercel → Project → Environment Variables, thêm cùng 4 key (Production). **Không** dùng prefix `VITE_` cho các biến này.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Atlas Network Access: cho phép IP serverless (thường `0.0.0.0/0`) và user DB có quyền read/write.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Chạy local
 
+```bash
+npm install
+npm run dev
 ```
+
+`vite` phục vụ UI và `/api/*` qua plugin dev (cùng process). Đăng nhập bằng `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+
+## Build
+
+```bash
+npm run build
+```
+
+## Deploy
+
+Push lên GitHub; Vercel build static + serverless dưới `/api`. Sau khi set env → Redeploy.

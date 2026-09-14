@@ -1,45 +1,11 @@
-import { AppHeader } from "@/components/layout/app-header";
-import {
-  EmptyState,
-  PageShell,
-  StatCard,
-} from "@/components/common/status-badges";
-import {
-  LoanStatusBadge,
-  ScheduleStatusBadge,
-} from "@/components/common/status-badges";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { db } from "@/db/database";
-import {
-  getInterestPaid,
-  getPrincipalPaid,
-  getRemainingPrincipal,
-  getScheduleRemaining,
-  groupTransactionsByMonth,
-  resolveScheduleStatus,
-} from "@/lib/calculations";
-import { formatCurrency } from "@/lib/currency";
-import { getDaysOverdue } from "@/lib/date";
-import { syncSchedulesForActiveLoans } from "@/features/loans/loan.service";
-import { useLiveQuery } from "dexie-react-hooks";
-import { EMPTY_ARRAY } from "@/lib/empty";
+import { useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
   Banknote,
   CircleDollarSign,
   HandCoins,
   Wallet,
 } from "lucide-react";
-import { useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
 import {
   Bar,
   BarChart,
@@ -51,18 +17,63 @@ import {
   YAxis,
 } from "recharts";
 import { format, parseISO, isSameDay, startOfDay } from "date-fns";
+import { AppHeader } from "@/components/layout/app-header";
+import {
+  EmptyState,
+  LoanStatusBadge,
+  PageShell,
+  ScheduleStatusBadge,
+  StatCard,
+} from "@/components/common/status-badges";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  fetchBorrowers,
+  fetchLoans,
+  fetchSchedules,
+  fetchTransactions,
+  syncSchedules,
+} from "@/api/endpoints";
+import { useAsyncData } from "@/hooks/use-async-data";
+import {
+  getInterestPaid,
+  getPrincipalPaid,
+  getRemainingPrincipal,
+  getScheduleRemaining,
+  groupTransactionsByMonth,
+  resolveScheduleStatus,
+} from "@/lib/calculations";
+import { formatCurrency } from "@/lib/currency";
+import { getDaysOverdue } from "@/lib/date";
+import { EMPTY_ARRAY } from "@/lib/empty";
 
 export function DashboardPage() {
   useEffect(() => {
-    void syncSchedulesForActiveLoans();
+    void syncSchedules().catch(() => undefined);
   }, []);
 
-  const borrowers = useLiveQuery(() => db.borrowers.toArray(), []) ?? EMPTY_ARRAY;
-  const loans = useLiveQuery(() => db.loans.toArray(), []) ?? EMPTY_ARRAY;
-  const transactions =
-    useLiveQuery(() => db.transactions.toArray(), []) ?? EMPTY_ARRAY;
-  const schedules =
-    useLiveQuery(() => db.interestSchedules.toArray(), []) ?? EMPTY_ARRAY;
+  const { data: bundle, loading } = useAsyncData(async () => {
+    const [borrowers, loans, transactions, schedules] = await Promise.all([
+      fetchBorrowers(),
+      fetchLoans(),
+      fetchTransactions(),
+      fetchSchedules(),
+    ]);
+    return { borrowers, loans, transactions, schedules };
+  }, []);
+
+  const borrowers = bundle?.borrowers ?? EMPTY_ARRAY;
+  const loans = bundle?.loans ?? EMPTY_ARRAY;
+  const transactions = bundle?.transactions ?? EMPTY_ARRAY;
+  const schedules = bundle?.schedules ?? EMPTY_ARRAY;
 
   const borrowerMap = useMemo(
     () => new Map(borrowers.map((b) => [b.id, b])),
@@ -142,10 +153,8 @@ export function DashboardPage() {
 
   const chartData = chartPeriods.map((period) => ({
     period: format(parseISO(`${period}-01`), "MM/yyyy"),
-    interest:
-      interestByMonth.find((i) => i.period === period)?.amount ?? 0,
-    principal:
-      principalByMonth.find((p) => p.period === period)?.amount ?? 0,
+    interest: interestByMonth.find((i) => i.period === period)?.amount ?? 0,
+    principal: principalByMonth.find((p) => p.period === period)?.amount ?? 0,
   }));
 
   return (
@@ -157,142 +166,97 @@ export function DashboardPage() {
         />
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Tổng vốn cho vay"
-          value={formatCurrency(totalDisbursed)}
-          icon={<Banknote className="size-4" />}
-        />
-        <StatCard
-          title="Tổng dư nợ gốc"
-          value={formatCurrency(totalRemaining)}
-          icon={<Wallet className="size-4" />}
-        />
-        <StatCard
-          title="Tổng tiền lời đã thu"
-          value={formatCurrency(totalInterestCollected)}
-          icon={<CircleDollarSign className="size-4" />}
-        />
-        <StatCard
-          title="Tiền cần thu"
-          value={formatCurrency(dueToCollect)}
-          hint="Lời còn thiếu trên các kỳ chưa đủ"
-          icon={<HandCoins className="size-4" />}
-        />
-      </div>
+      {loading && !bundle ? (
+        <EmptyState title="Đang tải dữ liệu..." />
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              title="Tổng vốn cho vay"
+              value={formatCurrency(totalDisbursed)}
+              icon={<Banknote className="size-4" />}
+            />
+            <StatCard
+              title="Tổng dư nợ gốc"
+              value={formatCurrency(totalRemaining)}
+              icon={<Wallet className="size-4" />}
+            />
+            <StatCard
+              title="Tổng tiền lời đã thu"
+              value={formatCurrency(totalInterestCollected)}
+              icon={<CircleDollarSign className="size-4" />}
+            />
+            <StatCard
+              title="Tiền cần thu"
+              value={formatCurrency(dueToCollect)}
+              hint="Lời còn thiếu trên các kỳ chưa đủ"
+              icon={<HandCoins className="size-4" />}
+            />
+          </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-base">Hôm nay cần thu</CardTitle>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/payments">Thu tiền</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {dueToday.length === 0 ? (
-              <EmptyState title="Không có khoản nào đến hạn hôm nay" />
-            ) : (
-              <div className="space-y-3 md:hidden">
-                {dueToday.map((s) => {
-                  const loan = loans.find((l) => l.id === s.loanId);
-                  const borrower = loan
-                    ? borrowerMap.get(loan.borrowerId)
-                    : undefined;
-                  return (
-                    <div
-                      key={s.id}
-                      className="rounded-lg border p-3 text-sm"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-medium">{borrower?.name ?? "—"}</p>
-                          <p className="text-muted-foreground">
-                            {formatCurrency(s.amount)}
-                          </p>
-                        </div>
-                        <ScheduleStatusBadge
-                          status={resolveScheduleStatus(s)}
-                        />
-                      </div>
-                      <Button asChild size="sm" className="mt-3 w-full">
-                        <Link to={`/payments?loanId=${s.loanId}`}>Thu tiền</Link>
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {dueToday.length > 0 && (
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Người vay</TableHead>
-                      <TableHead>Tiền lời</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                      <TableHead className="text-right">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-base">Hôm nay cần thu</CardTitle>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/payments">Thu tiền</Link>
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {dueToday.length === 0 ? (
+                  <EmptyState title="Không có khoản nào đến hạn hôm nay" />
+                ) : (
+                  <div className="space-y-3">
                     {dueToday.map((s) => {
                       const loan = loans.find((l) => l.id === s.loanId);
                       const borrower = loan
                         ? borrowerMap.get(loan.borrowerId)
                         : undefined;
                       return (
-                        <TableRow key={s.id}>
-                          <TableCell>{borrower?.name ?? "—"}</TableCell>
-                          <TableCell>{formatCurrency(s.amount)}</TableCell>
-                          <TableCell>
+                        <div
+                          key={s.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+                        >
+                          <div>
+                            <p className="font-medium">
+                              {borrower?.name ?? "—"}
+                            </p>
+                            <p className="text-muted-foreground">
+                              {formatCurrency(s.amount)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
                             <ScheduleStatusBadge
                               status={resolveScheduleStatus(s)}
                             />
-                          </TableCell>
-                          <TableCell className="text-right">
                             <Button asChild size="sm" variant="outline">
                               <Link to={`/payments?loanId=${s.loanId}`}>
                                 Thu tiền
                               </Link>
                             </Button>
-                          </TableCell>
-                        </TableRow>
+                          </div>
+                        </div>
                       );
                     })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Khoản quá hạn</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {overdue.length === 0 ? (
-              <EmptyState title="Không có khoản quá hạn" />
-            ) : (
-              <>
-                <div className="space-y-3 md:hidden">
-                  {overdue.slice(0, 8).map((s) => (
-                    <div key={s.id} className="rounded-lg border p-3 text-sm">
-                      <p className="font-medium">{s.borrowerName}</p>
-                      <p className="text-muted-foreground">
-                        {formatCurrency(getScheduleRemaining(s))} ·{" "}
-                        {s.daysOverdue} ngày
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <div className="hidden md:block">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Khoản quá hạn</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {overdue.length === 0 ? (
+                  <EmptyState title="Không có khoản quá hạn" />
+                ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Người vay</TableHead>
                         <TableHead>Số tiền</TableHead>
-                        <TableHead>Số ngày quá hạn</TableHead>
+                        <TableHead>Quá hạn</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -307,60 +271,31 @@ export function DashboardPage() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Khoản vay đang hoạt động</CardTitle>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/loans">Xem tất cả</Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {activeLoans.length === 0 ? (
-            <EmptyState
-              title="Chưa có khoản vay hoạt động"
-              action={
-                <Button asChild>
-                  <Link to="/loans">Tạo khoản vay</Link>
-                </Button>
-              }
-            />
-          ) : (
-            <>
-              <div className="space-y-3 md:hidden">
-                {activeLoans.map((loan) => {
-                  const txs = txsByLoan.get(loan.id) ?? [];
-                  const remaining = getRemainingPrincipal(
-                    loan.principalAmount,
-                    txs,
-                  );
-                  return (
-                    <Link
-                      key={loan.id}
-                      to={`/loans/${loan.id}`}
-                      className="block rounded-lg border p-3 text-sm transition-colors hover:bg-muted/40"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium">
-                          {borrowerMap.get(loan.borrowerId)?.name ?? "—"}
-                        </p>
-                        <LoanStatusBadge status={loan.status} />
-                      </div>
-                      <p className="mt-1 text-muted-foreground">
-                        Dư nợ {formatCurrency(remaining)} · Lời{" "}
-                        {formatCurrency(loan.monthlyInterestAmount)}/tháng
-                      </p>
-                    </Link>
-                  );
-                })}
-              </div>
-              <div className="hidden md:block">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-base">
+                Khoản vay đang hoạt động
+              </CardTitle>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/loans">Xem tất cả</Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {activeLoans.length === 0 ? (
+                <EmptyState
+                  title="Chưa có khoản vay hoạt động"
+                  action={
+                    <Button asChild>
+                      <Link to="/loans">Tạo khoản vay</Link>
+                    </Button>
+                  }
+                />
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -375,11 +310,6 @@ export function DashboardPage() {
                   <TableBody>
                     {activeLoans.map((loan) => {
                       const txs = txsByLoan.get(loan.id) ?? [];
-                      const paid = getPrincipalPaid(txs);
-                      const remaining = getRemainingPrincipal(
-                        loan.principalAmount,
-                        txs,
-                      );
                       return (
                         <TableRow key={loan.id}>
                           <TableCell>
@@ -393,8 +323,14 @@ export function DashboardPage() {
                           <TableCell>
                             {formatCurrency(loan.principalAmount)}
                           </TableCell>
-                          <TableCell>{formatCurrency(paid)}</TableCell>
-                          <TableCell>{formatCurrency(remaining)}</TableCell>
+                          <TableCell>
+                            {formatCurrency(getPrincipalPaid(txs))}
+                          </TableCell>
+                          <TableCell>
+                            {formatCurrency(
+                              getRemainingPrincipal(loan.principalAmount, txs),
+                            )}
+                          </TableCell>
                           <TableCell>
                             {formatCurrency(loan.monthlyInterestAmount)}
                           </TableCell>
@@ -406,57 +342,60 @@ export function DashboardPage() {
                     })}
                   </TableBody>
                 </Table>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Tiền lời & gốc thu theo tháng
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {chartData.length === 0 ? (
-            <EmptyState title="Chưa có dữ liệu biểu đồ" />
-          ) : (
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="period" tick={{ fontSize: 12 }} />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(v: number) =>
-                      `${Math.round(v / 1_000_000)}tr`
-                    }
-                  />
-                  <Tooltip
-                    formatter={(value) =>
-                      formatCurrency(Number(value ?? 0))
-                    }
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="interest"
-                    name="Tiền lời"
-                    fill="var(--chart-2)"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="principal"
-                    name="Tiền gốc"
-                    fill="var(--chart-1)"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Tiền lời & gốc thu theo tháng
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {chartData.length === 0 ? (
+                <EmptyState title="Chưa có dữ liệu biểu đồ" />
+              ) : (
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-border"
+                      />
+                      <XAxis dataKey="period" tick={{ fontSize: 12 }} />
+                      <YAxis
+                        tick={{ fontSize: 12 }}
+                        tickFormatter={(v: number) =>
+                          `${Math.round(v / 1_000_000)}tr`
+                        }
+                      />
+                      <Tooltip
+                        formatter={(value) =>
+                          formatCurrency(Number(value ?? 0))
+                        }
+                      />
+                      <Legend />
+                      <Bar
+                        dataKey="interest"
+                        name="Tiền lời"
+                        fill="var(--chart-2)"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="principal"
+                        name="Tiền gốc"
+                        fill="var(--chart-1)"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </PageShell>
   );
 }

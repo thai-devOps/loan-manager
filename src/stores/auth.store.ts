@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import {
-  attemptLogin,
+  clearSession,
   getSession,
-  isSessionValid,
+  loginRequest,
   logout as clearAuth,
   touchSession,
   type AuthSession,
@@ -15,33 +15,28 @@ interface AuthState {
   login: (
     username: string,
     password: string,
-  ) => { ok: true } | { ok: false; message: string };
+  ) => Promise<{ ok: true } | { ok: false; message: string }>;
   logout: () => void;
   touch: () => void;
-  checkExpiry: () => boolean;
 }
 
 function syncFromStorage(): Pick<AuthState, "session" | "isAuthenticated"> {
   const session = getSession();
-  const valid = isSessionValid(session);
-  if (!valid && session) {
-    clearAuth();
-  }
   return {
-    session: valid ? session : null,
-    isAuthenticated: valid,
+    session,
+    isAuthenticated: Boolean(session?.token),
   };
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   ...syncFromStorage(),
 
   hydrate: () => {
     set(syncFromStorage());
   },
 
-  login: (username, password) => {
-    const result = attemptLogin(username, password);
+  login: async (username, password) => {
+    const result = await loginRequest(username, password);
     if (!result.ok) {
       set({ session: null, isAuthenticated: false });
       return { ok: false, message: result.message };
@@ -58,18 +53,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   touch: () => {
     const next = touchSession();
     if (!next) {
+      clearSession();
       set({ session: null, isAuthenticated: false });
       return;
     }
     set({ session: next, isAuthenticated: true });
-  },
-
-  checkExpiry: () => {
-    const valid = isSessionValid(get().session ?? getSession());
-    if (!valid) {
-      clearAuth();
-      set({ session: null, isAuthenticated: false });
-    }
-    return valid;
   },
 }));

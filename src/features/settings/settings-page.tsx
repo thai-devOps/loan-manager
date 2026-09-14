@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
 import { Download, Upload, Database, Trash2, Sprout } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageShell, StatCard } from "@/components/common/status-badges";
@@ -16,13 +15,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { db } from "@/db/database";
-import { clearAllData, seedDemoData, seedIfEmpty } from "@/db/seed";
+import {
+  fetchStats,
+  resetDatabase as apiReset,
+  seedDemo,
+} from "@/api/endpoints";
+import { useAsyncData } from "@/hooks/use-async-data";
 import {
   downloadBackupJson,
   exportBackup,
   parseAndValidateBackup,
-  resetDatabase,
   restoreBackup,
 } from "@/lib/backup";
 
@@ -32,18 +34,21 @@ export function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingRestore, setPendingRestore] = useState<string | null>(null);
 
-  const borrowers = useLiveQuery(() => db.borrowers.count(), []) ?? 0;
-  const loans = useLiveQuery(() => db.loans.count(), []) ?? 0;
-  const transactions =
-    useLiveQuery(() => db.transactions.count(), []) ?? 0;
-  const schedules =
-    useLiveQuery(() => db.interestSchedules.count(), []) ?? 0;
+  const { data: stats, reload } = useAsyncData(() => fetchStats(), []);
+  const borrowers = stats?.borrowers ?? 0;
+  const loans = stats?.loans ?? 0;
+  const transactions = stats?.transactions ?? 0;
+  const schedules = stats?.schedules ?? 0;
 
   async function handleExport() {
     setError(null);
-    const payload = await exportBackup();
-    downloadBackupJson(payload);
-    setMessage("Đã xuất file backup JSON");
+    try {
+      const payload = await exportBackup();
+      downloadBackupJson(payload);
+      setMessage("Đã xuất file backup JSON");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Xuất backup thất bại");
+    }
   }
 
   function handleFileChange(file: File | undefined) {
@@ -72,33 +77,39 @@ export function SettingsPage() {
       setMessage("Đã khôi phục dữ liệu từ backup");
       setError(null);
       if (fileRef.current) fileRef.current.value = "";
+      reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Khôi phục thất bại");
     }
   }
 
   async function handleReset() {
-    await resetDatabase();
+    await apiReset();
     setMessage("Đã xóa toàn bộ dữ liệu");
     setError(null);
+    reload();
   }
 
   async function handleSeed() {
-    const seeded = await seedIfEmpty();
-    if (seeded) {
+    try {
+      await seedDemo(false);
       setMessage("Đã tạo dữ liệu mẫu");
-    } else {
+      setError(null);
+      reload();
+    } catch (e) {
       setError(
-        "Database đã có dữ liệu. Hãy Reset trước nếu muốn seed lại, hoặc dùng 'Ghi đè seed'.",
+        e instanceof Error
+          ? e.message
+          : "Database đã có dữ liệu. Hãy Reset trước nếu muốn seed lại, hoặc dùng 'Ghi đè seed'.",
       );
     }
   }
 
   async function handleForceSeed() {
-    await clearAllData();
-    await seedDemoData();
+    await seedDemo(true);
     setMessage("Đã ghi đè và tạo lại dữ liệu mẫu");
     setError(null);
+    reload();
   }
 
   return (
@@ -106,7 +117,7 @@ export function SettingsPage() {
       header={
         <AppHeader
           title="Cài đặt"
-          description="Backup, restore và quản lý database local"
+          description="Backup, restore và quản lý database MongoDB"
         />
       }
     >
@@ -136,7 +147,7 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Xuất toàn bộ IndexedDB thành file JSON để lưu trữ offline.
+              Xuất toàn bộ dữ liệu MongoDB thành file JSON để lưu trữ.
             </p>
             <Button onClick={() => void handleExport()}>
               <Download className="size-4" />
@@ -228,7 +239,8 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Xóa toàn bộ người vay, khoản vay, lịch thu và giao dịch.
+              Xóa toàn bộ người vay, khoản vay, lịch thu và giao dịch trên
+              MongoDB.
             </p>
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -241,8 +253,8 @@ export function SettingsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Xóa toàn bộ dữ liệu?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Cảnh báo: dữ liệu sẽ bị xóa vĩnh viễn khỏi trình duyệt này.
-                    Hãy Export backup trước nếu cần giữ lại.
+                    Cảnh báo: dữ liệu sẽ bị xóa vĩnh viễn trên MongoDB. Hãy
+                    Export backup trước nếu cần giữ lại.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -258,7 +270,7 @@ export function SettingsPage() {
             </AlertDialog>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Database className="size-3.5" />
-              LoanManagerDB · IndexedDB · local-first
+              MongoDB Atlas · Vercel API
             </div>
           </CardContent>
         </Card>

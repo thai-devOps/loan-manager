@@ -1,40 +1,10 @@
-/**
- * Credentials are injected by Vite at build time from:
- * - VITE_ADMIN_USERNAME
- * - VITE_ADMIN_PASSWORD
- *
- * On Vercel: set both in Project Settings → Environment Variables,
- * then Redeploy (Vite bakes values into the JS bundle at build time).
- */
-
 export const AUTH_STORAGE_KEY = "loan-manager.auth";
-export const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours of inactivity
 
 export interface AuthSession {
+  token: string;
   username: string;
   loggedInAt: string;
   lastActiveAt: string;
-}
-
-function readEnv(value: string | undefined): string {
-  // Avoid String(...) wrappers around import.meta.env — keep a plain
-  // reference so Vite/Rolldown inlines the value reliably.
-  if (typeof value !== "string") return "";
-  return value.trim();
-}
-
-export function getAdminCredentials(): {
-  username: string;
-  password: string;
-} | null {
-  const username = readEnv(import.meta.env.VITE_ADMIN_USERNAME);
-  const password = readEnv(import.meta.env.VITE_ADMIN_PASSWORD);
-
-  if (!username || !password) {
-    return null;
-  }
-
-  return { username, password };
 }
 
 export function getSession(): AuthSession | null {
@@ -43,6 +13,7 @@ export function getSession(): AuthSession | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AuthSession;
     if (
+      typeof parsed?.token !== "string" ||
       typeof parsed?.username !== "string" ||
       typeof parsed?.loggedInAt !== "string" ||
       typeof parsed?.lastActiveAt !== "string"
@@ -55,15 +26,6 @@ export function getSession(): AuthSession | null {
   }
 }
 
-export function isSessionValid(
-  session: AuthSession | null = getSession(),
-): boolean {
-  if (!session) return false;
-  const lastActive = Date.parse(session.lastActiveAt);
-  if (Number.isNaN(lastActive)) return false;
-  return Date.now() - lastActive < SESSION_TTL_MS;
-}
-
 export function saveSession(session: AuthSession): void {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
 }
@@ -74,10 +36,7 @@ export function clearSession(): void {
 
 export function touchSession(): AuthSession | null {
   const session = getSession();
-  if (!session || !isSessionValid(session)) {
-    clearSession();
-    return null;
-  }
+  if (!session) return null;
   const next: AuthSession = {
     ...session,
     lastActiveAt: new Date().toISOString(),
@@ -86,37 +45,47 @@ export function touchSession(): AuthSession | null {
   return next;
 }
 
-export function attemptLogin(
+export async function loginRequest(
   username: string,
   password: string,
-): { ok: true; session: AuthSession } | { ok: false; message: string } {
-  const expected = getAdminCredentials();
-  if (!expected) {
+): Promise<
+  { ok: true; session: AuthSession } | { ok: false; message: string }
+> {
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: username.trim(),
+        password: password.trim(),
+      }),
+    });
+    const data = (await res.json()) as {
+      token?: string;
+      username?: string;
+      error?: string;
+    };
+    if (!res.ok || !data.token || !data.username) {
+      return {
+        ok: false,
+        message: data.error ?? "Tên đăng nhập hoặc mật khẩu không đúng",
+      };
+    }
+    const now = new Date().toISOString();
+    const session: AuthSession = {
+      token: data.token,
+      username: data.username,
+      loggedInAt: now,
+      lastActiveAt: now,
+    };
+    saveSession(session);
+    return { ok: true, session };
+  } catch {
     return {
       ok: false,
-      message:
-        "Cấu hình đăng nhập chưa sẵn sàng. Kiểm tra biến môi trường trên server rồi redeploy.",
+      message: "Không kết nối được máy chủ. Kiểm tra mạng và thử lại.",
     };
   }
-
-  if (
-    username.trim() !== expected.username ||
-    password.trim() !== expected.password
-  ) {
-    return {
-      ok: false,
-      message: "Tên đăng nhập hoặc mật khẩu không đúng",
-    };
-  }
-
-  const now = new Date().toISOString();
-  const session: AuthSession = {
-    username: expected.username,
-    loggedInAt: now,
-    lastActiveAt: now,
-  };
-  saveSession(session);
-  return { ok: true, session };
 }
 
 export function logout(): void {

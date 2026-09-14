@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,13 +34,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { db } from "@/db/database";
+import { fetchLoanDetail } from "@/api/endpoints";
 import {
   cancelLoan,
   recordCombinedPayment,
   recordInterestPayment,
   recordPrincipalPayment,
 } from "@/features/loans/loan.service";
+import { useAsyncData } from "@/hooks/use-async-data";
 import {
   getCurrentInterestSchedule,
   getInterestPaid,
@@ -70,22 +70,18 @@ export function LoanDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loan = useLiveQuery(() => (id ? db.loans.get(id) : undefined), [id]);
-  const borrower = useLiveQuery(
-    () => (loan ? db.borrowers.get(loan.borrowerId) : undefined),
-    [loan?.borrowerId],
+  const { data: detail, loading, error: loadError, reload } = useAsyncData(
+    async () => {
+      if (!id) return null;
+      return fetchLoanDetail(id);
+    },
+    [id],
   );
-  const transactions =
-    useLiveQuery(
-      () => (id ? db.transactions.where("loanId").equals(id).toArray() : []),
-      [id],
-    ) ?? EMPTY_ARRAY;
-  const schedules =
-    useLiveQuery(
-      () =>
-        id ? db.interestSchedules.where("loanId").equals(id).toArray() : [],
-      [id],
-    ) ?? EMPTY_ARRAY;
+
+  const loan = detail?.loan;
+  const borrower = detail?.borrower ?? undefined;
+  const transactions = detail?.transactions ?? EMPTY_ARRAY;
+  const schedules = detail?.schedules ?? EMPTY_ARRAY;
 
   const principalPaid = getPrincipalPaid(transactions);
   const remaining = loan
@@ -170,6 +166,7 @@ export function LoanDetailPage() {
         });
       }
       setPayMode(null);
+      reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể ghi nhận thanh toán");
     } finally {
@@ -177,7 +174,7 @@ export function LoanDetailPage() {
     }
   }
 
-  if (loan === undefined) {
+  if (loading && !detail) {
     return (
       <PageShell header={<AppHeader title="Khoản vay" />}>
         <EmptyState title="Đang tải..." />
@@ -185,7 +182,7 @@ export function LoanDetailPage() {
     );
   }
 
-  if (!loan) {
+  if (loadError || !loan) {
     return (
       <PageShell header={<AppHeader title="Khoản vay" />}>
         <EmptyState
@@ -249,7 +246,9 @@ export function LoanDetailPage() {
           <Button
             variant="ghost"
             className="text-destructive"
-            onClick={() => void cancelLoan(loan.id)}
+            onClick={() => {
+              void cancelLoan(loan.id).then(() => reload());
+            }}
           >
             Hủy khoản vay
           </Button>
