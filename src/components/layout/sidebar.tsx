@@ -1,7 +1,10 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/components/layout/nav-items";
+import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/stores/ui.store";
+import { useAuthStore } from "@/stores/auth.store";
 
 interface SidebarNavProps {
   collapsed?: boolean;
@@ -38,6 +41,48 @@ export function SidebarNav({ collapsed = false, onNavigate }: SidebarNavProps) {
   );
 }
 
+export function LogoutButton({
+  collapsed = false,
+  className,
+  onNavigate,
+}: {
+  collapsed?: boolean;
+  className?: string;
+  onNavigate?: () => void;
+}) {
+  const navigate = useNavigate();
+  const logout = useAuthStore((s) => s.logout);
+  const username = useAuthStore((s) => s.session?.username);
+
+  function handleLogout() {
+    onNavigate?.();
+    logout();
+    void navigate("/login", { replace: true });
+  }
+
+  return (
+    <div className={cn("space-y-2 p-2", className)}>
+      {!collapsed && username && (
+        <p className="truncate px-2 text-xs text-muted-foreground">
+          Đăng nhập: {username}
+        </p>
+      )}
+      <Button
+        variant="ghost"
+        className={cn(
+          "w-full justify-start gap-3 text-sidebar-foreground",
+          collapsed && "justify-center px-2",
+        )}
+        onClick={handleLogout}
+        title="Đăng xuất"
+      >
+        <LogOut className="size-4 shrink-0" />
+        {!collapsed && <span>Đăng xuất</span>}
+      </Button>
+    </div>
+  );
+}
+
 export function DesktopSidebar() {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
 
@@ -70,6 +115,9 @@ export function DesktopSidebar() {
       </div>
       <div className="flex-1 overflow-y-auto">
         <SidebarNav collapsed={collapsed} />
+      </div>
+      <div className="border-t border-sidebar-border">
+        <LogoutButton collapsed={collapsed} />
       </div>
     </aside>
   );

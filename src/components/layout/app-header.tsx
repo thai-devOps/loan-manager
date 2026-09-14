@@ -1,4 +1,5 @@
-import { Menu, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeft, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -6,8 +7,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { SidebarNav } from "@/components/layout/sidebar";
+import { LogoutButton, SidebarNav } from "@/components/layout/sidebar";
 import { useUiStore } from "@/stores/ui.store";
+import { useAuthStore } from "@/stores/auth.store";
 
 interface AppHeaderProps {
   title: string;
@@ -16,10 +18,17 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ title, description, actions }: AppHeaderProps) {
+  const navigate = useNavigate();
   const mobileNavOpen = useUiStore((s) => s.mobileNavOpen);
   const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const logout = useAuthStore((s) => s.logout);
+
+  function handleLogout() {
+    logout();
+    void navigate("/login", { replace: true });
+  }
 
   return (
     <>
@@ -56,17 +65,33 @@ export function AppHeader({ title, description, actions }: AppHeaderProps) {
             </p>
           )}
         </div>
-        {actions && (
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {actions}
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden sm:inline-flex"
+            onClick={handleLogout}
+          >
+            <LogOut className="size-4" />
+            Đăng xuất
+          </Button>
+        </div>
       </header>
 
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        <SheetContent side="left" className="w-[280px] p-0">
+        <SheetContent side="left" className="flex w-[280px] flex-col p-0">
           <SheetHeader className="border-b px-4 py-4">
             <SheetTitle>Loan Manager</SheetTitle>
           </SheetHeader>
-          <SidebarNav onNavigate={() => setMobileNavOpen(false)} />
+          <div className="flex-1 overflow-y-auto">
+            <SidebarNav onNavigate={() => setMobileNavOpen(false)} />
+          </div>
+          <div className="border-t">
+            <LogoutButton
+              onNavigate={() => setMobileNavOpen(false)}
+            />
+          </div>
         </SheetContent>
       </Sheet>
     </>
