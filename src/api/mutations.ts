@@ -3,19 +3,33 @@ import {
   cancelLoan as apiCancelLoan,
   createBorrower as apiCreateBorrower,
   createFinanceTransaction,
+  createGoldPurchase,
   createLoan as apiCreateLoan,
+  createManualAsset,
   deleteFinanceTransaction,
+  deleteGoldPurchase,
+  deleteManualAsset,
   importBackup,
   recordPayment,
   resetDatabase,
   seedDemo,
+  updateAssetSettings,
   updateBorrower as apiUpdateBorrower,
   updateFinanceTransaction,
+  updateGoldPurchase,
+  updateManualAsset,
+  upsertGoldPlan,
 } from "@/api/endpoints";
 import { queryKeys } from "@/api/query-keys";
 import type { BorrowerFormValues } from "@/schemas/borrower.schema";
 import type { LoanFormValues } from "@/schemas/loan.schema";
 import type { FinanceTransaction } from "@/types/finance";
+import type {
+  AssetSettings,
+  GoldPlan,
+  GoldPurchase,
+  ManualAsset,
+} from "@/types/assets";
 
 function useInvalidateAllData() {
   const queryClient = useQueryClient();
@@ -122,6 +136,7 @@ export function useResetDatabaseMutation() {
       Promise.all([
         invalidate(),
         queryClient.invalidateQueries({ queryKey: queryKeys.finance.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all }),
       ]),
   });
 }
@@ -168,6 +183,96 @@ export function useDeleteFinanceTransactionMutation() {
   const invalidate = useInvalidateFinance();
   return useMutation({
     mutationFn: (id: string) => deleteFinanceTransaction(id),
+    onSuccess: () => invalidate(),
+  });
+}
+
+function useInvalidateAssets() {
+  const queryClient = useQueryClient();
+  return () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.assets.all });
+}
+
+export function useCreateManualAssetMutation() {
+  const invalidate = useInvalidateAssets();
+  return useMutation({
+    mutationFn: (body: Omit<ManualAsset, "id" | "createdAt" | "updatedAt">) =>
+      createManualAsset(body),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateManualAssetMutation() {
+  const invalidate = useInvalidateAssets();
+  return useMutation({
+    mutationFn: ({
+      id,
+      values,
+    }: {
+      id: string;
+      values: Omit<ManualAsset, "id" | "createdAt" | "updatedAt">;
+    }) => updateManualAsset(id, values),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteManualAssetMutation() {
+  const invalidate = useInvalidateAssets();
+  return useMutation({
+    mutationFn: (id: string) => deleteManualAsset(id),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useCreateGoldPurchaseMutation() {
+  const invalidate = useInvalidateAssets();
+  return useMutation({
+    mutationFn: (body: Omit<GoldPurchase, "id" | "createdAt" | "updatedAt">) =>
+      createGoldPurchase(body),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateGoldPurchaseMutation() {
+  const invalidate = useInvalidateAssets();
+  return useMutation({
+    mutationFn: ({
+      id,
+      values,
+    }: {
+      id: string;
+      values: Omit<GoldPurchase, "id" | "createdAt" | "updatedAt">;
+    }) => updateGoldPurchase(id, values),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteGoldPurchaseMutation() {
+  const invalidate = useInvalidateAssets();
+  return useMutation({
+    mutationFn: (id: string) => deleteGoldPurchase(id),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpsertGoldPlanMutation() {
+  const invalidate = useInvalidateAssets();
+  return useMutation({
+    mutationFn: (body: Omit<GoldPlan, "id" | "createdAt" | "updatedAt">) =>
+      upsertGoldPlan(body),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateAssetSettingsMutation() {
+  const invalidate = useInvalidateAssets();
+  return useMutation({
+    mutationFn: (body: {
+      goldReferencePricePerChi?: Partial<
+        AssetSettings["goldReferencePricePerChi"]
+      >;
+      allocationTargets?: AssetSettings["allocationTargets"] | null;
+    }) => updateAssetSettings(body),
     onSuccess: () => invalidate(),
   });
 }

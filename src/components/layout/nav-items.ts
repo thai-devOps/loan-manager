@@ -10,10 +10,14 @@ import {
   Settings,
   TrendingUp,
   TrendingDown,
+  Landmark,
+  PieChart,
+  Coins,
+  List,
   type LucideIcon,
 } from "lucide-react";
 
-export type AppFeatureId = "loans" | "finance" | "analytics";
+export type AppFeatureId = "loans" | "finance" | "analytics" | "assets";
 
 export interface NavItem {
   title: string;
@@ -66,6 +70,19 @@ export const APP_FEATURES: AppFeature[] = [
     ],
   },
   {
+    id: "assets",
+    title: "Tài sản",
+    description: "Phân bổ vốn và kế hoạch tích lũy vàng",
+    href: "/assets",
+    icon: Landmark,
+    nav: [
+      { title: "Tổng quan", href: "/assets", icon: LayoutDashboard, end: true },
+      { title: "Danh mục tài sản", href: "/assets/holdings", icon: List },
+      { title: "Phân bổ vốn", href: "/assets/allocation", icon: PieChart },
+      { title: "Tích lũy vàng", href: "/assets/gold", icon: Coins },
+    ],
+  },
+  {
     id: "analytics",
     title: "Phân tích",
     description: "Báo cáo và biểu đồ hiệu quả cho vay",
@@ -83,6 +100,9 @@ export function getFeatureFromPath(pathname: string): AppFeature | null {
   if (pathname === "/apps" || pathname.startsWith("/apps/")) return null;
   if (pathname === "/finance" || pathname.startsWith("/finance/")) {
     return getFeatureById("finance");
+  }
+  if (pathname === "/assets" || pathname.startsWith("/assets/")) {
+    return getFeatureById("assets");
   }
   if (pathname === "/reports" || pathname.startsWith("/reports/")) {
     return getFeatureById("analytics");

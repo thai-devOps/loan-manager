@@ -86,6 +86,10 @@ const routes: Route[] = [
     load: () => import("../api/finance/index.ts"),
   },
   {
+    pattern: /^\/api\/assets\/?$/,
+    load: () => import("../api/assets/index.ts"),
+  },
+  {
     pattern: /^\/api\/stats\/?$/,
     load: () => import("../api/stats/index.ts"),
   },

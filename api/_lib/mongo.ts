@@ -3,7 +3,14 @@ import type { Borrower } from "./types.js";
 import type { Loan } from "./types.js";
 import type { InterestSchedule } from "./types.js";
 import type { Transaction } from "./types.js";
-import type { FinanceTransaction } from "./types.js";
+import type {
+  AssetSettings,
+  AssetSnapshot,
+  FinanceTransaction,
+  GoldPlan,
+  GoldPurchase,
+  ManualAsset,
+} from "./types.js";
 
 const uri = process.env.MONGODB_URI;
 const DB_NAME = "loan-db";
@@ -46,6 +53,10 @@ async function ensureIndexes(db: Db): Promise<void> {
     db.collection("transactions").createIndex({ transactionDate: 1 }),
     db.collection("finance_transactions").createIndex({ date: 1 }),
     db.collection("finance_transactions").createIndex({ type: 1 }),
+    db.collection("assets").createIndex({ type: 1 }),
+    db.collection("gold_purchases").createIndex({ purchaseDate: 1 }),
+    db.collection("gold_purchases").createIndex({ type: 1 }),
+    db.collection("asset_snapshots").createIndex({ month: 1 }, { unique: true }),
   ]);
   indexesReady = true;
 }
@@ -70,6 +81,26 @@ export async function financeTransactionsCol(): Promise<
   Collection<FinanceTransaction>
 > {
   return (await getDb()).collection<FinanceTransaction>("finance_transactions");
+}
+
+export async function assetsCol(): Promise<Collection<ManualAsset>> {
+  return (await getDb()).collection<ManualAsset>("assets");
+}
+
+export async function goldPurchasesCol(): Promise<Collection<GoldPurchase>> {
+  return (await getDb()).collection<GoldPurchase>("gold_purchases");
+}
+
+export async function goldPlansCol(): Promise<Collection<GoldPlan>> {
+  return (await getDb()).collection<GoldPlan>("gold_plans");
+}
+
+export async function assetSettingsCol(): Promise<Collection<AssetSettings>> {
+  return (await getDb()).collection<AssetSettings>("asset_settings");
+}
+
+export async function assetSnapshotsCol(): Promise<Collection<AssetSnapshot>> {
+  return (await getDb()).collection<AssetSnapshot>("asset_snapshots");
 }
 
 /** Strip MongoDB-only fields for API responses */

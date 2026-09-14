@@ -60,7 +60,7 @@ export function AppsHubPage() {
           </p>
         </div>
 
-        <div className="grid w-full max-w-4xl gap-4 sm:grid-cols-3">
+        <div className="grid w-full max-w-4xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {APP_FEATURES.map((feature) => {
             const Icon = feature.icon;
             return (

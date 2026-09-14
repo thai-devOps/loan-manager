@@ -1,10 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  fetchAssetAllocation,
+  fetchAssetSettings,
+  fetchAssetSnapshots,
+  fetchAssetSummary,
   fetchBorrower,
   fetchBorrowers,
   fetchFinanceTransactions,
+  fetchGoldPlan,
+  fetchGoldPurchases,
   fetchLoanDetail,
   fetchLoans,
+  fetchManualAssets,
   fetchSchedules,
   fetchStats,
   fetchTransactions,
@@ -79,5 +86,54 @@ export function useFinanceTransactionsQuery(params?: {
   return useQuery({
     queryKey: key,
     queryFn: () => fetchFinanceTransactions(params),
+  });
+}
+
+export function useAssetSummaryQuery() {
+  return useQuery({
+    queryKey: queryKeys.assets.summary,
+    queryFn: fetchAssetSummary,
+  });
+}
+
+export function useAssetAllocationQuery() {
+  return useQuery({
+    queryKey: queryKeys.assets.allocation,
+    queryFn: fetchAssetAllocation,
+  });
+}
+
+export function useManualAssetsQuery() {
+  return useQuery({
+    queryKey: queryKeys.assets.list,
+    queryFn: fetchManualAssets,
+  });
+}
+
+export function useGoldPurchasesQuery() {
+  return useQuery({
+    queryKey: queryKeys.assets.goldPurchases,
+    queryFn: fetchGoldPurchases,
+  });
+}
+
+export function useGoldPlanQuery() {
+  return useQuery({
+    queryKey: queryKeys.assets.goldPlan,
+    queryFn: fetchGoldPlan,
+  });
+}
+
+export function useAssetSettingsQuery() {
+  return useQuery({
+    queryKey: queryKeys.assets.settings,
+    queryFn: fetchAssetSettings,
+  });
+}
+
+export function useAssetSnapshotsQuery(months = 12) {
+  return useQuery({
+    queryKey: queryKeys.assets.snapshots(months),
+    queryFn: () => fetchAssetSnapshots(months),
   });
 }

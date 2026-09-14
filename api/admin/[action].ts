@@ -5,8 +5,13 @@ import { requireAuth } from "../_lib/auth.js";
 import { generateInterestSchedules } from "../_lib/calculations.js";
 import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http.js";
 import {
+  assetSettingsCol,
+  assetSnapshotsCol,
+  assetsCol,
   borrowersCol,
   financeTransactionsCol,
+  goldPlansCol,
+  goldPurchasesCol,
   loansCol,
   schedulesCol,
   stripDoc,
@@ -283,5 +288,10 @@ async function clearAll() {
     (await transactionsCol()).deleteMany({}),
     (await schedulesCol()).deleteMany({}),
     (await financeTransactionsCol()).deleteMany({}),
+    (await assetsCol()).deleteMany({}),
+    (await goldPurchasesCol()).deleteMany({}),
+    (await goldPlansCol()).deleteMany({}),
+    (await assetSettingsCol()).deleteMany({}),
+    (await assetSnapshotsCol()).deleteMany({}),
   ]);
 }

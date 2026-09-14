@@ -4,6 +4,15 @@ import type { Borrower } from "@/types/borrower";
 import type { Loan } from "@/types/loan";
 import type { InterestSchedule } from "@/types/interest-schedule";
 import type { Transaction } from "@/types/transaction";
+import type {
+  AssetAllocation,
+  AssetSettings,
+  AssetSnapshot,
+  AssetSummary,
+  GoldPlan,
+  GoldPurchase,
+  ManualAsset,
+} from "@/types/assets";
 import type { BorrowerFormValues } from "@/schemas/borrower.schema";
 import type { LoanFormValues } from "@/schemas/loan.schema";
 
@@ -181,5 +190,103 @@ export function deleteFinanceTransaction(id: string) {
   return apiFetch<{ ok: boolean }>(
     `/api/finance?id=${encodeURIComponent(id)}`,
     { method: "DELETE" },
+  );
+}
+
+function assetsUrl(resource: string, extra?: Record<string, string>) {
+  const search = new URLSearchParams({ resource, ...extra });
+  return `/api/assets?${search.toString()}`;
+}
+
+export function fetchAssetSummary() {
+  return apiFetch<AssetSummary>(assetsUrl("summary"));
+}
+
+export function fetchAssetAllocation() {
+  return apiFetch<AssetAllocation>(assetsUrl("allocation"));
+}
+
+export function fetchManualAssets() {
+  return apiFetch<ManualAsset[]>(assetsUrl("assets"));
+}
+
+export function createManualAsset(
+  body: Omit<ManualAsset, "id" | "createdAt" | "updatedAt">,
+) {
+  return apiFetch<ManualAsset>(assetsUrl("assets"), { method: "POST", body });
+}
+
+export function updateManualAsset(
+  id: string,
+  body: Omit<ManualAsset, "id" | "createdAt" | "updatedAt">,
+) {
+  return apiFetch<ManualAsset>(assetsUrl("assets", { id }), {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function deleteManualAsset(id: string) {
+  return apiFetch<{ ok: boolean }>(assetsUrl("assets", { id }), {
+    method: "DELETE",
+  });
+}
+
+export function fetchGoldPurchases() {
+  return apiFetch<GoldPurchase[]>(assetsUrl("gold-purchases"));
+}
+
+export function createGoldPurchase(
+  body: Omit<GoldPurchase, "id" | "createdAt" | "updatedAt">,
+) {
+  return apiFetch<GoldPurchase>(assetsUrl("gold-purchases"), {
+    method: "POST",
+    body,
+  });
+}
+
+export function updateGoldPurchase(
+  id: string,
+  body: Omit<GoldPurchase, "id" | "createdAt" | "updatedAt">,
+) {
+  return apiFetch<GoldPurchase>(assetsUrl("gold-purchases", { id }), {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function deleteGoldPurchase(id: string) {
+  return apiFetch<{ ok: boolean }>(assetsUrl("gold-purchases", { id }), {
+    method: "DELETE",
+  });
+}
+
+export function fetchGoldPlan() {
+  return apiFetch<GoldPlan | null>(assetsUrl("gold-plan"));
+}
+
+export function upsertGoldPlan(
+  body: Omit<GoldPlan, "id" | "createdAt" | "updatedAt">,
+) {
+  return apiFetch<GoldPlan>(assetsUrl("gold-plan"), { method: "PUT", body });
+}
+
+export function fetchAssetSettings() {
+  return apiFetch<AssetSettings>(assetsUrl("settings"));
+}
+
+export function updateAssetSettings(body: {
+  goldReferencePricePerChi?: Partial<AssetSettings["goldReferencePricePerChi"]>;
+  allocationTargets?: AssetSettings["allocationTargets"] | null;
+}) {
+  return apiFetch<AssetSettings>(assetsUrl("settings"), {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function fetchAssetSnapshots(months = 12) {
+  return apiFetch<AssetSnapshot[]>(
+    assetsUrl("snapshots", { months: String(months) }),
   );
 }

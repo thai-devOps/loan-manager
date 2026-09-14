@@ -50,6 +50,7 @@ import {
   useLoansQuery,
   useSchedulesQuery,
   useTransactionsQuery,
+  useAssetSummaryQuery,
 } from "@/api/queries";
 import {
   getInterestPaid,
@@ -62,6 +63,7 @@ import {
 import { formatCurrency } from "@/lib/currency";
 import { getDaysOverdue } from "@/lib/date";
 import { EMPTY_ARRAY } from "@/lib/empty";
+import { calculateGoldGoalProgress } from "@/features/assets/lib/calculations";
 
 export function DashboardPage() {
   const borrowersQ = useBorrowersQuery();
@@ -198,6 +200,8 @@ export function DashboardPage() {
               icon={<HandCoins className="size-4" />}
             />
           </div>
+
+          <DashboardAssetsWidgets />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
@@ -450,5 +454,85 @@ export function DashboardPage() {
         </>
       )}
     </PageShell>
+  );
+}
+
+function DashboardAssetsWidgets() {
+  const summaryQ = useAssetSummaryQuery();
+  if (summaryQ.isLoading || !summaryQ.data) return null;
+  const s = summaryQ.data;
+  const progress = s.plan
+    ? calculateGoldGoalProgress(s.goldCost, s.plan.targetAmount)
+    : 0;
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-base">Tài sản</CardTitle>
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/assets">Xem tài sản →</Link>
+          </Button>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-muted-foreground">Tổng tài sản</p>
+            <p className="font-semibold tabular-nums">
+              {formatCurrency(s.totalAssets)}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Đang cho vay</p>
+            <p className="font-semibold tabular-nums">
+              {formatCurrency(s.lentCapital)}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Khả dụng</p>
+            <p className="font-semibold tabular-nums">
+              {formatCurrency(s.availableCash)}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Vàng</p>
+            <p className="font-semibold tabular-nums">
+              {formatCurrency(s.goldValue)}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-base">Kế hoạch vàng</CardTitle>
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/assets/gold">Xem kế hoạch →</Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {!s.plan ? (
+            <p className="text-sm text-muted-foreground">
+              Chưa có kế hoạch tích lũy vàng.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm">
+                {formatCurrency(s.goldCost)} /{" "}
+                {formatCurrency(s.plan.targetAmount)}
+              </p>
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-amber-600"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {progress}% · {formatCurrency(s.plan.monthlyBudget)} / tháng
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

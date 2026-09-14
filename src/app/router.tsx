@@ -18,6 +18,11 @@ import { FinanceOverviewPage } from "@/features/finance/finance-overview-page";
 import { FinanceIncomePage } from "@/features/finance/finance-income-page";
 import { FinanceExpensesPage } from "@/features/finance/finance-expenses-page";
 import { FinanceTransactionsPage } from "@/features/finance/finance-transactions-page";
+import { AssetsLayout } from "@/features/assets/assets-layout";
+import { AssetsOverviewPage } from "@/features/assets/assets-overview-page";
+import { AssetsHoldingsPage } from "@/features/assets/assets-holdings-page";
+import { AssetsAllocationPage } from "@/features/assets/assets-allocation-page";
+import { AssetsGoldPage } from "@/features/assets/assets-gold-page";
 
 export const router = createBrowserRouter([
   {
@@ -48,6 +53,16 @@ export const router = createBrowserRouter([
               { path: "income", element: <FinanceIncomePage /> },
               { path: "expenses", element: <FinanceExpensesPage /> },
               { path: "transactions", element: <FinanceTransactionsPage /> },
+            ],
+          },
+          {
+            path: "assets",
+            element: <AssetsLayout />,
+            children: [
+              { index: true, element: <AssetsOverviewPage /> },
+              { path: "holdings", element: <AssetsHoldingsPage /> },
+              { path: "allocation", element: <AssetsAllocationPage /> },
+              { path: "gold", element: <AssetsGoldPage /> },
             ],
           },
           { path: "reports", element: <ReportsPage /> },
