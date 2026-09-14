@@ -506,16 +506,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         try {
           const parsed = validateAssetBody(readJsonBody(req));
-          const update =
+          const now = new Date().toISOString();
+          const result =
             parsed.type === "gold"
-              ? { $set: { ...parsed, updatedAt: new Date().toISOString() } }
-              : {
-                  $set: { ...parsed, updatedAt: new Date().toISOString() },
-                  $unset: { goldDetails: "" },
-                };
-          const result = await col.findOneAndUpdate({ id }, update, {
-            returnDocument: "after",
-          });
+              ? await col.findOneAndUpdate(
+                  { id },
+                  { $set: { ...parsed, updatedAt: now } },
+                  { returnDocument: "after" },
+                )
+              : await col.findOneAndUpdate(
+                  { id },
+                  {
+                    $set: { ...parsed, updatedAt: now },
+                    $unset: { goldDetails: 1 },
+                  },
+                  { returnDocument: "after" },
+                );
           if (!result) {
             res.status(404).json({ error: "Không tìm thấy tài sản" });
             return;

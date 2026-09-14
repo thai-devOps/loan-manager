@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const goldDetailsSchema = z.object({
   goldType: z.enum(["9999", "18k", "other"], {
-    required_error: "Chọn loại vàng",
+    message: "Chọn loại vàng",
   }),
   quantity: z.number().positive("Khối lượng phải lớn hơn 0"),
   unit: z.enum(["cay", "chi", "phan"]),
