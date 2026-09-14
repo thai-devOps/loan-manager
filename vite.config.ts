@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { loanApiDevPlugin } from "./plugins/api-dev-plugin";
+import { loanApiDevPlugin } from "./plugins/api-dev-plugin.ts";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 

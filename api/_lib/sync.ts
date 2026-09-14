@@ -1,8 +1,8 @@
 import {
   ensureInterestSchedules,
   refreshScheduleStatuses,
-} from "./calculations";
-import { loansCol, schedulesCol } from "./mongo";
+} from "./calculations.js";
+import { loansCol, schedulesCol } from "./mongo.js";
 
 export async function syncAllSchedules() {
   const loans = await (await loansCol()).find({ status: "ACTIVE" }).toArray();

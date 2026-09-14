@@ -1,19 +1,19 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth } from "../_lib/auth";
-import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http";
+import { requireAuth } from "../_lib/auth.js";
+import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http.js";
 import {
   borrowersCol,
   loansCol,
   schedulesCol,
   stripDoc,
   transactionsCol,
-} from "../_lib/mongo";
+} from "../_lib/mongo.js";
 import type {
   Borrower,
   InterestSchedule,
   Loan,
   Transaction,
-} from "../_lib/types";
+} from "../_lib/types.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {

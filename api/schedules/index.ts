@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth } from "../_lib/auth";
-import { resolveScheduleStatus } from "../_lib/calculations";
-import { methodNotAllowed, withHandler } from "../_lib/http";
-import { schedulesCol, stripDoc } from "../_lib/mongo";
+import { requireAuth } from "../_lib/auth.js";
+import { resolveScheduleStatus } from "../_lib/calculations.js";
+import { methodNotAllowed, withHandler } from "../_lib/http.js";
+import { schedulesCol, stripDoc } from "../_lib/mongo.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {

@@ -1,8 +1,8 @@
 import { MongoClient, type Db, type Collection } from "mongodb";
-import type { Borrower } from "./types";
-import type { Loan } from "./types";
-import type { InterestSchedule } from "./types";
-import type { Transaction } from "./types";
+import type { Borrower } from "./types.js";
+import type { Loan } from "./types.js";
+import type { InterestSchedule } from "./types.js";
+import type { Transaction } from "./types.js";
 
 const uri = process.env.MONGODB_URI;
 const DB_NAME = "loan-db";

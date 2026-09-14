@@ -9,8 +9,8 @@ import {
   startOfDay,
   format,
 } from "date-fns";
-import type { InterestSchedule, InterestScheduleStatus, Loan, Transaction } from "./types";
-import { getPeriodFromISO } from "./date";
+import type { InterestSchedule, InterestScheduleStatus, Loan, Transaction } from "./types.js";
+import { getPeriodFromISO } from "./date.js";
 
 export function getPrincipalPaid(transactions: Transaction[]): number {
   return transactions

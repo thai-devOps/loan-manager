@@ -1,20 +1,20 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
-import { requireAuth } from "../../_lib/auth";
+import { requireAuth } from "../../_lib/auth.js";
 import {
   applyInterestPaymentToSchedules,
   getRemainingPrincipal,
   shouldCompleteLoan,
-} from "../../_lib/calculations";
-import { dateInputToISO } from "../../_lib/date";
-import { methodNotAllowed, readJsonBody, withHandler } from "../../_lib/http";
+} from "../../_lib/calculations.js";
+import { dateInputToISO } from "../../_lib/date.js";
+import { methodNotAllowed, readJsonBody, withHandler } from "../../_lib/http.js";
 import {
   loansCol,
   schedulesCol,
   stripDoc,
   transactionsCol,
-} from "../../_lib/mongo";
-import type { Transaction } from "../../_lib/types";
+} from "../../_lib/mongo.js";
+import type { Transaction } from "../../_lib/types.js";
 
 type PaymentBody = {
   paymentType?: "INTEREST_PAYMENT" | "PRINCIPAL_PAYMENT" | "BOTH";

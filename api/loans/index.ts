@@ -1,18 +1,18 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
-import { requireAuth } from "../_lib/auth";
+import { requireAuth } from "../_lib/auth.js";
 import {
   generateInterestSchedules,
-} from "../_lib/calculations";
-import { dateInputToISO } from "../_lib/date";
-import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http";
+} from "../_lib/calculations.js";
+import { dateInputToISO } from "../_lib/date.js";
+import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http.js";
 import {
   loansCol,
   schedulesCol,
   stripDoc,
   transactionsCol,
-} from "../_lib/mongo";
-import type { Loan, Transaction } from "../_lib/types";
+} from "../_lib/mongo.js";
+import type { Loan, Transaction } from "../_lib/types.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
