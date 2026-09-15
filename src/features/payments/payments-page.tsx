@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -331,7 +332,14 @@ export function PaymentsPage() {
 
               <div className="space-y-2">
                 <Label>Ngày thu *</Label>
-                <Input type="date" {...form.register("transactionDate")} />
+                <DatePicker
+                  value={form.watch("transactionDate")}
+                  onChange={(v) =>
+                    form.setValue("transactionDate", v, {
+                      shouldValidate: true,
+                    })
+                  }
+                />
               </div>
 
               <div className="space-y-2">

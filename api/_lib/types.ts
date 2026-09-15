@@ -116,15 +116,36 @@ export interface GoldPurchase {
   updatedAt: string;
 }
 
+export type GoldPlanStatus =
+  | "active"
+  | "paused"
+  | "completed"
+  | "cancelled"
+  | "expired";
+
+export interface GoldPlanBudgetEntry {
+  /** YYYY-MM — budget applies from this month inclusive */
+  effectiveFrom: string;
+  monthlyBudget: number;
+}
+
 export interface GoldPlan {
   _id?: string;
   id: string;
+  /** Legacy / reference money goal — kept for backward compatibility */
   targetAmount: number;
+  /** Primary goal in integer phân; null/undefined = legacy plan not yet migrated */
+  targetQuantityInPhan?: number | null;
+  /** Loại vàng kế hoạch mua (9999 / 18k / other) */
+  goldType?: GoldType | null;
+  initialQuantityInPhan: number;
+  includeInitialQuantity: boolean;
   monthlyBudget: number;
+  budgetHistory: GoldPlanBudgetEntry[];
   plannedPurchaseDay: number;
   startMonth: string;
   endMonth: string;
-  status: "active" | "paused" | "completed";
+  status: GoldPlanStatus;
   createdAt: string;
   updatedAt: string;
 }

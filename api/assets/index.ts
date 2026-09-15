@@ -297,20 +297,70 @@ function validatePurchaseBody(body: {
   };
 }
 
-function validatePlanBody(body: {
-  targetAmount?: number;
-  monthlyBudget?: number;
-  plannedPurchaseDay?: number;
-  startMonth?: string;
-  endMonth?: string;
-  status?: string;
-}): Omit<GoldPlan, "_id" | "id" | "createdAt" | "updatedAt"> {
-  const targetAmount = Number(body.targetAmount);
+const PLAN_STATUSES = new Set([
+  "active",
+  "paused",
+  "completed",
+  "cancelled",
+  "expired",
+]);
+
+function normalizeGoldPlan(
+  plan: GoldPlan,
+): Omit<GoldPlan, "_id"> {
+  const monthlyBudget = plan.monthlyBudget;
+  const startMonth = plan.startMonth;
+  const history =
+    Array.isArray(plan.budgetHistory) && plan.budgetHistory.length > 0
+      ? plan.budgetHistory
+      : [{ effectiveFrom: startMonth, monthlyBudget }];
+  const targetQty = plan.targetQuantityInPhan;
+  const goldType =
+    plan.goldType === "9999" || plan.goldType === "18k" || plan.goldType === "other"
+      ? plan.goldType
+      : null;
+  return {
+    id: plan.id,
+    targetAmount: plan.targetAmount,
+    targetQuantityInPhan:
+      targetQty == null || !Number.isFinite(targetQty)
+        ? null
+        : Math.max(0, Math.round(targetQty)),
+    goldType,
+    initialQuantityInPhan: Number.isInteger(plan.initialQuantityInPhan)
+      ? Math.max(0, plan.initialQuantityInPhan)
+      : 0,
+    includeInitialQuantity: Boolean(plan.includeInitialQuantity),
+    monthlyBudget,
+    budgetHistory: history,
+    plannedPurchaseDay: plan.plannedPurchaseDay,
+    startMonth,
+    endMonth: plan.endMonth,
+    status: PLAN_STATUSES.has(plan.status) ? plan.status : "active",
+    createdAt: plan.createdAt,
+    updatedAt: plan.updatedAt,
+  };
+}
+
+function validatePlanBody(
+  body: {
+    targetAmount?: number;
+    targetQuantityInPhan?: number | null;
+    goldType?: string | null;
+    initialQuantityInPhan?: number;
+    includeInitialQuantity?: boolean;
+    monthlyBudget?: number;
+    budgetHistory?: { effectiveFrom?: string; monthlyBudget?: number }[];
+    budgetEffectiveFrom?: string;
+    plannedPurchaseDay?: number;
+    startMonth?: string;
+    endMonth?: string;
+    status?: string;
+  },
+  existing: GoldPlan | null,
+): Omit<GoldPlan, "_id" | "id" | "createdAt" | "updatedAt"> {
   const monthlyBudget = Number(body.monthlyBudget);
   const plannedPurchaseDay = Number(body.plannedPurchaseDay);
-  if (!Number.isInteger(targetAmount) || targetAmount <= 0) {
-    throw new Error("Mục tiêu tổng phải lớn hơn 0");
-  }
   if (!Number.isInteger(monthlyBudget) || monthlyBudget <= 0) {
     throw new Error("Ngân sách tháng phải lớn hơn 0");
   }
@@ -329,13 +379,110 @@ function validatePlanBody(body: {
   if (endMonth < startMonth) {
     throw new Error("Thời gian kết thúc phải sau thời gian bắt đầu");
   }
-  const status =
-    body.status === "paused" || body.status === "completed"
-      ? body.status
+
+  let targetAmount = Number(body.targetAmount);
+  if (!Number.isInteger(targetAmount) || targetAmount <= 0) {
+    targetAmount =
+      existing && Number.isInteger(existing.targetAmount) && existing.targetAmount > 0
+        ? existing.targetAmount
+        : Math.max(monthlyBudget, 1);
+  }
+
+  let targetQuantityInPhan: number | null = null;
+  if (
+    body.targetQuantityInPhan !== undefined &&
+    body.targetQuantityInPhan !== null
+  ) {
+    const qty = Number(body.targetQuantityInPhan);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      throw new Error("Mục tiêu số lượng vàng phải lớn hơn 0");
+    }
+    targetQuantityInPhan = qty;
+  } else if (
+    existing?.targetQuantityInPhan != null &&
+    Number.isInteger(existing.targetQuantityInPhan)
+  ) {
+    targetQuantityInPhan = existing.targetQuantityInPhan;
+  }
+
+  const initialQuantityInPhan = Number(body.initialQuantityInPhan ?? 0);
+  if (
+    !Number.isInteger(initialQuantityInPhan) ||
+    initialQuantityInPhan < 0
+  ) {
+    throw new Error("Số vàng ban đầu không hợp lệ");
+  }
+  const includeInitialQuantity = Boolean(body.includeInitialQuantity);
+  if (
+    includeInitialQuantity &&
+    targetQuantityInPhan != null &&
+    initialQuantityInPhan >= targetQuantityInPhan
+  ) {
+    throw new Error("Mục tiêu phải lớn hơn số vàng hiện có");
+  }
+
+  const status = PLAN_STATUSES.has(body.status ?? "")
+    ? (body.status as GoldPlan["status"])
+    : existing?.status && PLAN_STATUSES.has(existing.status)
+      ? existing.status
       : "active";
+
+  const budgetEffectiveFrom = (body.budgetEffectiveFrom ?? "").trim();
+  const effectiveFrom =
+    budgetEffectiveFrom && isValidMonth(budgetEffectiveFrom)
+      ? budgetEffectiveFrom
+      : currentMonthKey();
+
+  let budgetHistory: GoldPlan["budgetHistory"] = [];
+  if (existing) {
+    const prev = normalizeGoldPlan(existing).budgetHistory;
+    budgetHistory = [...prev];
+    if (monthlyBudget !== existing.monthlyBudget) {
+      const withoutSame = budgetHistory.filter(
+        (e) => e.effectiveFrom !== effectiveFrom,
+      );
+      withoutSame.push({ effectiveFrom, monthlyBudget });
+      withoutSame.sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+      budgetHistory = withoutSame;
+    }
+  } else if (Array.isArray(body.budgetHistory) && body.budgetHistory.length > 0) {
+    budgetHistory = body.budgetHistory
+      .map((e) => ({
+        effectiveFrom: (e.effectiveFrom ?? "").trim(),
+        monthlyBudget: Number(e.monthlyBudget),
+      }))
+      .filter(
+        (e) =>
+          isValidMonth(e.effectiveFrom) &&
+          Number.isInteger(e.monthlyBudget) &&
+          e.monthlyBudget > 0,
+      );
+  }
+  if (budgetHistory.length === 0) {
+    budgetHistory = [{ effectiveFrom: startMonth, monthlyBudget }];
+  }
+
+  let goldType: GoldType | null = null;
+  if (body.goldType === "9999" || body.goldType === "18k" || body.goldType === "other") {
+    goldType = body.goldType;
+  } else if (
+    existing?.goldType === "9999" ||
+    existing?.goldType === "18k" ||
+    existing?.goldType === "other"
+  ) {
+    goldType = existing.goldType;
+  } else if (targetQuantityInPhan != null) {
+    throw new Error("Vui lòng chọn loại vàng (9999 / 18K)");
+  }
+
   return {
     targetAmount,
+    targetQuantityInPhan,
+    goldType,
+    initialQuantityInPhan,
+    includeInitialQuantity,
     monthlyBudget,
+    budgetHistory,
     plannedPurchaseDay,
     startMonth,
     endMonth,
@@ -369,7 +516,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         quantityByType: parts.quantityByType,
         allocation: parts.allocation,
         settings: parts.settings,
-        plan: plan ? stripDoc(plan) : null,
+        plan: plan ? normalizeGoldPlan(plan) : null,
         purchasesCount: parts.purchasesCount,
       });
       return;
@@ -637,21 +784,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const col = await goldPlansCol();
       if (req.method === "GET") {
         const plan = await col.findOne({ id: PLAN_ID });
-        res.status(200).json(plan ? stripDoc(plan) : null);
+        res.status(200).json(plan ? normalizeGoldPlan(plan) : null);
         return;
       }
       if (req.method === "PUT" || req.method === "PATCH" || req.method === "POST") {
         try {
-          const parsed = validatePlanBody(readJsonBody(req));
-          const now = new Date().toISOString();
           const existing = await col.findOne({ id: PLAN_ID });
+          const parsed = validatePlanBody(readJsonBody(req), existing);
+          const now = new Date().toISOString();
           if (existing) {
             const result = await col.findOneAndUpdate(
               { id: PLAN_ID },
               { $set: { ...parsed, updatedAt: now } },
               { returnDocument: "after" },
             );
-            res.status(200).json(stripDoc(result!));
+            res.status(200).json(normalizeGoldPlan(result!));
           } else {
             const row: GoldPlan = {
               _id: PLAN_ID,
@@ -661,7 +808,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               updatedAt: now,
             };
             await col.insertOne(row);
-            res.status(201).json(stripDoc(row));
+            res.status(201).json(normalizeGoldPlan(row));
           }
         } catch (e) {
           res.status(400).json({

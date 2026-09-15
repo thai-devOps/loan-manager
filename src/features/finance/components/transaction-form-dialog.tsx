@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MoneyInput } from "@/features/finance/components/money-input";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   categoriesForType,
   PAYMENT_METHODS,
@@ -239,7 +240,11 @@ function TransactionFormFields({
 
       <div className="space-y-2">
         <Label htmlFor="finance-date">Ngày *</Label>
-        <Input id="finance-date" type="date" {...form.register("date")} />
+        <DatePicker
+          id="finance-date"
+          value={form.watch("date")}
+          onChange={(v) => form.setValue("date", v, { shouldValidate: true })}
+        />
         {form.formState.errors.date && (
           <p className="text-xs text-destructive">
             {form.formState.errors.date.message}

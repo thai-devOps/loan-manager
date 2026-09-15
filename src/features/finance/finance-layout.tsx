@@ -6,7 +6,7 @@ import { FeatureSubNav } from "@/components/layout/feature-sub-nav";
 import { getFeatureById } from "@/components/layout/nav-items";
 import { PageShell } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { MonthPicker } from "@/components/ui/date-picker";
 import { TransactionFormDialog } from "@/features/finance/components/transaction-form-dialog";
 import {
   FinanceMonthContext,
@@ -82,12 +82,11 @@ export function FinanceLayout() {
           >
             Tháng
           </label>
-          <Input
+          <MonthPicker
             id="finance-month"
-            type="month"
             className="w-[11rem]"
             value={month}
-            onChange={(e) => setMonth(e.target.value)}
+            onChange={setMonth}
           />
         </div>
 

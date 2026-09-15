@@ -73,19 +73,138 @@ export function monthSpend(purchases: GoldPurchase[], month: string): number {
   );
 }
 
+export function monthQuantityPhan(
+  purchases: GoldPurchase[],
+  month: string,
+): number {
+  return purchasesInMonth(purchases, month).reduce(
+    (sum, p) => sum + p.quantityInPhan,
+    0,
+  );
+}
+
+/** Purchases with purchaseDate in [startMonth, endMonth] inclusive (YYYY-MM). */
+export function purchasesInPlanRange(
+  purchases: GoldPurchase[],
+  startMonth: string,
+  endMonth: string,
+): GoldPurchase[] {
+  return purchases.filter((p) => {
+    const m = p.purchaseDate.slice(0, 7);
+    return m >= startMonth && m <= endMonth;
+  });
+}
+
+export function purchasesBeforeMonth(
+  purchases: GoldPurchase[],
+  month: string,
+): GoldPurchase[] {
+  return purchases.filter((p) => p.purchaseDate.slice(0, 7) < month);
+}
+
+export function normalizeGoldPlan(plan: GoldPlan): GoldPlan {
+  const monthlyBudget = plan.monthlyBudget;
+  const startMonth = plan.startMonth;
+  const history =
+    Array.isArray(plan.budgetHistory) && plan.budgetHistory.length > 0
+      ? plan.budgetHistory
+      : [{ effectiveFrom: startMonth, monthlyBudget }];
+  const goldType =
+    plan.goldType === "9999" ||
+    plan.goldType === "18k" ||
+    plan.goldType === "other"
+      ? plan.goldType
+      : null;
+  return {
+    ...plan,
+    goldType,
+    targetQuantityInPhan:
+      plan.targetQuantityInPhan == null ||
+      !Number.isFinite(plan.targetQuantityInPhan)
+        ? null
+        : Math.max(0, Math.round(plan.targetQuantityInPhan)),
+    initialQuantityInPhan: Number.isInteger(plan.initialQuantityInPhan)
+      ? Math.max(0, plan.initialQuantityInPhan)
+      : 0,
+    includeInitialQuantity: Boolean(plan.includeInitialQuantity),
+    budgetHistory: history,
+  };
+}
+
+/** Purchases for plan progress — filter by goldType when plan has one. */
+export function purchasesForPlan(
+  plan: GoldPlan,
+  purchases: GoldPurchase[],
+): GoldPurchase[] {
+  const normalized = normalizeGoldPlan(plan);
+  const inRange = purchasesInPlanRange(
+    purchases,
+    normalized.startMonth,
+    normalized.endMonth,
+  );
+  if (!normalized.goldType) return inRange;
+  return inRange.filter((p) => p.type === normalized.goldType);
+}
+
+/** Rule 1A: (initial if included) + sum qty of plan-type purchases in range. */
+export function planAccumulatedPhan(
+  plan: GoldPlan,
+  purchases: GoldPurchase[],
+): number {
+  const normalized = normalizeGoldPlan(plan);
+  const initial = normalized.includeInitialQuantity
+    ? normalized.initialQuantityInPhan
+    : 0;
+  return (
+    initial +
+    purchasesForPlan(normalized, purchases).reduce(
+      (sum, p) => sum + p.quantityInPhan,
+      0,
+    )
+  );
+}
+
+export function planRemainingPhan(
+  plan: GoldPlan,
+  purchases: GoldPurchase[],
+): number | null {
+  const target = normalizeGoldPlan(plan).targetQuantityInPhan;
+  if (target == null || target <= 0) return null;
+  return Math.max(target - planAccumulatedPhan(plan, purchases), 0);
+}
+
+export function planHasQuantityTarget(plan: GoldPlan): boolean {
+  const qty = normalizeGoldPlan(plan).targetQuantityInPhan;
+  return qty != null && qty > 0;
+}
+
+/** Budget effective for a given YYYY-MM from history (latest entry with effectiveFrom <= month). */
+export function budgetForMonth(plan: GoldPlan, month: string): number {
+  const normalized = normalizeGoldPlan(plan);
+  const applicable = normalized.budgetHistory
+    .filter((e) => e.effectiveFrom <= month)
+    .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+  return applicable[0]?.monthlyBudget ?? normalized.monthlyBudget;
+}
+
 export type MonthlyPlanStatus =
   | "not_started"
   | "in_progress"
   | "completed"
-  | "deferred";
+  | "exceeded"
+  | "deferred"
+  | "paused";
 
 export function monthlyPlanStatus(params: {
   month: string;
   budget: number;
   spent: number;
   currentMonth: string;
+  planStatus?: GoldPlan["status"];
 }): MonthlyPlanStatus {
-  const { month, budget, spent, currentMonth } = params;
+  const { month, budget, spent, currentMonth, planStatus } = params;
+  if (planStatus === "paused" && month === currentMonth) return "paused";
+  if (spent > budget && budget > 0) return "exceeded";
   if (spent >= budget && budget > 0) return "completed";
   if (month > currentMonth) return "not_started";
   if (month < currentMonth && spent === 0) return "deferred";
@@ -98,13 +217,17 @@ export function monthlyPlanStatus(params: {
 export function monthlyPlanStatusLabel(status: MonthlyPlanStatus): string {
   switch (status) {
     case "not_started":
-      return "Chưa thực hiện";
+      return "Chưa bắt đầu";
     case "in_progress":
       return "Đang thực hiện";
     case "completed":
       return "Đã hoàn thành";
+    case "exceeded":
+      return "Vượt kế hoạch";
     case "deferred":
-      return "Hoãn";
+      return "Đã bỏ qua";
+    case "paused":
+      return "Tạm dừng";
   }
 }
 
@@ -157,4 +280,37 @@ export function expectedPurchaseCost(
   pricePerChi: number,
 ): number {
   return Math.round(phanToChi(quantityInPhan) * pricePerChi);
+}
+
+/**
+ * Ước tính số phân mua được từ ngân sách theo giá tham chiếu (₫/chỉ).
+ * Làm tròn xuống phân nguyên — không cam kết giá thực tế.
+ */
+export function estimatePhanFromBudget(
+  monthlyBudget: number,
+  pricePerChi: number,
+): number | null {
+  if (monthlyBudget <= 0 || pricePerChi <= 0) return null;
+  return Math.floor((monthlyBudget / pricePerChi) * 10);
+}
+
+/** Số tháng ước tính để đủ remainingPhan nếu mỗi tháng mua được monthlyPhan. */
+export function estimateMonthsFromQuantity(
+  remainingPhan: number,
+  monthlyPhan: number,
+): number | null {
+  if (remainingPhan <= 0) return 0;
+  if (monthlyPhan <= 0) return null;
+  return Math.ceil(remainingPhan / monthlyPhan);
+}
+
+/** Prefer chi for form display of integer phân. */
+export function phanToFormQuantity(phan: number): {
+  quantity: number;
+  unit: "cay" | "chi" | "phan";
+} {
+  if (phan <= 0) return { quantity: 1, unit: "chi" };
+  if (phan % 100 === 0) return { quantity: phan / 100, unit: "cay" };
+  if (phan % 10 === 0) return { quantity: phan / 10, unit: "chi" };
+  return { quantity: phan, unit: "phan" };
 }

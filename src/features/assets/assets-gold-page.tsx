@@ -7,7 +7,6 @@ import { EmptyState, StatCard } from "@/components/common/status-badges";
 import { StatCardsSkeleton } from "@/components/common/loading-skeletons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Table,
@@ -36,6 +35,8 @@ import {
 } from "@/components/ui/dialog";
 import { MoneyInput } from "@/features/finance/components/money-input";
 import { GoldPurchaseFormDialog } from "@/features/assets/components/gold-purchase-form-dialog";
+import { GoldPlanFormDialog } from "@/features/assets/components/gold-plan-form-dialog";
+import { GoldPlanCard } from "@/features/assets/components/gold-plan-card";
 import {
   useAssetSummaryQuery,
   useGoldPlanQuery,
@@ -44,34 +45,30 @@ import {
 import {
   useDeleteGoldPurchaseMutation,
   useUpdateAssetSettingsMutation,
-  useUpsertGoldPlanMutation,
 } from "@/api/mutations";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
 import { currentMonthKey } from "@/features/finance/lib/calculations";
 import {
-  calculateEstimatedMonthsToGoal,
+  calculateAllocationPercentage,
   calculateGoldGoalProgress,
-  calculateRemainingGoldGoal,
-  listPlanMonths,
+  monthQuantityPhan,
   monthSpend,
-  monthlyPlanStatus,
-  monthlyPlanStatusLabel,
+  normalizeGoldPlan,
+  planAccumulatedPhan,
+  planHasQuantityTarget,
+  listPlanMonths,
 } from "@/features/assets/lib/calculations";
+import { createGoldPriceService } from "@/features/assets/lib/gold-price-service";
 import {
   formatChiDecimal,
   formatGoldQuantity,
   GOLD_TYPE_LABELS,
   phanToChi,
 } from "@/features/assets/lib/gold-units";
-import {
-  goldPlanSchema,
-  goldPricesSchema,
-  type GoldPlanFormValues,
-} from "@/schemas/assets.schema";
+import { goldPricesSchema } from "@/schemas/assets.schema";
 import type { GoldPurchase } from "@/types/assets";
 import { EMPTY_ARRAY } from "@/lib/empty";
-import { cn } from "@/lib/utils";
 import { z } from "zod";
 
 export function AssetsGoldPage() {
@@ -88,20 +85,25 @@ export function AssetsGoldPage() {
 
   const purchases = purchasesQ.data ?? EMPTY_ARRAY;
   const summary = summaryQ.data;
-  const plan = planQ.data ?? summary?.plan ?? null;
+  const planRaw = planQ.data ?? summary?.plan ?? null;
+  const plan = planRaw ? normalizeGoldPlan(planRaw) : null;
   const month = currentMonthKey();
 
   const holdings = useMemo(() => {
     if (!summary) return [];
-    return (Object.keys(GOLD_TYPE_LABELS) as Array<keyof typeof GOLD_TYPE_LABELS>)
+    const priceService = createGoldPriceService(
+      summary.settings.goldReferencePricePerChi,
+    );
+    return (
+      Object.keys(GOLD_TYPE_LABELS) as Array<keyof typeof GOLD_TYPE_LABELS>
+    )
       .map((type) => {
         const phan = summary.quantityByType[type] ?? 0;
         if (phan <= 0) return null;
         const cost = purchases
           .filter((p) => p.type === type)
           .reduce((s, p) => s + p.totalCost, 0);
-        const price =
-          summary.settings.goldReferencePricePerChi[type] ?? 0;
+        const price = priceService.getCurrentGoldPrice(type);
         const value = Math.round(phanToChi(phan) * price);
         return { type, phan, cost, value };
       })
@@ -131,17 +133,21 @@ export function AssetsGoldPage() {
     );
   }
 
-  const progress = plan
-    ? calculateGoldGoalProgress(summary.goldCost, plan.targetAmount)
-    : 0;
-  const remaining = plan
-    ? calculateRemainingGoldGoal(summary.goldCost, plan.targetAmount)
-    : 0;
-  const estMonths = plan
-    ? calculateEstimatedMonthsToGoal(remaining, plan.monthlyBudget)
-    : null;
+  const goldShare = calculateAllocationPercentage(
+    summary.goldValue,
+    summary.totalAssets,
+  );
+  const planProgress =
+    plan && planHasQuantityTarget(plan)
+      ? calculateGoldGoalProgress(
+          planAccumulatedPhan(plan, purchases),
+          plan.targetQuantityInPhan!,
+        )
+      : plan
+        ? calculateGoldGoalProgress(summary.goldCost, plan.targetAmount)
+        : null;
 
-  const planMonths = plan ? listPlanMonths(plan).slice(-6) : [];
+  const recentMonths = plan ? listPlanMonths(plan).slice(-6) : [];
 
   return (
     <div className="space-y-6">
@@ -171,7 +177,7 @@ export function AssetsGoldPage() {
             }}
           >
             <Plus className="size-4" />
-            Thêm lần mua
+            Thêm giao dịch mua vàng
           </Button>
         </div>
       </div>
@@ -188,14 +194,14 @@ export function AssetsGoldPage() {
           hint="Theo giá tham chiếu bạn đã nhập"
         />
         <StatCard
-          title="Tổng tiền đã mua"
+          title="Giá vốn"
           value={formatCurrency(summary.goldCost)}
           hint="Tổng chi phí các lần mua"
         />
         <StatCard
-          title="Chênh lệch giá trị tạm tính"
+          title="Lãi tạm tính"
           value={`${summary.goldDifference >= 0 ? "+" : ""}${formatCurrency(summary.goldDifference)}`}
-          hint="Ước tính − giá vốn (không phải lợi nhuận chắc chắn)"
+          hint="Giá trị hiện tại − giá vốn"
         />
       </div>
 
@@ -216,7 +222,7 @@ export function AssetsGoldPage() {
                     setPurchaseOpen(true);
                   }}
                 >
-                  Thêm lần mua
+                  Thêm giao dịch mua vàng
                 </Button>
               }
             />
@@ -241,116 +247,51 @@ export function AssetsGoldPage() {
         </CardContent>
       </Card>
 
+      <GoldPlanCard
+        plan={plan}
+        purchases={purchases}
+        summary={summary}
+        currentMonth={month}
+        onEdit={() => setPlanOpen(true)}
+      />
+
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-          <CardTitle className="text-base">Kế hoạch tích lũy vàng</CardTitle>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setPlanOpen(true)}
-          >
-            {plan ? "Sửa kế hoạch" : "Tạo kế hoạch"}
-          </Button>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Giao dịch vàng</CardTitle>
         </CardHeader>
         <CardContent>
-          {!plan ? (
+          {purchases.length === 0 ? (
             <EmptyState
-              title="Bạn chưa có kế hoạch tích lũy vàng"
-              description="Đặt mục tiêu tổng và ngân sách hàng tháng để theo dõi tiến độ."
+              title="Chưa có giao dịch mua vàng"
+              description="Ghi nhận lần mua để cập nhật tài sản và tiến độ kế hoạch."
               action={
-                <Button size="sm" onClick={() => setPlanOpen(true)}>
-                  Tạo kế hoạch
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditing(null);
+                    setPurchaseOpen(true);
+                  }}
+                >
+                  <Plus className="size-4" />
+                  Thêm giao dịch mua vàng
                 </Button>
               }
             />
           ) : (
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Snapshot label="Mục tiêu" value={formatCurrency(plan.targetAmount)} />
-                <Snapshot
-                  label="Đã tích lũy"
-                  value={formatCurrency(summary.goldCost)}
-                />
-                <Snapshot label="Tiến độ" value={`${progress}%`} />
-                <Snapshot
-                  label="Kế hoạch hàng tháng"
-                  value={`${formatCurrency(plan.monthlyBudget)} / tháng`}
-                />
-              </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-amber-600"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Ngày dự kiến mua: ngày {plan.plannedPurchaseDay} hàng tháng
-                {estMonths != null &&
-                  ` · Ước tính theo kế hoạch hiện tại: còn khoảng ${estMonths} tháng`}
-              </p>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Các tháng gần đây</p>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {planMonths.map((m) => {
-                    const spent = monthSpend(purchases, m);
-                    const status = monthlyPlanStatus({
-                      month: m,
-                      budget: plan.monthlyBudget,
-                      spent,
-                      currentMonth: month,
-                    });
-                    return (
-                      <div
-                        key={m}
-                        className="rounded-lg border px-3 py-2.5 text-sm"
-                      >
-                        <div className="flex justify-between gap-2">
-                          <span className="font-medium">Tháng {m}</span>
-                          <span
-                            className={cn(
-                              "text-xs",
-                              status === "completed" && "text-emerald-700",
-                              status === "deferred" && "text-amber-700",
-                              status === "in_progress" && "text-sky-700",
-                            )}
-                          >
-                            {monthlyPlanStatusLabel(status)}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-muted-foreground">
-                          Ngân sách: {formatCurrency(plan.monthlyBudget)}
-                        </p>
-                        <p className="text-muted-foreground">
-                          Đã mua: {formatCurrency(spent)}
-                        </p>
-                        <p className="text-muted-foreground">
-                          Còn lại:{" "}
-                          {formatCurrency(
-                            Math.max(plan.monthlyBudget - spent, 0),
-                          )}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Lịch sử mua vàng</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {purchases.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Chưa có lần mua nào được ghi nhận.
-            </p>
-          ) : (
             <>
+              <div className="mb-3 flex justify-end">
+                <Button
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setEditing(null);
+                    setPurchaseOpen(true);
+                  }}
+                >
+                  <Plus className="size-4" />
+                  Thêm giao dịch mua vàng
+                </Button>
+              </div>
               <div className="hidden overflow-hidden rounded-lg border md:block">
                 <Table>
                   <TableHeader>
@@ -371,6 +312,7 @@ export function AssetsGoldPage() {
                             <Button
                               size="icon"
                               variant="ghost"
+                              aria-label="Sửa"
                               onClick={() => {
                                 setEditing(p);
                                 setPurchaseOpen(true);
@@ -381,15 +323,14 @@ export function AssetsGoldPage() {
                             <Button
                               size="icon"
                               variant="ghost"
+                              aria-label="Xóa"
                               onClick={() => setDeleting(p)}
                             >
                               <DeleteIcon />
                             </Button>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          {formatDate(p.createdAt)}
-                        </TableCell>
+                        <TableCell>{formatDate(p.purchaseDate)}</TableCell>
                         <TableCell>{GOLD_TYPE_LABELS[p.type]}</TableCell>
                         <TableCell>
                           {formatGoldQuantity(p.quantityInPhan)}
@@ -415,7 +356,7 @@ export function AssetsGoldPage() {
                           {GOLD_TYPE_LABELS[p.type]}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {formatDate(p.createdAt)}
+                          {formatDate(p.purchaseDate)}
                         </p>
                       </div>
                       <p className="font-semibold tabular-nums">
@@ -453,6 +394,69 @@ export function AssetsGoldPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Phân tích tích lũy vàng</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AnalyticRow
+              label="Tổng số vàng đã tích lũy"
+              value={formatGoldQuantity(summary.totalGoldPhan)}
+            />
+            <AnalyticRow
+              label="Giá vốn"
+              value={formatCurrency(summary.goldCost)}
+            />
+            <AnalyticRow
+              label="Giá trị hiện tại"
+              value={formatCurrency(summary.goldValue)}
+            />
+            <AnalyticRow
+              label="Lãi / lỗ tạm tính"
+              value={`${summary.goldDifference >= 0 ? "+" : ""}${formatCurrency(summary.goldDifference)}`}
+            />
+            <AnalyticRow
+              label="Tỷ trọng vàng trong tổng tài sản"
+              value={`${goldShare}%`}
+            />
+            <AnalyticRow
+              label="Tiến độ kế hoạch"
+              value={
+                planProgress != null
+                  ? `${planProgress}%`
+                  : "Chưa có kế hoạch"
+              }
+            />
+          </div>
+
+          {recentMonths.length > 0 && (
+            <div className="space-y-2 border-t pt-4">
+              <p className="text-sm font-medium">Theo tháng gần đây</p>
+              <div className="space-y-2">
+                {recentMonths.map((m) => {
+                  const [y, mo] = m.split("-");
+                  return (
+                    <div
+                      key={m}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+                    >
+                      <span className="font-medium">
+                        {mo}/{y}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {formatCurrency(monthSpend(purchases, m))} ·{" "}
+                        {formatGoldQuantity(monthQuantityPhan(purchases, m))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <GoldPurchaseFormDialog
         open={purchaseOpen}
         onOpenChange={(open) => {
@@ -462,10 +466,11 @@ export function AssetsGoldPage() {
         editing={editing}
       />
 
-      <GoldPlanDialog
+      <GoldPlanFormDialog
         open={planOpen}
         onOpenChange={setPlanOpen}
         existing={plan}
+        purchases={purchases}
       />
 
       <GoldPricesDialog
@@ -480,13 +485,11 @@ export function AssetsGoldPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa lần mua?</AlertDialogTitle>
+            <AlertDialogTitle>Xóa giao dịch mua?</AlertDialogTitle>
             <AlertDialogDescription>
               Xóa giao dịch mua vàng ngày{" "}
-              {deleting
-                ? formatDate(deleting.createdAt)
-                : ""}
-              . Khối lượng và giá vốn sẽ được cập nhật lại.
+              {deleting ? formatDate(deleting.purchaseDate) : ""}. Khối lượng
+              và giá vốn sẽ được cập nhật lại.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -508,120 +511,12 @@ export function AssetsGoldPage() {
   );
 }
 
-function Snapshot({ label, value }: { label: string; value: string }) {
+function AnalyticRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border px-3 py-2">
+    <div className="rounded-lg border px-3 py-2.5">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-0.5 font-semibold">{value}</p>
+      <p className="mt-0.5 font-semibold tabular-nums">{value}</p>
     </div>
-  );
-}
-
-function GoldPlanDialog({
-  open,
-  onOpenChange,
-  existing,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  existing: import("@/types/assets").GoldPlan | null;
-}) {
-  const upsert = useUpsertGoldPlanMutation();
-  const [error, setError] = useState<string | null>(null);
-  const form = useForm<GoldPlanFormValues>({
-    resolver: zodResolver(goldPlanSchema),
-    values: existing
-      ? {
-          targetAmount: existing.targetAmount,
-          monthlyBudget: existing.monthlyBudget,
-          plannedPurchaseDay: existing.plannedPurchaseDay,
-          startMonth: existing.startMonth,
-          endMonth: existing.endMonth,
-          status: existing.status,
-        }
-      : {
-          targetAmount: 50_000_000,
-          monthlyBudget: 2_000_000,
-          plannedPurchaseDay: 25,
-          startMonth: currentMonthKey(),
-          endMonth: `${new Date().getFullYear() + 1}-12`,
-          status: "active",
-        },
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {existing ? "Sửa kế hoạch" : "Tạo kế hoạch tích lũy vàng"}
-          </DialogTitle>
-        </DialogHeader>
-        <form
-          className="space-y-4"
-          onSubmit={form.handleSubmit(async (values) => {
-            setError(null);
-            try {
-              await upsert.mutateAsync({
-                targetAmount: values.targetAmount,
-                monthlyBudget: values.monthlyBudget,
-                plannedPurchaseDay: values.plannedPurchaseDay,
-                startMonth: values.startMonth,
-                endMonth: values.endMonth,
-                status: values.status ?? "active",
-              });
-              onOpenChange(false);
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Không thể lưu");
-            }
-          })}
-        >
-          <div className="space-y-2">
-            <Label>Mục tiêu tổng</Label>
-            <MoneyInput
-              value={form.watch("targetAmount")}
-              onChange={(v) => form.setValue("targetAmount", v)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Ngân sách mua vàng / tháng</Label>
-            <MoneyInput
-              value={form.watch("monthlyBudget")}
-              onChange={(v) => form.setValue("monthlyBudget", v)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plan-day">Ngày dự kiến mua (1–28)</Label>
-            <Input
-              id="plan-day"
-              type="number"
-              min={1}
-              max={28}
-              {...form.register("plannedPurchaseDay", { valueAsNumber: true })}
-            />
-            <p className="text-xs text-muted-foreground">
-              Chỉ là ngày nhắc kế hoạch, không phải khuyến nghị thời điểm mua.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="plan-start">Bắt đầu</Label>
-              <Input id="plan-start" type="month" {...form.register("startMonth")} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="plan-end">Kết thúc</Label>
-              <Input id="plan-end" type="month" {...form.register("endMonth")} />
-            </div>
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <DialogFooter>
-            <Button type="submit" disabled={upsert.isPending}>
-              {upsert.isPending ? "Đang lưu..." : "Lưu kế hoạch"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

@@ -24,18 +24,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   useAssetSnapshotsQuery,
   useAssetSummaryQuery,
+  useGoldPurchasesQuery,
 } from "@/api/queries";
 import { formatCurrency } from "@/lib/currency";
 import {
   calculateGoldGoalProgress,
+  normalizeGoldPlan,
+  planAccumulatedPhan,
+  planHasQuantityTarget,
 } from "@/features/assets/lib/calculations";
 import { formatGoldQuantity } from "@/features/assets/lib/gold-units";
+import { EMPTY_ARRAY } from "@/lib/empty";
 import { cn } from "@/lib/utils";
 
 const COLORS = ["#334155", "#0f766e", "#a16207", "#64748b"];
 
 export function AssetsOverviewPage() {
   const summaryQ = useAssetSummaryQuery();
+  const purchasesQ = useGoldPurchasesQuery();
   const [range, setRange] = useState<6 | 12>(12);
   const snapshotsQ = useAssetSnapshotsQuery(range);
 
@@ -58,9 +64,16 @@ export function AssetsOverviewPage() {
   }
 
   const s = summaryQ.data;
+  const purchases = purchasesQ.data ?? EMPTY_ARRAY;
   const segments = s.allocation.segments.filter((seg) => seg.amount > 0);
-  const planProgress = s.plan
-    ? calculateGoldGoalProgress(s.goldCost, s.plan.targetAmount)
+  const plan = s.plan ? normalizeGoldPlan(s.plan) : null;
+  const planProgress = plan
+    ? planHasQuantityTarget(plan)
+      ? calculateGoldGoalProgress(
+          planAccumulatedPhan(plan, purchases),
+          plan.targetQuantityInPhan!,
+        )
+      : calculateGoldGoalProgress(s.goldCost, plan.targetAmount)
     : 0;
 
   return (
@@ -191,8 +204,19 @@ export function AssetsOverviewPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Đã tích lũy</span>
                   <span className="font-medium">
-                    {formatCurrency(s.goldCost)} /{" "}
-                    {formatCurrency(s.plan.targetAmount)}
+                    {plan && planHasQuantityTarget(plan) ? (
+                      <>
+                        {formatGoldQuantity(
+                          planAccumulatedPhan(plan, purchases),
+                        )}{" "}
+                        / {formatGoldQuantity(plan.targetQuantityInPhan!)}
+                      </>
+                    ) : (
+                      <>
+                        {formatCurrency(s.goldCost)} /{" "}
+                        {formatCurrency(s.plan.targetAmount)}
+                      </>
+                    )}
                   </span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-muted">

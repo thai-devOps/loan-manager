@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MoneyInput } from "@/features/finance/components/money-input";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   manualAssetSchema,
   type ManualAssetFormValues,
@@ -391,7 +392,13 @@ function AssetFormFields({
         <Label htmlFor="asset-date">
           {isGold ? "Ngày mua / cập nhật" : "Ngày cập nhật"}
         </Label>
-        <Input id="asset-date" type="date" {...form.register("valuationDate")} />
+        <DatePicker
+          id="asset-date"
+          value={form.watch("valuationDate")}
+          onChange={(v) =>
+            form.setValue("valuationDate", v, { shouldValidate: true })
+          }
+        />
       </div>
 
       <div className="space-y-2">

@@ -52,6 +52,7 @@ import {
   useSchedulesQuery,
   useTransactionsQuery,
   useAssetSummaryQuery,
+  useGoldPurchasesQuery,
 } from "@/api/queries";
 import {
   getInterestPaid,
@@ -64,7 +65,13 @@ import {
 import { formatCurrency } from "@/lib/currency";
 import { getDaysOverdue } from "@/lib/date";
 import { EMPTY_ARRAY } from "@/lib/empty";
-import { calculateGoldGoalProgress } from "@/features/assets/lib/calculations";
+import {
+  calculateGoldGoalProgress,
+  normalizeGoldPlan,
+  planAccumulatedPhan,
+  planHasQuantityTarget,
+} from "@/features/assets/lib/calculations";
+import { formatGoldQuantity } from "@/features/assets/lib/gold-units";
 
 export function DashboardPage() {
   const borrowersQ = useBorrowersQuery();
@@ -461,10 +468,18 @@ export function DashboardPage() {
 
 function DashboardAssetsWidgets() {
   const summaryQ = useAssetSummaryQuery();
+  const purchasesQ = useGoldPurchasesQuery();
   if (summaryQ.isLoading || !summaryQ.data) return null;
   const s = summaryQ.data;
-  const progress = s.plan
-    ? calculateGoldGoalProgress(s.goldCost, s.plan.targetAmount)
+  const purchases = purchasesQ.data ?? EMPTY_ARRAY;
+  const plan = s.plan ? normalizeGoldPlan(s.plan) : null;
+  const progress = plan
+    ? planHasQuantityTarget(plan)
+      ? calculateGoldGoalProgress(
+          planAccumulatedPhan(plan, purchases),
+          plan.targetQuantityInPhan!,
+        )
+      : calculateGoldGoalProgress(s.goldCost, plan.targetAmount)
     : 0;
 
   return (
@@ -512,15 +527,24 @@ function DashboardAssetsWidgets() {
           </Button>
         </CardHeader>
         <CardContent>
-          {!s.plan ? (
+          {!plan ? (
             <p className="text-sm text-muted-foreground">
               Chưa có kế hoạch tích lũy vàng.
             </p>
           ) : (
             <div className="space-y-2">
               <p className="text-sm">
-                {formatCurrency(s.goldCost)} /{" "}
-                {formatCurrency(s.plan.targetAmount)}
+                {planHasQuantityTarget(plan) ? (
+                  <>
+                    {formatGoldQuantity(planAccumulatedPhan(plan, purchases))} /{" "}
+                    {formatGoldQuantity(plan.targetQuantityInPhan!)}
+                  </>
+                ) : (
+                  <>
+                    {formatCurrency(s.goldCost)} /{" "}
+                    {formatCurrency(plan.targetAmount)}
+                  </>
+                )}
               </p>
               <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <div
@@ -529,7 +553,7 @@ function DashboardAssetsWidgets() {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                {progress}% · {formatCurrency(s.plan.monthlyBudget)} / tháng
+                {progress}% · {formatCurrency(plan.monthlyBudget)} / tháng
               </p>
             </div>
           )}

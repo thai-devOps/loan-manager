@@ -258,8 +258,11 @@ export function useDeleteGoldPurchaseMutation() {
 export function useUpsertGoldPlanMutation() {
   const invalidate = useInvalidateAssets();
   return useMutation({
-    mutationFn: (body: Omit<GoldPlan, "id" | "createdAt" | "updatedAt">) =>
-      upsertGoldPlan(body),
+    mutationFn: (
+      body: Omit<GoldPlan, "id" | "createdAt" | "updatedAt"> & {
+        budgetEffectiveFrom?: string;
+      },
+    ) => upsertGoldPlan(body),
     onSuccess: () => invalidate(),
   });
 }

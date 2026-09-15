@@ -266,7 +266,9 @@ export function fetchGoldPlan() {
 }
 
 export function upsertGoldPlan(
-  body: Omit<GoldPlan, "id" | "createdAt" | "updatedAt">,
+  body: Omit<GoldPlan, "id" | "createdAt" | "updatedAt"> & {
+    budgetEffectiveFrom?: string;
+  },
 ) {
   return apiFetch<GoldPlan>(assetsUrl("gold-plan"), { method: "PUT", body });
 }

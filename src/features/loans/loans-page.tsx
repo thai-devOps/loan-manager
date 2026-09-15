@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -342,10 +343,12 @@ export function LoansPage() {
 
             <div className="space-y-2">
               <Label htmlFor="startDate">Ngày bắt đầu *</Label>
-              <Input
+              <DatePicker
                 id="startDate"
-                type="date"
-                {...form.register("startDate")}
+                value={form.watch("startDate")}
+                onChange={(v) =>
+                  form.setValue("startDate", v, { shouldValidate: true })
+                }
               />
               {form.formState.errors.startDate && (
                 <p className="text-xs text-destructive">

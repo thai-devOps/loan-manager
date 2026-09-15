@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MoneyInput } from "@/features/finance/components/money-input";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   goldPurchaseSchema,
   type GoldPurchaseFormValues,
@@ -46,7 +47,7 @@ export function GoldPurchaseFormDialog({
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {editing ? "Sửa lần mua vàng" : "Thêm lần mua vàng"}
+            {editing ? "Sửa giao dịch mua vàng" : "Thêm giao dịch mua vàng"}
           </DialogTitle>
         </DialogHeader>
         {open && (
@@ -142,7 +143,13 @@ function GoldPurchaseFields({
     <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
       <div className="space-y-2">
         <Label htmlFor="gold-date">Ngày mua</Label>
-        <Input id="gold-date" type="date" {...form.register("purchaseDate")} />
+        <DatePicker
+          id="gold-date"
+          value={form.watch("purchaseDate")}
+          onChange={(v) =>
+            form.setValue("purchaseDate", v, { shouldValidate: true })
+          }
+        />
       </div>
 
       <div className="space-y-2">
@@ -227,7 +234,7 @@ function GoldPurchaseFields({
 
       <DialogFooter>
         <Button type="submit" disabled={pending}>
-          {pending ? "Đang lưu..." : editing ? "Cập nhật" : "Thêm lần mua"}
+          {pending ? "Đang lưu..." : editing ? "Cập nhật" : "Thêm giao dịch"}
         </Button>
       </DialogFooter>
     </form>

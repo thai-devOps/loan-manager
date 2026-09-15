@@ -68,14 +68,54 @@ export const goldPurchaseSchema = z.object({
 
 export type GoldPurchaseFormValues = z.infer<typeof goldPurchaseSchema>;
 
-export const goldPlanSchema = z.object({
-  targetAmount: z.number().int().positive("Mục tiêu phải lớn hơn 0"),
-  monthlyBudget: z.number().int().positive("Ngân sách phải lớn hơn 0"),
-  plannedPurchaseDay: z.number().int().min(1).max(28),
-  startMonth: z.string().regex(/^\d{4}-\d{2}$/, "Tháng bắt đầu không hợp lệ"),
-  endMonth: z.string().regex(/^\d{4}-\d{2}$/, "Tháng kết thúc không hợp lệ"),
-  status: z.enum(["active", "paused", "completed"]),
-});
+export const goldPlanSchema = z
+  .object({
+    goldType: z.enum(["9999", "18k", "other"], {
+      message: "Chọn loại vàng",
+    }),
+    targetQuantity: z.number().positive("Mục tiêu phải lớn hơn 0"),
+    targetUnit: z.enum(["cay", "chi", "phan"]),
+    /** Legacy money reference — kept for API compatibility */
+    targetAmount: z.number().int().positive().optional(),
+    hasInitialGold: z.boolean(),
+    initialQuantity: z.number().nonnegative().optional(),
+    initialUnit: z.enum(["cay", "chi", "phan"]).optional(),
+    includeInitialQuantity: z.boolean(),
+    monthlyBudget: z.number().int().positive("Ngân sách phải lớn hơn 0"),
+    budgetEffectiveFrom: z
+      .string()
+      .regex(/^\d{4}-\d{2}$/, "Tháng áp dụng ngân sách không hợp lệ")
+      .optional(),
+    plannedPurchaseDay: z.number().int().min(1).max(28),
+    startMonth: z.string().regex(/^\d{4}-\d{2}$/, "Tháng bắt đầu không hợp lệ"),
+    endMonth: z.string().regex(/^\d{4}-\d{2}$/, "Tháng kết thúc không hợp lệ"),
+    status: z.enum([
+      "active",
+      "paused",
+      "completed",
+      "cancelled",
+      "expired",
+    ]),
+  })
+  .superRefine((data, ctx) => {
+    if (data.endMonth < data.startMonth) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Thời gian kết thúc phải sau thời gian bắt đầu",
+        path: ["endMonth"],
+      });
+    }
+    if (data.hasInitialGold) {
+      const qty = data.initialQuantity ?? 0;
+      if (qty <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Nhập số vàng hiện có",
+          path: ["initialQuantity"],
+        });
+      }
+    }
+  });
 
 export type GoldPlanFormValues = z.infer<typeof goldPlanSchema>;
 
