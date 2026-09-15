@@ -147,6 +147,7 @@ export function SchedulesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-28">Thao tác</TableHead>
                   <TableHead>Người vay</TableHead>
                   <TableHead>Kỳ</TableHead>
                   <TableHead>Ngày đến hạn</TableHead>
@@ -154,7 +155,6 @@ export function SchedulesPage() {
                   <TableHead>Đã thu</TableHead>
                   <TableHead>Còn thiếu</TableHead>
                   <TableHead>Trạng thái</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -165,18 +165,7 @@ export function SchedulesPage() {
                     : undefined;
                   return (
                     <TableRow key={s.id}>
-                      <TableCell>{borrower?.name ?? "—"}</TableCell>
-                      <TableCell>{formatPeriod(s.period)}</TableCell>
-                      <TableCell>{formatDate(s.dueDate)}</TableCell>
-                      <TableCell>{formatCurrency(s.amount)}</TableCell>
-                      <TableCell>{formatCurrency(s.paidAmount)}</TableCell>
                       <TableCell>
-                        {formatCurrency(getScheduleRemaining(s))}
-                      </TableCell>
-                      <TableCell>
-                        <ScheduleStatusBadge status={s.resolvedStatus} />
-                      </TableCell>
-                      <TableCell className="text-right">
                         {s.resolvedStatus !== "PAID" &&
                         loan?.status === "ACTIVE" ? (
                           <Button asChild size="sm" variant="outline">
@@ -187,6 +176,17 @@ export function SchedulesPage() {
                         ) : (
                           "—"
                         )}
+                      </TableCell>
+                      <TableCell>{borrower?.name ?? "—"}</TableCell>
+                      <TableCell>{formatPeriod(s.period)}</TableCell>
+                      <TableCell>{formatDate(s.dueDate)}</TableCell>
+                      <TableCell>{formatCurrency(s.amount)}</TableCell>
+                      <TableCell>{formatCurrency(s.paidAmount)}</TableCell>
+                      <TableCell>
+                        {formatCurrency(getScheduleRemaining(s))}
+                      </TableCell>
+                      <TableCell>
+                        <ScheduleStatusBadge status={s.resolvedStatus} />
                       </TableCell>
                     </TableRow>
                   );

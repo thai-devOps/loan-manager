@@ -1,5 +1,6 @@
 import { Menu, PanelLeftClose, PanelLeft, LogOut } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ThemeToggle } from "@/components/common/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -73,6 +74,7 @@ export function AppHeader({ title, description, actions }: AppHeaderProps) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {actions}
+          <ThemeToggle />
           <Button
             variant="outline"
             size="sm"

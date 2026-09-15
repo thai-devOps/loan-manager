@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ArrowDownRight, ArrowUpRight, Pencil, Trash2 } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { DeleteIcon, EditIcon } from "@/components/icons";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { TablePageSkeleton } from "@/components/common/loading-skeletons";
 import {
@@ -182,7 +183,7 @@ export function FinanceTransactionsPage() {
                       className="flex-1"
                       onClick={() => openEdit(tx)}
                     >
-                      <Pencil className="size-3.5" />
+                      <EditIcon size={14} />
                       Sửa
                     </Button>
                     <Button
@@ -191,7 +192,7 @@ export function FinanceTransactionsPage() {
                       className="flex-1 text-destructive"
                       onClick={() => setDeleting(tx)}
                     >
-                      <Trash2 className="size-3.5" />
+                      <DeleteIcon size={14} />
                       Xóa
                     </Button>
                   </div>
@@ -204,17 +205,37 @@ export function FinanceTransactionsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-24">Thao tác</TableHead>
                   <TableHead>Ngày</TableHead>
                   <TableHead>Loại</TableHead>
                   <TableHead>Danh mục</TableHead>
                   <TableHead>Nội dung</TableHead>
                   <TableHead className="text-right">Số tiền</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((tx) => (
                   <TableRow key={tx.id}>
+                    <TableCell>
+                      <div className="inline-flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openEdit(tx)}
+                          aria-label="Sửa"
+                        >
+                          <EditIcon />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setDeleting(tx)}
+                          aria-label="Xóa"
+                        >
+                          <DeleteIcon />
+                        </Button>
+                      </div>
+                    </TableCell>
                     <TableCell>{formatDate(tx.createdAt)}</TableCell>
                     <TableCell>
                       <Badge
@@ -246,26 +267,6 @@ export function FinanceTransactionsPage() {
                     >
                       {tx.type === "income" ? "+" : "−"}
                       {formatCurrency(tx.amount)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="inline-flex gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openEdit(tx)}
-                          aria-label="Sửa"
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setDeleting(tx)}
-                          aria-label="Xóa"
-                        >
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
-                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

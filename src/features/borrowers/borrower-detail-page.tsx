@@ -8,8 +8,8 @@ import {
   Banknote,
   CircleDollarSign,
   HandCoins,
-  Pencil,
 } from "lucide-react";
+import { EditIcon } from "@/components/icons";
 import { AppHeader } from "@/components/layout/app-header";
 import { DetailPageSkeleton } from "@/components/common/loading-skeletons";
 import {
@@ -160,7 +160,7 @@ export function BorrowerDetailPage() {
           actions={
             <div className="flex items-center gap-2">
               <Button variant="secondary" size="sm" onClick={openEdit}>
-                <Pencil className="size-4" />
+                <EditIcon />
                 Chỉnh sửa
               </Button>
               <Button asChild variant="outline" size="sm">
@@ -186,7 +186,7 @@ export function BorrowerDetailPage() {
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Thông tin cá nhân</CardTitle>
           <Button variant="outline" size="sm" onClick={openEdit}>
-            <Pencil className="size-4" />
+            <EditIcon />
             Cập nhật
           </Button>
         </CardHeader>

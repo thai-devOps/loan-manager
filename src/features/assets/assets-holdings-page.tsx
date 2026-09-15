@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
+import { DeleteIcon, EditIcon } from "@/components/icons";
 import { EmptyState } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
 import {
@@ -95,16 +96,37 @@ export function AssetsHoldingsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-24">Thao tác</TableHead>
                   <TableHead>Tên</TableHead>
                   <TableHead>Loại</TableHead>
                   <TableHead className="text-right">Giá trị</TableHead>
                   <TableHead>Ngày cập nhật</TableHead>
-                  <TableHead className="w-24" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {assets.map((asset) => (
                   <TableRow key={asset.id}>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditing(asset);
+                            setDialogOpen(true);
+                          }}
+                        >
+                          <EditIcon />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setDeleting(asset)}
+                        >
+                          <DeleteIcon />
+                        </Button>
+                      </div>
+                    </TableCell>
                     <TableCell className="font-medium">
                       <div>
                         <p>{asset.name}</p>
@@ -125,27 +147,6 @@ export function AssetsHoldingsPage() {
                     </TableCell>
                     <TableCell>
                       {formatDate(asset.updatedAt)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditing(asset);
-                            setDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setDeleting(asset)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

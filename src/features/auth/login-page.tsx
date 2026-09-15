@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, LockKeyhole } from "lucide-react";
+import { ThemeToggle } from "@/components/common/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,7 +54,6 @@ export function LoginPage() {
     }
   }
 
-
   return (
     <div className="login-page grid min-h-full lg:grid-cols-2">
       <section className="relative hidden overflow-hidden lg:block">
@@ -86,34 +86,37 @@ export function LoginPage() {
         </div>
       </section>
 
-      <section className="relative flex min-h-full items-center justify-center overflow-hidden bg-[#f4f7f6] px-5 py-10 sm:px-8">
+      <section className="relative flex min-h-full items-center justify-center overflow-hidden bg-background px-5 py-10 sm:px-8">
+        <div className="absolute top-4 right-4 z-10 sm:top-6 sm:right-6">
+          <ThemeToggle />
+        </div>
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.35]"
+          className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-[0.15]"
           style={{
             backgroundImage:
               "radial-gradient(circle at 1px 1px, rgb(15 118 110 / 0.18) 1px, transparent 0)",
             backgroundSize: "22px 22px",
           }}
         />
-        <div className="pointer-events-none absolute -top-24 right-[-4rem] size-72 rounded-full bg-teal-200/40 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-[-5rem] left-[-3rem] size-80 rounded-full bg-emerald-100/70 blur-3xl" />
+        <div className="pointer-events-none absolute -top-24 right-[-4rem] size-72 rounded-full bg-teal-200/40 blur-3xl dark:bg-teal-500/15" />
+        <div className="pointer-events-none absolute bottom-[-5rem] left-[-3rem] size-80 rounded-full bg-emerald-100/70 blur-3xl dark:bg-emerald-500/10" />
 
         <div className="relative w-full max-w-[24rem]">
           <div className="mb-8 space-y-3 lg:mb-10">
             <div className="flex items-center gap-3 lg:hidden">
-              <div className="flex size-11 items-center justify-center rounded-xl bg-[#0f766e] font-[family-name:var(--font-login-display)] text-sm font-semibold tracking-wide text-teal-50">
+              <div className="flex size-11 items-center justify-center rounded-xl bg-teal-700 font-[family-name:var(--font-login-display)] text-sm font-semibold tracking-wide text-teal-50 dark:bg-teal-600">
                 LM
               </div>
-              <p className="font-[family-name:var(--font-login-display)] text-lg font-semibold text-[#134e4a]">
+              <p className="font-[family-name:var(--font-login-display)] text-lg font-semibold text-foreground">
                 Loan Manager
               </p>
             </div>
 
-            <h2 className="font-[family-name:var(--font-login-display)] text-3xl font-semibold tracking-tight text-[#134e4a]">
+            <h2 className="font-[family-name:var(--font-login-display)] text-3xl font-semibold tracking-tight text-foreground">
               Đăng nhập
             </h2>
-            <p className="text-sm leading-relaxed text-[#5b716e]">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               Nhập tài khoản quản trị để tiếp tục làm việc.
             </p>
           </div>
@@ -123,17 +126,12 @@ export function LoginPage() {
             onSubmit={form.handleSubmit(onSubmit)}
           >
             <div className="space-y-2">
-              <Label
-                htmlFor="username"
-                className="text-[#3d5652]"
-              >
-                Tên đăng nhập
-              </Label>
+              <Label htmlFor="username">Tên đăng nhập</Label>
               <Input
                 id="username"
                 autoComplete="username"
                 autoFocus
-                className="h-11 border-[#c9d8d5] bg-white/90 shadow-none focus-visible:border-teal-600 focus-visible:ring-teal-600/30"
+                className="h-11"
                 {...form.register("username")}
               />
               {form.formState.errors.username && (
@@ -144,17 +142,12 @@ export function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label
-                htmlFor="password"
-                className="text-[#3d5652]"
-              >
-                Mật khẩu
-              </Label>
+              <Label htmlFor="password">Mật khẩu</Label>
               <Input
                 id="password"
                 type="password"
                 autoComplete="current-password"
-                className="h-11 border-[#c9d8d5] bg-white/90 shadow-none focus-visible:border-teal-600 focus-visible:ring-teal-600/30"
+                className="h-11"
                 {...form.register("password")}
               />
               {form.formState.errors.password && (
@@ -173,7 +166,7 @@ export function LoginPage() {
             <Button
               type="submit"
               disabled={submitting}
-              className="h-11 w-full gap-2 bg-[#0f766e] text-teal-50 shadow-none hover:bg-[#0d9488]"
+              className="h-11 w-full gap-2 bg-teal-700 text-teal-50 shadow-none hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-500"
             >
               {submitting ? (
                 "Đang đăng nhập..."

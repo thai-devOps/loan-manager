@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Pencil, Plus, Settings2, Trash2 } from "lucide-react";
+import { Plus, Settings2 } from "lucide-react";
+import { DeleteIcon, EditIcon } from "@/components/icons";
 import { EmptyState, StatCard } from "@/components/common/status-badges";
 import { StatCardsSkeleton } from "@/components/common/loading-skeletons";
 import { Button } from "@/components/ui/button";
@@ -354,17 +355,38 @@ export function AssetsGoldPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-24">Thao tác</TableHead>
                       <TableHead>Ngày</TableHead>
                       <TableHead>Loại</TableHead>
                       <TableHead>Khối lượng</TableHead>
                       <TableHead className="text-right">Giá mua</TableHead>
                       <TableHead className="text-right">Thành tiền</TableHead>
-                      <TableHead className="w-24" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {purchases.map((p) => (
                       <TableRow key={p.id}>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditing(p);
+                                setPurchaseOpen(true);
+                              }}
+                            >
+                              <EditIcon />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeleting(p)}
+                            >
+                              <DeleteIcon />
+                            </Button>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           {formatDate(p.createdAt)}
                         </TableCell>
@@ -377,27 +399,6 @@ export function AssetsGoldPage() {
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {formatCurrency(p.totalCost)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => {
-                                setEditing(p);
-                                setPurchaseOpen(true);
-                              }}
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleting(p)}
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

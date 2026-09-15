@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Pencil, Plus, Search, UserRound } from "lucide-react";
+import { Plus, Search, UserRound } from "lucide-react";
+import { EditIcon } from "@/components/icons";
 import { AppHeader } from "@/components/layout/app-header";
 import { TablePageSkeleton } from "@/components/common/loading-skeletons";
 import {
@@ -241,7 +242,7 @@ export function BorrowersPage() {
                       className="flex-1"
                       onClick={() => openEdit(borrower)}
                     >
-                      <Pencil className="size-3.5" />
+                      <EditIcon size={14} />
                       Cập nhật
                     </Button>
                   </div>
@@ -254,17 +255,28 @@ export function BorrowersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-32">Thao tác</TableHead>
                   <TableHead>Tên</TableHead>
                   <TableHead>Số điện thoại</TableHead>
                   <TableHead>Tổng khoản vay</TableHead>
                   <TableHead>Dư nợ</TableHead>
                   <TableHead>Trạng thái</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map(({ borrower, loanCount, remaining, status }) => (
                   <TableRow key={borrower.id}>
+                    <TableCell>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openEdit(borrower)}
+                      >
+                        <EditIcon size={14} />
+                        Cập nhật
+                      </Button>
+                    </TableCell>
                     <TableCell>
                       <Link
                         to={`/borrowers/${borrower.id}`}
@@ -286,17 +298,6 @@ export function BorrowersPage() {
                           }
                         />
                       )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(borrower)}
-                      >
-                        <Pencil className="size-3.5" />
-                        Cập nhật
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

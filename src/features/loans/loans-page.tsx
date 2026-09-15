@@ -191,6 +191,7 @@ export function LoansPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-28">Thao tác</TableHead>
                   <TableHead>Người vay</TableHead>
                   <TableHead>Gốc ban đầu</TableHead>
                   <TableHead>Đã thu gốc</TableHead>
@@ -198,7 +199,6 @@ export function LoansPage() {
                   <TableHead>Lời/tháng</TableHead>
                   <TableHead>Ngày bắt đầu</TableHead>
                   <TableHead>Trạng thái</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -206,6 +206,11 @@ export function LoansPage() {
                   const txs = transactions.filter((t) => t.loanId === loan.id);
                   return (
                     <TableRow key={loan.id}>
+                      <TableCell>
+                        <Button asChild size="sm" variant="outline">
+                          <Link to={`/loans/${loan.id}`}>Chi tiết</Link>
+                        </Button>
+                      </TableCell>
                       <TableCell className="font-medium">
                         {borrowerMap.get(loan.borrowerId)?.name ?? "—"}
                       </TableCell>
@@ -226,11 +231,6 @@ export function LoansPage() {
                       <TableCell>{formatDate(loan.createdAt)}</TableCell>
                       <TableCell>
                         <LoanStatusBadge status={loan.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button asChild size="sm" variant="outline">
-                          <Link to={`/loans/${loan.id}`}>Chi tiết</Link>
-                        </Button>
                       </TableCell>
                     </TableRow>
                   );

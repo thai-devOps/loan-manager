@@ -1,0 +1,41 @@
+---
+description: Shared SVG icon guidelines for edit/delete and future brand icons
+globs: src/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# SVG icon guidelines
+
+## Source of truth
+
+- Put reusable brand icons in `src/components/icons/`.
+- Export from `src/components/icons/index.ts`.
+- Import via `@/components/icons` (e.g. `EditIcon`, `DeleteIcon`).
+
+## Rules
+
+1. **Do not** use Lucide `Pencil` / `Trash2` for table or row actions. Use `EditIcon` / `DeleteIcon`.
+2. Default canvas is **16×16** (`viewBox="0 0 16 16"`). Pass `size` only when a different pixel size is required.
+3. Keep brand fill colors from design unless the design system updates them:
+   - Delete primary: `#CF453B`
+   - Edit primary: `#ECAB3F`
+   - Delete highlight / inner detail: `#EDEBEA`
+4. Icons are decorative by default (`aria-hidden`). Put the accessible name on the button (`aria-label` or visible text).
+5. New icons must:
+   - Live as a React component under `src/components/icons/`
+   - Accept `IconProps` (`size`, `className`, SVG props)
+   - Use `iconProps()` from `./types`
+   - Avoid inline one-off SVG copies in feature pages
+
+## Example
+
+```tsx
+import { DeleteIcon, EditIcon } from "@/components/icons";
+
+<Button size="icon" variant="ghost" aria-label="Sửa">
+  <EditIcon />
+</Button>
+<Button size="icon" variant="ghost" aria-label="Xóa">
+  <DeleteIcon />
+</Button>
+```

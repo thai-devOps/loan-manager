@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Download, Upload, Database, Trash2, Sprout } from "lucide-react";
+import { Download, Upload, Database, Sprout } from "lucide-react";
+import { DeleteIcon } from "@/components/icons";
 import { AppHeader } from "@/components/layout/app-header";
 import { StatsBlockSkeleton } from "@/components/common/loading-skeletons";
 import { PageShell, StatCard } from "@/components/common/status-badges";
@@ -261,7 +262,7 @@ export function SettingsPage() {
                   variant="destructive"
                   disabled={resetMutation.isPending}
                 >
-                  <Trash2 className="size-4" />
+                  <DeleteIcon />
                   Reset database
                 </Button>
               </AlertDialogTrigger>
