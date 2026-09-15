@@ -7,7 +7,7 @@ export function AppLayout() {
     <TooltipProvider>
       <div className="flex h-full min-h-0 w-full overflow-hidden bg-background">
         <DesktopSidebar />
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <Outlet />
         </div>
       </div>

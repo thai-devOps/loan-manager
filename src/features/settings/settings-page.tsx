@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Download, Upload, Database, Sprout } from "lucide-react";
 import { DeleteIcon } from "@/components/icons";
 import { AppHeader } from "@/components/layout/app-header";
+import { LoansModuleChrome } from "@/features/loans/loans-layout";
 import { StatsBlockSkeleton } from "@/components/common/loading-skeletons";
 import { PageShell, StatCard } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
@@ -121,6 +122,7 @@ export function SettingsPage() {
           description="Backup, restore và quản lý database MongoDB"
         />
       }
+      subNav={<LoansModuleChrome />}
     >
       {(message || error) && (
         <div

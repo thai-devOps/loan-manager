@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
+import { FeatureSubNav } from "@/components/layout/feature-sub-nav";
+import { getFeatureById } from "@/components/layout/nav-items";
 import { PageShell } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +51,8 @@ export function FinanceLayout() {
     [ctx.openCreate, month],
   );
 
+  const feature = getFeatureById("finance");
+
   return (
     <FinanceMonthContext.Provider value={ctx}>
       <PageShell
@@ -69,6 +73,7 @@ export function FinanceLayout() {
             }
           />
         }
+        subNav={<FeatureSubNav items={feature.nav} />}
       >
         <div className="flex items-center justify-end gap-2">
           <label

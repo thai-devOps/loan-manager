@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { CalendarClock } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
+import { LoansModuleChrome } from "@/features/loans/loans-layout";
 import { TablePageSkeleton } from "@/components/common/loading-skeletons";
 import {
   CollectMoneyButton,
@@ -88,6 +89,7 @@ export function SchedulesPage() {
           description="Lịch tiền lời theo tháng"
         />
       }
+      subNav={<LoansModuleChrome />}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Select

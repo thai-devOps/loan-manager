@@ -20,6 +20,7 @@ import {
 } from "recharts";
 import { format, parseISO, isSameDay, startOfDay } from "date-fns";
 import { AppHeader } from "@/components/layout/app-header";
+import { LoansModuleChrome } from "@/features/loans/loans-layout";
 import { DashboardSkeleton } from "@/components/common/loading-skeletons";
 import {
   CollectMoneyButton,
@@ -172,6 +173,7 @@ export function DashboardPage() {
           description="Theo dõi vốn cho vay, dư nợ và lịch thu"
         />
       }
+      subNav={<LoansModuleChrome />}
     >
       {isLoading ? (
         <DashboardSkeleton />

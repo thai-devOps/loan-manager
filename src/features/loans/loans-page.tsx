@@ -5,6 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { HandCoins, Plus } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
+import { LoansModuleChrome } from "@/features/loans/loans-layout";
 import { TablePageSkeleton } from "@/components/common/loading-skeletons";
 import {
   MobileList,
@@ -137,6 +138,7 @@ export function LoansPage() {
           }
         />
       }
+      subNav={<LoansModuleChrome />}
     >
       <Tabs
         value={filter}

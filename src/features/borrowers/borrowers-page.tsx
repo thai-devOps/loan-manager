@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Search, UserRound } from "lucide-react";
 import { EditIcon } from "@/components/icons";
 import { AppHeader } from "@/components/layout/app-header";
+import { LoansModuleChrome } from "@/features/loans/loans-layout";
 import { TablePageSkeleton } from "@/components/common/loading-skeletons";
 import {
   MobileList,
@@ -179,6 +180,7 @@ export function BorrowersPage() {
           }
         />
       }
+      subNav={<LoansModuleChrome />}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative w-full sm:max-w-sm">

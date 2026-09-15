@@ -45,7 +45,7 @@ export function AppsHubPage() {
   }
 
   return (
-    <div className="apps-hub relative flex min-h-full flex-col overflow-hidden bg-background">
+    <div className="apps-hub relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain bg-background pb-28 md:pb-0">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-[0.45] dark:opacity-[0.2]"

@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  LayoutGrid,
   Users,
   Wallet,
   WalletCards,
@@ -33,6 +34,17 @@ export interface AppFeature {
   href: string;
   icon: LucideIcon;
   nav: NavItem[];
+}
+
+export interface MobileBottomTab {
+  id: string;
+  title: string;
+  href: string;
+  icon: LucideIcon;
+  /** Elevated center FAB (Apps hub). */
+  fab?: boolean;
+  /** Match active state for this tab. */
+  isActive: (pathname: string) => boolean;
 }
 
 export const APP_FEATURES: AppFeature[] = [
@@ -108,4 +120,52 @@ export function getFeatureFromPath(pathname: string): AppFeature | null {
     return getFeatureById("analytics");
   }
   return getFeatureById("loans");
+}
+
+/** Bottom tab order: Cho vay · Tài chính · Ứng dụng (FAB) · Tài sản · Phân tích */
+export const MOBILE_BOTTOM_TABS: MobileBottomTab[] = [
+  {
+    id: "loans",
+    title: "Cho vay",
+    href: "/",
+    icon: Wallet,
+    isActive: (pathname) => getFeatureFromPath(pathname)?.id === "loans",
+  },
+  {
+    id: "finance",
+    title: "Tài chính",
+    href: "/finance",
+    icon: WalletCards,
+    isActive: (pathname) => getFeatureFromPath(pathname)?.id === "finance",
+  },
+  {
+    id: "apps",
+    title: "Ứng dụng",
+    href: "/apps",
+    icon: LayoutGrid,
+    fab: true,
+    isActive: (pathname) =>
+      pathname === "/apps" || pathname.startsWith("/apps/"),
+  },
+  {
+    id: "assets",
+    title: "Tài sản",
+    href: "/assets",
+    icon: Landmark,
+    isActive: (pathname) => getFeatureFromPath(pathname)?.id === "assets",
+  },
+  {
+    id: "analytics",
+    title: "Phân tích",
+    href: "/reports",
+    icon: BarChart3,
+    isActive: (pathname) => getFeatureFromPath(pathname)?.id === "analytics",
+  },
+];
+
+/** Detail routes where mobile feature sub-nav should be hidden. */
+export function isFeatureDetailPath(pathname: string): boolean {
+  return (
+    /^\/borrowers\/[^/]+$/.test(pathname) || /^\/loans\/[^/]+$/.test(pathname)
+  );
 }

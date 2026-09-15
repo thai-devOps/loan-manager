@@ -4,6 +4,7 @@ import { EMPTY_ARRAY } from "@/lib/empty";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AppHeader } from "@/components/layout/app-header";
+import { LoansModuleChrome } from "@/features/loans/loans-layout";
 import { TablePageSkeleton } from "@/components/common/loading-skeletons";
 import { EmptyState, PageShell } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
@@ -141,6 +142,7 @@ export function PaymentsPage() {
           description="Ghi nhận thu lời hoặc thu gốc"
         />
       }
+      subNav={<LoansModuleChrome />}
     >
       {isLoading ? (
         <TablePageSkeleton showSearch={false} rows={4} />

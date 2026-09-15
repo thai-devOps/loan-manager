@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { ArrowDownLeft, Banknote, CircleDollarSign } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
+import { LoansModuleChrome } from "@/features/loans/loans-layout";
 import { TablePageSkeleton } from "@/components/common/loading-skeletons";
 import {
   MobileList,
@@ -74,6 +75,7 @@ export function TransactionsPage() {
           description="Lịch sử giao dịch (chỉ xem — không xóa)"
         />
       }
+      subNav={<LoansModuleChrome />}
     >
       <div className="flex flex-col gap-3 sm:flex-row">
         <Select

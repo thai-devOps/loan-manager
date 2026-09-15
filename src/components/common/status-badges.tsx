@@ -52,18 +52,21 @@ export function TransactionTypeBadge({ type }: { type: TransactionType }) {
 
 export function PageShell({
   header,
+  subNav,
   children,
 }: {
   header: React.ReactNode;
+  subNav?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {header}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6">
+      {subNav}
+      <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 pb-28 md:p-6 md:pb-6">
         <div className="mx-auto w-full max-w-7xl space-y-6">{children}</div>
       </main>
-    </>
+    </div>
   );
 }
 

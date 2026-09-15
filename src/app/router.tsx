@@ -1,11 +1,13 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
+import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { RequireAuth } from "@/features/auth/require-auth";
 import { LoginPage } from "@/features/auth/login-page";
 import { AppsHubPage } from "@/features/apps/apps-hub-page";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { BorrowersPage } from "@/features/borrowers/borrowers-page";
 import { BorrowerDetailPage } from "@/features/borrowers/borrower-detail-page";
+import { LoansLayout } from "@/features/loans/loans-layout";
 import { LoansPage } from "@/features/loans/loans-page";
 import { LoanDetailPage } from "@/features/loans/loan-detail-page";
 import { PaymentsPage } from "@/features/payments/payments-page";
@@ -33,40 +35,50 @@ export const router = createBrowserRouter([
     path: "/",
     element: <RequireAuth />,
     children: [
-      { path: "apps", element: <AppsHubPage /> },
       {
-        element: <AppLayout />,
+        element: <AuthenticatedShell />,
         children: [
-          { index: true, element: <DashboardPage /> },
-          { path: "borrowers", element: <BorrowersPage /> },
-          { path: "borrowers/:id", element: <BorrowerDetailPage /> },
-          { path: "loans", element: <LoansPage /> },
-          { path: "loans/:id", element: <LoanDetailPage /> },
-          { path: "payments", element: <PaymentsPage /> },
-          { path: "schedules", element: <SchedulesPage /> },
-          { path: "transactions", element: <TransactionsPage /> },
+          { path: "apps", element: <AppsHubPage /> },
           {
-            path: "finance",
-            element: <FinanceLayout />,
+            element: <AppLayout />,
             children: [
-              { index: true, element: <FinanceOverviewPage /> },
-              { path: "income", element: <FinanceIncomePage /> },
-              { path: "expenses", element: <FinanceExpensesPage /> },
-              { path: "transactions", element: <FinanceTransactionsPage /> },
+              {
+                element: <LoansLayout />,
+                children: [
+                  { index: true, element: <DashboardPage /> },
+                  { path: "borrowers", element: <BorrowersPage /> },
+                  { path: "borrowers/:id", element: <BorrowerDetailPage /> },
+                  { path: "loans", element: <LoansPage /> },
+                  { path: "loans/:id", element: <LoanDetailPage /> },
+                  { path: "payments", element: <PaymentsPage /> },
+                  { path: "schedules", element: <SchedulesPage /> },
+                  { path: "transactions", element: <TransactionsPage /> },
+                  { path: "settings", element: <SettingsPage /> },
+                ],
+              },
+              {
+                path: "finance",
+                element: <FinanceLayout />,
+                children: [
+                  { index: true, element: <FinanceOverviewPage /> },
+                  { path: "income", element: <FinanceIncomePage /> },
+                  { path: "expenses", element: <FinanceExpensesPage /> },
+                  { path: "transactions", element: <FinanceTransactionsPage /> },
+                ],
+              },
+              {
+                path: "assets",
+                element: <AssetsLayout />,
+                children: [
+                  { index: true, element: <AssetsOverviewPage /> },
+                  { path: "holdings", element: <AssetsHoldingsPage /> },
+                  { path: "allocation", element: <AssetsAllocationPage /> },
+                  { path: "gold", element: <AssetsGoldPage /> },
+                ],
+              },
+              { path: "reports", element: <ReportsPage /> },
             ],
           },
-          {
-            path: "assets",
-            element: <AssetsLayout />,
-            children: [
-              { index: true, element: <AssetsOverviewPage /> },
-              { path: "holdings", element: <AssetsHoldingsPage /> },
-              { path: "allocation", element: <AssetsAllocationPage /> },
-              { path: "gold", element: <AssetsGoldPage /> },
-            ],
-          },
-          { path: "reports", element: <ReportsPage /> },
-          { path: "settings", element: <SettingsPage /> },
         ],
       },
     ],
