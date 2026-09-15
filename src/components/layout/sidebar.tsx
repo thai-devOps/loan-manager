@@ -7,6 +7,8 @@ import {
   type NavItem,
 } from "@/components/layout/nav-items";
 import { Button } from "@/components/ui/button";
+import { AppLogo } from "@/components/common/app-logo";
+import { APP_NAME } from "@/lib/brand";
 import { useUiStore } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
 
@@ -128,23 +130,23 @@ function SidebarBrand({
   feature: AppFeature;
   collapsed: boolean;
 }) {
-  const Icon = feature.icon;
-
   return (
     <div
       className={cn(
-        "flex h-14 items-center border-b border-sidebar-border px-4",
+        "flex h-14 items-center border-b border-sidebar-border px-3",
         collapsed && "justify-center px-2",
       )}
     >
-      <div className="flex items-center gap-2">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Icon className="size-4" />
-        </div>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <AppLogo size="sm" className="rounded-lg" alt={APP_NAME} />
         {!collapsed && (
-          <div>
-            <p className="text-sm font-semibold leading-none">{feature.title}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Loan Manager</p>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold leading-none">
+              {feature.title}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {APP_NAME}
+            </p>
           </div>
         )}
       </div>

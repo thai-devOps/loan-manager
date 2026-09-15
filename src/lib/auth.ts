@@ -1,4 +1,5 @@
-export const AUTH_STORAGE_KEY = "loan-manager.auth";
+export const AUTH_STORAGE_KEY = "monely.auth";
+const LEGACY_AUTH_STORAGE_KEYS = ["vayly.auth", "loan-manager.auth"];
 
 export interface AuthSession {
   token: string;
@@ -9,7 +10,13 @@ export interface AuthSession {
 
 export function getSession(): AuthSession | null {
   try {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    let raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) {
+      for (const key of LEGACY_AUTH_STORAGE_KEYS) {
+        raw = localStorage.getItem(key);
+        if (raw) break;
+      }
+    }
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AuthSession;
     if (
@@ -28,10 +35,16 @@ export function getSession(): AuthSession | null {
 
 export function saveSession(session: AuthSession): void {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  for (const key of LEGACY_AUTH_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+  }
 }
 
 export function clearSession(): void {
   localStorage.removeItem(AUTH_STORAGE_KEY);
+  for (const key of LEGACY_AUTH_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+  }
 }
 
 export function touchSession(): AuthSession | null {

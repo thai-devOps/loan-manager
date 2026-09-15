@@ -82,7 +82,7 @@ export function downloadBackupJson(payload: BackupPayload): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `loan-manager-backup-${payload.exportedAt.slice(0, 10)}.json`;
+  a.download = `monely-backup-${payload.exportedAt.slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -96,7 +96,7 @@ export function parseAndValidateBackup(raw: string): BackupPayload {
   }
   const result = backupSchema.safeParse(parsed);
   if (!result.success) {
-    throw new Error("Dữ liệu backup không đúng định dạng Loan Manager");
+    throw new Error("Dữ liệu backup không đúng định dạng Monely");
   }
   return result.data;
 }

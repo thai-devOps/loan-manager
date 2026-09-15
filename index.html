@@ -2,13 +2,21 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function () {
         try {
-          var key = "loan-manager-theme";
+          var key = "monely-theme";
+          var legacy = ["vayly-theme", "loan-manager-theme"];
           var stored = localStorage.getItem(key);
+          if (!stored) {
+            for (var i = 0; i < legacy.length; i++) {
+              stored = localStorage.getItem(legacy[i]);
+              if (stored) break;
+            }
+          }
           var theme =
             stored === "light" || stored === "dark" || stored === "system"
               ? stored
@@ -28,7 +36,7 @@
       href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <title>Loan Manager</title>
+    <title>Monely</title>
   </head>
   <body>
     <div id="root"></div>

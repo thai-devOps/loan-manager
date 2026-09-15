@@ -1,6 +1,7 @@
 import { Menu, PanelLeftClose, PanelLeft, LogOut } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/common/theme-toggle";
+import { AppLogo } from "@/components/common/app-logo";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -13,6 +14,7 @@ import {
   SidebarNav,
 } from "@/components/layout/sidebar";
 import { getFeatureFromPath } from "@/components/layout/nav-items";
+import { APP_NAME } from "@/lib/brand";
 import { useUiStore } from "@/stores/ui.store";
 import { useAuthStore } from "@/stores/auth.store";
 
@@ -90,7 +92,19 @@ export function AppHeader({ title, description, actions }: AppHeaderProps) {
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
         <SheetContent side="left" className="flex w-[280px] flex-col p-0">
           <SheetHeader className="border-b px-4 py-4">
-            <SheetTitle>{feature?.title ?? "Loan Manager"}</SheetTitle>
+            <SheetTitle className="flex items-center gap-3">
+              <AppLogo size="sm" className="rounded-lg" />
+              <span className="sr-only">{APP_NAME}</span>
+              {feature ? (
+                <span className="text-sm font-semibold text-foreground">
+                  {feature.title}
+                </span>
+              ) : (
+                <span className="text-sm font-semibold text-foreground">
+                  {APP_NAME}
+                </span>
+              )}
+            </SheetTitle>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto">
             {feature && (

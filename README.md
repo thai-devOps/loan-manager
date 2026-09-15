@@ -1,6 +1,6 @@
-# Loan Manager
+# Monely
 
-Ứng dụng quản lý cho vay cá nhân (React + Vite + Vercel Serverless API + MongoDB Atlas).
+Không gian quản lý tài chính cá nhân (cho vay, thu chi, tài sản) — React + Vite + Vercel Serverless API + MongoDB Atlas.
 
 ## Yêu cầu
 

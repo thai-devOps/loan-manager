@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { ThemeToggle } from "@/components/common/theme-toggle";
+import { AppLogo } from "@/components/common/app-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import {
   loginSchema,
   type LoginFormValues,
 } from "@/schemas/login.schema";
+import { APP_NAME } from "@/lib/brand";
 import { useAuthStore } from "@/stores/auth.store";
 
 function resolvePostLoginPath(from?: string): string {
@@ -66,13 +68,16 @@ export function LoginPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(45_166_154_/_0.35),transparent_55%)]" />
 
         <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
-          <p className="font-[family-name:var(--font-login-display)] text-sm tracking-[0.2em] text-teal-50/80 uppercase">
-            Loan Manager
-          </p>
+          <div className="flex items-center gap-3">
+            <AppLogo size="lg" className="rounded-2xl ring-white/20" />
+            <p className="font-[family-name:var(--font-login-display)] text-lg font-semibold tracking-wide text-teal-50">
+              {APP_NAME}
+            </p>
+          </div>
 
           <div className="max-w-md space-y-4">
             <h1 className="font-[family-name:var(--font-login-display)] text-4xl leading-tight font-semibold text-balance text-teal-50 xl:text-5xl">
-              Quản lý cho vay rõ ràng, mỗi kỳ thu đúng hạn
+              Quản lý tài chính rõ ràng, mỗi module một không gian
             </h1>
             <p className="max-w-sm text-base leading-relaxed text-teal-50/75">
               Theo dõi người vay, dư nợ và lịch thu trong một không gian gọn
@@ -104,12 +109,10 @@ export function LoginPage() {
 
         <div className="relative w-full max-w-[24rem]">
           <div className="mb-8 space-y-3 lg:mb-10">
-            <div className="flex items-center gap-3 lg:hidden">
-              <div className="flex size-11 items-center justify-center rounded-xl bg-teal-700 font-[family-name:var(--font-login-display)] text-sm font-semibold tracking-wide text-teal-50 dark:bg-teal-600">
-                LM
-              </div>
+            <div className="mb-2 flex items-center gap-3 lg:hidden">
+              <AppLogo size="lg" className="rounded-2xl" />
               <p className="font-[family-name:var(--font-login-display)] text-lg font-semibold text-foreground">
-                Loan Manager
+                {APP_NAME}
               </p>
             </div>
 

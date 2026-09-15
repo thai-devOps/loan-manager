@@ -1,9 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/common/theme-toggle";
+import { AppLogo } from "@/components/common/app-logo";
 import { APP_FEATURES, type AppFeatureId } from "@/components/layout/nav-items";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth.store";
+import { APP_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 const FEATURE_ACCENT: Record<
@@ -59,12 +61,10 @@ export function AppsHubPage() {
 
       <header className="relative z-10 flex items-center justify-between gap-3 px-5 py-5 sm:px-8">
         <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-2xl bg-teal-700 text-sm font-bold tracking-wide text-teal-50 shadow-lg shadow-teal-900/20 dark:bg-teal-600 dark:shadow-teal-950/40">
-            LM
-          </div>
+          <AppLogo size="lg" />
           <div>
             <p className="text-sm font-semibold leading-none text-foreground">
-              Loan Manager
+              {APP_NAME}
             </p>
             {username && (
               <p className="mt-1.5 text-xs text-muted-foreground">
