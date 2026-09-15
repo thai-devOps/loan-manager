@@ -63,7 +63,7 @@ export function PageShell({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {header}
       {subNav}
-      <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 pb-28 md:p-6 md:pb-6">
+      <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 pb-32 md:p-6 md:pb-6">
         <div className="mx-auto w-full max-w-7xl space-y-6">{children}</div>
       </main>
     </div>

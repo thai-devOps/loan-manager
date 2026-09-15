@@ -45,45 +45,49 @@ export function AppsHubPage() {
   }
 
   return (
-    <div className="apps-hub relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain bg-background pb-28 md:pb-0">
+    <div className="apps-hub relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-background pb-32 md:pb-0">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.45] dark:opacity-[0.2]"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, rgb(15 118 110 / 0.16) 1px, transparent 0)",
-          backgroundSize: "22px 22px",
-        }}
-      />
-      <div className="pointer-events-none absolute -top-32 right-[-5rem] size-[28rem] rounded-full bg-teal-300/35 blur-3xl dark:bg-teal-500/15" />
-      <div className="pointer-events-none absolute bottom-[-10rem] left-[-6rem] size-[30rem] rounded-full bg-emerald-200/50 blur-3xl dark:bg-emerald-500/10" />
-      <div className="pointer-events-none absolute top-1/3 left-1/2 size-72 -translate-x-1/2 rounded-full bg-amber-200/20 blur-3xl dark:bg-amber-400/10" />
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+        <div
+          className="absolute inset-0 opacity-[0.45] dark:opacity-[0.2]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, rgb(15 118 110 / 0.16) 1px, transparent 0)",
+            backgroundSize: "22px 22px",
+          }}
+        />
+        <div className="absolute -top-32 -right-20 size-112 rounded-full bg-teal-300/35 blur-3xl dark:bg-teal-500/15" />
+        <div className="absolute -bottom-40 -left-24 size-120 rounded-full bg-emerald-200/50 blur-3xl dark:bg-emerald-500/10" />
+        <div className="absolute top-1/3 left-1/2 size-72 -translate-x-1/2 rounded-full bg-amber-200/20 blur-3xl dark:bg-amber-400/10" />
+      </div>
 
-      <header className="relative z-10 flex items-center justify-between gap-3 px-5 py-5 sm:px-8">
-        <div className="flex items-center gap-3">
+      <header className="relative z-10 flex w-full min-w-0 items-center justify-between gap-3 px-5 py-5 sm:px-8">
+        <div className="flex min-w-0 items-center gap-3">
           <AppLogo size="lg" />
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-semibold leading-none text-foreground">
               {APP_NAME}
             </p>
             {username && (
-              <p className="mt-1.5 text-xs text-muted-foreground">
+              <p className="mt-1.5 truncate text-xs text-muted-foreground">
                 Xin chào, {username}
               </p>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <ThemeToggle />
           <Button variant="outline" size="sm" onClick={handleLogout}>
             <LogOut className="size-4" />
-            Đăng xuất
+            <span className="hidden sm:inline">Đăng xuất</span>
           </Button>
         </div>
       </header>
 
-      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-5 py-10 sm:px-8">
-        <div className="mb-10 max-w-xl text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <main className="relative z-10 flex w-full min-w-0 flex-1 flex-col items-center justify-center px-5 py-10 sm:px-8">
+        <div className="mb-10 w-full max-w-xl text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
           <p className="mb-3 text-xs font-medium tracking-[0.22em] text-teal-800/70 uppercase dark:text-teal-300/70">
             Workspace
           </p>
@@ -106,7 +110,7 @@ export function AppsHubPage() {
                 to={feature.href}
                 style={{ animationDelay: `${80 + index * 70}ms` }}
                 className={cn(
-                  "group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card/85 p-5 text-left shadow-sm backdrop-blur-sm",
+                  "group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card/85 p-5 text-left shadow-sm backdrop-blur-sm",
                   "transition-all duration-300 ease-out",
                   "hover:-translate-y-1 hover:shadow-xl",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40",
@@ -121,7 +125,7 @@ export function AppsHubPage() {
                     accent.glow,
                   )}
                 />
-                <div className="relative">
+                <div className="relative min-w-0">
                   <div
                     className={cn(
                       "flex size-12 items-center justify-center rounded-2xl shadow-sm transition-colors duration-300",
