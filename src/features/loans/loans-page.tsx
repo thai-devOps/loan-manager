@@ -223,7 +223,7 @@ export function LoansPage() {
                       <TableCell>
                         {formatCurrency(loan.monthlyInterestAmount)}
                       </TableCell>
-                      <TableCell>{formatDate(loan.startDate)}</TableCell>
+                      <TableCell>{formatDate(loan.createdAt)}</TableCell>
                       <TableCell>
                         <LoanStatusBadge status={loan.status} />
                       </TableCell>

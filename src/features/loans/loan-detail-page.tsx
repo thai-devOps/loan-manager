@@ -200,7 +200,7 @@ export function LoanDetailPage() {
       header={
         <AppHeader
           title={borrower?.name ?? "Khoản vay"}
-          description={`Bắt đầu ${formatDate(loan.startDate)}`}
+          description={`Bắt đầu ${formatDate(loan.createdAt)}`}
           actions={
             <div className="flex items-center gap-2">
               <LoanStatusBadge status={loan.status} />
@@ -346,7 +346,7 @@ export function LoanDetailPage() {
                         <Banknote />
                       )
                     }
-                    title={formatDate(tx.transactionDate)}
+                    title={formatDate(tx.createdAt)}
                     badge={<TransactionTypeBadge type={tx.type} />}
                     primaryValue={formatCurrency(tx.amount)}
                     meta={tx.note || undefined}
@@ -366,7 +366,7 @@ export function LoanDetailPage() {
                   <TableBody>
                     {sortedTx.map((tx) => (
                       <TableRow key={tx.id}>
-                        <TableCell>{formatDate(tx.transactionDate)}</TableCell>
+                        <TableCell>{formatDate(tx.createdAt)}</TableCell>
                         <TableCell>
                           <TransactionTypeBadge type={tx.type} />
                         </TableCell>

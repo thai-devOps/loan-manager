@@ -158,7 +158,7 @@ export function FinanceTransactionsPage() {
                   )
                 }
                 title={tx.description}
-                subtitle={`${formatDate(tx.date)} · ${categoryLabel(tx.category)}`}
+                subtitle={`${formatDate(tx.createdAt)} · ${categoryLabel(tx.category)}`}
                 primaryValue={
                   <span
                     className={
@@ -215,7 +215,7 @@ export function FinanceTransactionsPage() {
               <TableBody>
                 {rows.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell>{formatDate(tx.date)}</TableCell>
+                    <TableCell>{formatDate(tx.createdAt)}</TableCell>
                     <TableCell>
                       <Badge
                         variant={

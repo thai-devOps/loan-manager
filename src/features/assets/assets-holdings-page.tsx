@@ -124,7 +124,7 @@ export function AssetsHoldingsPage() {
                       {formatCurrency(asset.value)}
                     </TableCell>
                     <TableCell>
-                      {formatDate(`${asset.valuationDate}T00:00:00.000Z`)}
+                      {formatDate(asset.updatedAt)}
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
@@ -182,7 +182,7 @@ export function AssetsHoldingsPage() {
                 <div className="mt-3 flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
                     Cập nhật{" "}
-                    {formatDate(`${asset.valuationDate}T00:00:00.000Z`)}
+                    {formatDate(asset.updatedAt)}
                   </p>
                   <div className="flex gap-1">
                     <Button

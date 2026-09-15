@@ -233,7 +233,7 @@ export function BorrowerDetailPage() {
                       title={formatCurrency(loan.principalAmount)}
                       badge={<LoanStatusBadge status={loan.status} />}
                       primaryValue={formatCurrency(remaining)}
-                      meta={`Bắt đầu ${formatDate(loan.startDate)}`}
+                      meta={`Bắt đầu ${formatDate(loan.createdAt)}`}
                     />
                   );
                 })}
@@ -276,7 +276,7 @@ export function BorrowerDetailPage() {
                           <TableCell>
                             {formatCurrency(loan.monthlyInterestAmount)}
                           </TableCell>
-                          <TableCell>{formatDate(loan.startDate)}</TableCell>
+                          <TableCell>{formatDate(loan.createdAt)}</TableCell>
                           <TableCell>
                             <LoanStatusBadge status={loan.status} />
                           </TableCell>
@@ -314,7 +314,7 @@ export function BorrowerDetailPage() {
                         <Banknote />
                       )
                     }
-                    title={formatDate(tx.transactionDate)}
+                    title={formatDate(tx.createdAt)}
                     badge={<TransactionTypeBadge type={tx.type} />}
                     primaryValue={formatCurrency(tx.amount)}
                     meta={tx.note || undefined}
@@ -334,7 +334,7 @@ export function BorrowerDetailPage() {
                   <TableBody>
                     {transactions.map((tx) => (
                       <TableRow key={tx.id}>
-                        <TableCell>{formatDate(tx.transactionDate)}</TableCell>
+                        <TableCell>{formatDate(tx.createdAt)}</TableCell>
                         <TableCell>
                           <TransactionTypeBadge type={tx.type} />
                         </TableCell>

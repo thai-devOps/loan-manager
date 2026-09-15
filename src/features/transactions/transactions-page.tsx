@@ -118,7 +118,7 @@ export function TransactionsPage() {
                     )
                   }
                   title={borrower?.name ?? "—"}
-                  subtitle={formatDate(tx.transactionDate)}
+                  subtitle={formatDate(tx.createdAt)}
                   badge={<TransactionTypeBadge type={tx.type} />}
                   primaryValue={formatCurrency(tx.amount)}
                   meta={tx.note || undefined}
@@ -157,7 +157,7 @@ export function TransactionsPage() {
                     : undefined;
                   return (
                     <TableRow key={tx.id}>
-                      <TableCell>{formatDate(tx.transactionDate)}</TableCell>
+                      <TableCell>{formatDate(tx.createdAt)}</TableCell>
                       <TableCell>{borrower?.name ?? "—"}</TableCell>
                       <TableCell>
                         {loan ? (

@@ -366,7 +366,7 @@ export function AssetsGoldPage() {
                     {purchases.map((p) => (
                       <TableRow key={p.id}>
                         <TableCell>
-                          {formatDate(`${p.purchaseDate}T00:00:00.000Z`)}
+                          {formatDate(p.createdAt)}
                         </TableCell>
                         <TableCell>{GOLD_TYPE_LABELS[p.type]}</TableCell>
                         <TableCell>
@@ -414,7 +414,7 @@ export function AssetsGoldPage() {
                           {GOLD_TYPE_LABELS[p.type]}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {formatDate(`${p.purchaseDate}T00:00:00.000Z`)}
+                          {formatDate(p.createdAt)}
                         </p>
                       </div>
                       <p className="font-semibold tabular-nums">
@@ -483,7 +483,7 @@ export function AssetsGoldPage() {
             <AlertDialogDescription>
               Xóa giao dịch mua vàng ngày{" "}
               {deleting
-                ? formatDate(`${deleting.purchaseDate}T00:00:00.000Z`)
+                ? formatDate(deleting.createdAt)
                 : ""}
               . Khối lượng và giá vốn sẽ được cập nhật lại.
             </AlertDialogDescription>

@@ -393,7 +393,7 @@ export function FinanceOverviewPage() {
                         {tx.description}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {formatDate(tx.date)} · {categoryLabel(tx.category)}
+                        {formatDate(tx.createdAt)} · {categoryLabel(tx.category)}
                       </p>
                     </div>
                     <p
@@ -423,7 +423,7 @@ export function FinanceOverviewPage() {
                   <TableBody>
                     {recent.map((tx) => (
                       <TableRow key={tx.id}>
-                        <TableCell>{formatDate(tx.date)}</TableCell>
+                        <TableCell>{formatDate(tx.createdAt)}</TableCell>
                         <TableCell>{tx.description}</TableCell>
                         <TableCell>
                           <Badge variant="secondary">
