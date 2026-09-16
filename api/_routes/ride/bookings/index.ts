@@ -7,15 +7,14 @@ import {
   generateBookingCode,
   normalizePhone,
 } from "../../../_lib/ride-booking.js";
+import { upsertCustomer } from "../../../_lib/ride-customer.js";
 import type {
   RideBooking,
-  RideCustomer,
   ServiceType,
   TripType,
 } from "../../../_lib/ride-types.js";
 import {
   rideBookingsCol,
-  rideCustomersCol,
   rideVehiclesCol,
   stripDoc,
 } from "../../../_lib/mongo.js";
@@ -29,44 +28,6 @@ const SERVICE_TYPES = new Set([
   "CUSTOM",
 ]);
 const TRIP_TYPES = new Set(["ONE_WAY", "ROUND_TRIP", "DAILY", "CUSTOM"]);
-
-async function upsertCustomer(params: {
-  name: string;
-  phone: string;
-}): Promise<string> {
-  const col = await rideCustomersCol();
-  const phone = normalizePhone(params.phone);
-  const existing = await col.findOne({ phone });
-  const now = new Date().toISOString();
-  if (existing) {
-    await col.updateOne(
-      { id: existing.id },
-      {
-        $set: {
-          name: params.name.trim() || existing.name,
-          updatedAt: now,
-          lastBookingAt: now,
-        },
-        $inc: { tripCount: 1 },
-      },
-    );
-    return existing.id;
-  }
-  const id = randomUUID();
-  const row: RideCustomer = {
-    _id: id,
-    id,
-    name: params.name.trim(),
-    phone,
-    tripCount: 1,
-    totalSpend: 0,
-    lastBookingAt: now,
-    createdAt: now,
-    updatedAt: now,
-  };
-  await col.insertOne(row);
-  return id;
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {

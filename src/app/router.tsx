@@ -52,6 +52,10 @@ import { RideAdminVehiclesPage } from "@/features/ride-admin/pages/vehicles-page
 import { RideAdminVehicleDetailPage } from "@/features/ride-admin/pages/vehicle-detail-page";
 import { RideAdminDriversPage } from "@/features/ride-admin/pages/drivers-page";
 import { RideAdminDriverDetailPage } from "@/features/ride-admin/pages/driver-detail-page";
+import { RideAdminTripsPage } from "@/features/ride-admin/pages/trips-page";
+import { RideAdminTripDetailPage } from "@/features/ride-admin/pages/trip-detail-page";
+import { RideAdminCustomersPage } from "@/features/ride-admin/pages/customers-page";
+import { RideAdminCustomerDetailPage } from "@/features/ride-admin/pages/customer-detail-page";
 import { RideAdminComingSoonPage } from "@/features/ride-admin/pages/coming-soon-page";
 import { AccessControlLayout } from "@/features/access-control/components/access-control-layout";
 import { UsersPage } from "@/features/access-control/pages/users-page";
@@ -234,13 +238,41 @@ export const router = createBrowserRouter([
                   {
                     path: "trips",
                     element: (
-                      <RideAdminComingSoonPage title="Chuyến xe" />
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_TRIP_VIEW}
+                      >
+                        <RideAdminTripsPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "trips/:id",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_TRIP_VIEW}
+                      >
+                        <RideAdminTripDetailPage />
+                      </PermissionRoute>
                     ),
                   },
                   {
                     path: "customers",
                     element: (
-                      <RideAdminComingSoonPage title="Khách hàng" />
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_CUSTOMER_VIEW}
+                      >
+                        <RideAdminCustomersPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "customers/:id",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_CUSTOMER_VIEW}
+                      >
+                        <RideAdminCustomerDetailPage />
+                      </PermissionRoute>
                     ),
                   },
                   {

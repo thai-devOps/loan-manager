@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BookingStatusBadge } from "@/features/ride-admin/components/booking-status-badge";
+import { Can } from "@/features/auth/can";
 import {
   bookingAdminService,
   driverAdminService,
+  tripAdminService,
   vehicleAdminService,
 } from "@/features/ride-admin/services/admin-api";
 import {
@@ -29,9 +31,11 @@ import type {
 } from "@/features/ride/types/ride";
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
+import { PERMISSIONS } from "@/config/permissions";
 
 export function RideAdminBookingDetailPage() {
   const { id = "" } = useParams();
+  const navigate = useNavigate();
   const [booking, setBooking] = useState<TripBooking | null | undefined>(
     undefined,
   );
@@ -44,6 +48,7 @@ export function RideAdminBookingDetailPage() {
   const [paid, setPaid] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
+  const [creatingTrip, setCreatingTrip] = useState(false);
 
   async function load() {
     setError(null);
@@ -68,7 +73,9 @@ export function RideAdminBookingDetailPage() {
   }
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => {
+      void load();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -87,6 +94,22 @@ export function RideAdminBookingDetailPage() {
       setError(e instanceof ApiError ? e.message : "Thao tác thất bại");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function createTripFromBooking() {
+    setCreatingTrip(true);
+    setError(null);
+    try {
+      const trip = await tripAdminService.create({ bookingId: id });
+      const refreshed = await bookingAdminService.get(id);
+      setBooking(refreshed);
+      return trip.id;
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Không tạo được chuyến");
+      return null;
+    } finally {
+      setCreatingTrip(false);
     }
   }
 
@@ -123,6 +146,30 @@ export function RideAdminBookingDetailPage() {
             <BookingStatusBadge status={booking.status} />
           </div>
         </div>
+        <div className="flex flex-wrap gap-2">
+          {booking.tripId ? (
+            <Button asChild size="sm" className="bg-teal-800 hover:bg-teal-700">
+              <Link to={`/admin/trips/${booking.tripId}`}>Xem chuyến</Link>
+            </Button>
+          ) : booking.status !== "PENDING" &&
+            booking.status !== "CANCELLED" ? (
+            <Can permission={PERMISSIONS.FLEET_TRIP_CREATE}>
+              <Button
+                size="sm"
+                className="bg-teal-800 hover:bg-teal-700"
+                disabled={busy || creatingTrip}
+                onClick={() => {
+                  void (async () => {
+                    const tripId = await createTripFromBooking();
+                    if (tripId) void navigate(`/admin/trips/${tripId}`);
+                  })();
+                }}
+              >
+                {creatingTrip ? "Đang tạo…" : "Tạo chuyến xe"}
+              </Button>
+            </Can>
+          ) : null}
+        </div>
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -131,7 +178,18 @@ export function RideAdminBookingDetailPage() {
         <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
           Khách hàng
         </h2>
-        <p className="mt-2 font-medium">{booking.customer.name}</p>
+        <p className="mt-2 font-medium">
+          {booking.customerId ? (
+            <Link
+              className="underline-offset-2 hover:underline"
+              to={`/admin/customers/${booking.customerId}`}
+            >
+              {booking.customer.name}
+            </Link>
+          ) : (
+            booking.customer.name
+          )}
+        </p>
         <p className="text-sm text-muted-foreground">{booking.customer.phone}</p>
       </section>
 

@@ -134,6 +134,24 @@ export const API_ROUTES: ApiRoute[] = [
     params: (m) => ({ id: m[1]! }),
   },
   {
+    pattern: /^\/api\/ride\/trips\/?$/,
+    load: () => import("../_routes/ride/trips/index.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/trips\/([^/]+)\/?$/,
+    load: () => import("../_routes/ride/trips/[id].js"),
+    params: (m) => ({ id: m[1]! }),
+  },
+  {
+    pattern: /^\/api\/ride\/customers\/?$/,
+    load: () => import("../_routes/ride/customers/index.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/customers\/([^/]+)\/?$/,
+    load: () => import("../_routes/ride/customers/[id].js"),
+    params: (m) => ({ id: m[1]! }),
+  },
+  {
     pattern: /^\/api\/ride\/vehicles\/?$/,
     load: () => import("../_routes/ride/vehicles/index.js"),
   },

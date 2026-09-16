@@ -60,6 +60,10 @@ export const PERMISSIONS = {
   FLEET_DRIVER_CREATE: "fleet.driver.create",
   FLEET_DRIVER_UPDATE: "fleet.driver.update",
   FLEET_DRIVER_DELETE: "fleet.driver.delete",
+  FLEET_CUSTOMER_VIEW: "fleet.customer.view",
+  FLEET_CUSTOMER_CREATE: "fleet.customer.create",
+  FLEET_CUSTOMER_UPDATE: "fleet.customer.update",
+  FLEET_CUSTOMER_DELETE: "fleet.customer.delete",
 
   // Report
   REPORT_FINANCE_VIEW: "report.finance.view",
@@ -120,6 +124,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   booking: "Booking",
   trip: "Chuyến xe",
   driver: "Tài xế",
+  customer: "Khách hàng",
   finance: "Tài chính",
   fleet: "Vận hành xe",
   report: "Báo cáo",

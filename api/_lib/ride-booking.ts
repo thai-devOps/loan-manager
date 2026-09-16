@@ -1,17 +1,15 @@
-import { randomUUID } from "node:crypto";
 import type {
   BookingStatus,
   RideBooking,
   RideDriver,
-  RideTrip,
   RideVehicle,
 } from "./ride-types.js";
 import {
   rideBookingsCol,
   rideDriversCol,
-  rideTripsCol,
   rideVehiclesCol,
 } from "./mongo.js";
+import { ensureTripFromBooking } from "./ride-trip.js";
 
 const ACTIVE_STATUSES: BookingStatus[] = [
   "CONFIRMED",
@@ -55,7 +53,7 @@ export function canTransition(
   return map[from]?.includes(to) ?? false;
 }
 
-/** Same calendar day conflict — MVP window check by date (+ optional time string compare). */
+/** Same calendar day conflict — MVP window check by date. */
 export async function hasVehicleConflict(params: {
   vehicleId: string;
   pickupDate: string;
@@ -94,55 +92,9 @@ export async function hasDriverConflict(params: {
   return Boolean(hit);
 }
 
+/** Upsert full trip from booking (replaces thin stub). */
 export async function ensureTripStub(booking: RideBooking): Promise<string | null> {
-  if (!booking.vehicleId || !booking.driverId) return null;
-  if (
-    booking.status !== "DRIVER_ASSIGNED" &&
-    booking.status !== "DRIVER_ARRIVING" &&
-    booking.status !== "IN_PROGRESS" &&
-    booking.status !== "COMPLETED"
-  ) {
-    return booking.tripId ?? null;
-  }
-
-  const trips = await rideTripsCol();
-  if (booking.tripId) {
-    await trips.updateOne(
-      { id: booking.tripId },
-      {
-        $set: {
-          vehicleId: booking.vehicleId,
-          driverId: booking.driverId,
-          status: booking.status,
-          pickupDate: booking.pickupDate,
-          pickupTime: booking.pickupTime,
-          updatedAt: new Date().toISOString(),
-        },
-      },
-    );
-    return booking.tripId;
-  }
-
-  const existing = await trips.findOne({ bookingId: booking.id });
-  if (existing) return existing.id;
-
-  const now = new Date().toISOString();
-  const id = randomUUID();
-  const trip: RideTrip = {
-    _id: id,
-    id,
-    bookingId: booking.id,
-    bookingCode: booking.bookingCode,
-    vehicleId: booking.vehicleId,
-    driverId: booking.driverId,
-    pickupDate: booking.pickupDate,
-    pickupTime: booking.pickupTime,
-    status: booking.status,
-    createdAt: now,
-    updatedAt: now,
-  };
-  await trips.insertOne(trip);
-  return id;
+  return ensureTripFromBooking(booking);
 }
 
 export async function buildDriverSnapshot(

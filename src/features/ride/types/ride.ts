@@ -17,6 +17,15 @@ export type BookingStatus =
   | "COMPLETED"
   | "CANCELLED";
 
+/** Independent trip lifecycle (fleet ops). */
+export type TripStatus =
+  | "DRAFT"
+  | "CONFIRMED"
+  | "ASSIGNED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
+
 export type SuitableFor =
   | "travel"
   | "medical"
@@ -77,6 +86,24 @@ export type TripCustomer = {
   phone: string;
 };
 
+export type RideCustomerStatus = "ACTIVE" | "INACTIVE";
+
+export type RideCustomer = {
+  id: string;
+  customerCode: string;
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  note?: string;
+  status: RideCustomerStatus;
+  tripCount: number;
+  totalSpend: number;
+  lastBookingAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TripDriver = {
   name: string;
   phone: string;
@@ -106,6 +133,52 @@ export type TripBooking = {
   tripId?: string | null;
   createdAt: string;
   updatedAt?: string;
+};
+
+export type TripStatusEvent = {
+  status: TripStatus;
+  at: string;
+  byUserId?: string | null;
+  note?: string;
+};
+
+export type RideTrip = {
+  id: string;
+  tripCode: string;
+  bookingId?: string | null;
+  bookingCode?: string | null;
+  customerId?: string | null;
+  customer: TripCustomer;
+  pickup: Place;
+  destination: Place;
+  routeLabel?: string;
+  pickupDate: string;
+  pickupTime: string;
+  returnDate?: string | null;
+  returnTime?: string | null;
+  vehicleId?: string | null;
+  driverId?: string | null;
+  tripType: TripType;
+  passengers: number;
+  note?: string;
+  tripPrice: number;
+  expenseTotal: number;
+  revenueAmount: number;
+  status: TripStatus;
+  statusHistory: TripStatusEvent[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RideCustomerDetail = RideCustomer & {
+  stats: {
+    tripCount: number;
+    completedTrips: number;
+    totalRevenue: number;
+    bookingCount: number;
+  };
+  recentTrips: RideTrip[];
+  recentBookings: TripBooking[];
 };
 
 export type PriceQuote = {
