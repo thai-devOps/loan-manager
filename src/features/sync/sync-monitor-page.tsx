@@ -7,6 +7,7 @@ import {
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
+import { DeleteIcon } from "@/components/icons";
 import { AppHeader } from "@/components/layout/app-header";
 import { ProfileModuleChrome } from "@/features/profile/profile-layout";
 import {
@@ -34,6 +35,7 @@ import {
   syncQueueRepository,
 } from "@/features/sync/sync-queue.repository";
 import type { SyncQueueItem, SyncQueueStatus } from "@/db/schema";
+import { MAX_SYNC_RETRIES } from "@/sync/syncQueue";
 import { cn } from "@/lib/utils";
 
 function formatSyncTime(iso: string | null): string {
@@ -136,14 +138,45 @@ export function SyncMonitorPage() {
     }
   }
 
+  async function handleRemoveError(localId: number) {
+    setError(null);
+    try {
+      await syncQueueRepository.removeError(localId);
+      setMessage("Đã xóa mục lỗi khỏi hàng đợi");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không xóa được lỗi");
+    }
+  }
+
+  async function handleClearErrors() {
+    setError(null);
+    try {
+      const n = await syncQueueRepository.clearErrors();
+      setMessage(
+        n > 0 ? `Đã xóa ${n} mục lỗi khỏi hàng đợi` : "Không có lỗi để xóa",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không xóa được lỗi");
+    }
+  }
+
   return (
     <PageShell
       header={
         <AppHeader
           title="Đồng bộ"
-          description="Theo dõi hàng đợi offline và trạng thái đồng bộ với máy chủ"
+          description={`Theo dõi hàng đợi offline (tối đa ${MAX_SYNC_RETRIES} lần thử tự động)`}
           actions={
             <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy || failedCount === 0}
+                onClick={() => void handleClearErrors()}
+              >
+                <DeleteIcon />
+                Xóa lỗi
+              </Button>
               <Button
                 size="sm"
                 variant="secondary"
@@ -234,11 +267,21 @@ export function SyncMonitorPage() {
                       <TableHead className="text-right">Retry</TableHead>
                       <TableHead>Lỗi</TableHead>
                       <TableHead>Thời gian</TableHead>
+                      <TableHead className="text-right">Thao tác</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {ops.map((op) => (
-                      <QueueRow key={op.localId ?? op.opId} op={op} />
+                      <QueueRow
+                        key={op.localId ?? op.opId}
+                        op={op}
+                        onRemoveError={
+                          op.localId != null &&
+                          (op.status === "failed" || op.status === "conflict")
+                            ? () => void handleRemoveError(op.localId!)
+                            : undefined
+                        }
+                      />
                     ))}
                   </TableBody>
                 </Table>
@@ -259,8 +302,21 @@ export function SyncMonitorPage() {
                     }
                     meta={
                       op.lastError
-                        ? op.lastError
+                        ? `${op.lastError} · retry ${op.retryCount}/${MAX_SYNC_RETRIES}`
                         : formatCreatedAt(op.createdAt)
+                    }
+                    footer={
+                      op.localId != null &&
+                      (op.status === "failed" || op.status === "conflict") ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void handleRemoveError(op.localId!)}
+                        >
+                          <DeleteIcon />
+                          Xóa lỗi
+                        </Button>
+                      ) : undefined
                     }
                   />
                 ))}
@@ -364,7 +420,13 @@ export function SyncMonitorPage() {
   );
 }
 
-function QueueRow({ op }: { op: SyncQueueItem }) {
+function QueueRow({
+  op,
+  onRemoveError,
+}: {
+  op: SyncQueueItem;
+  onRemoveError?: () => void;
+}) {
   return (
     <TableRow>
       <TableCell>{SYNC_ENTITY_LABELS[op.entity] ?? op.entity}</TableCell>
@@ -377,12 +439,28 @@ function QueueRow({ op }: { op: SyncQueueItem }) {
           {statusLabel(op.status)}
         </Badge>
       </TableCell>
-      <TableCell className="text-right tabular-nums">{op.retryCount}</TableCell>
+      <TableCell className="text-right tabular-nums">
+        {op.retryCount}/{MAX_SYNC_RETRIES}
+      </TableCell>
       <TableCell className="max-w-[14rem] truncate text-xs text-muted-foreground">
         {op.lastError ?? "—"}
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">
         {formatCreatedAt(op.createdAt)}
+      </TableCell>
+      <TableCell className="text-right">
+        {onRemoveError ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label="Xóa lỗi"
+            onClick={onRemoveError}
+          >
+            <DeleteIcon />
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
       </TableCell>
     </TableRow>
   );

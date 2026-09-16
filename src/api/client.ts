@@ -17,6 +17,10 @@ export async function apiFetch<T>(
   path: string,
   options: ApiFetchOptions = {},
 ): Promise<T> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    throw new ApiError("Offline", 0);
+  }
+
   const session = getSession();
   const headers = new Headers(options.headers);
   if (!headers.has("Content-Type") && options.body !== undefined) {
@@ -26,16 +30,23 @@ export async function apiFetch<T>(
     headers.set("Authorization", `Bearer ${session.token}`);
   }
 
-  const res = await fetch(path, {
-    ...options,
-    headers,
-    body:
-      options.body === undefined
-        ? undefined
-        : typeof options.body === "string"
-          ? options.body
-          : JSON.stringify(options.body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      ...options,
+      headers,
+      body:
+        options.body === undefined
+          ? undefined
+          : typeof options.body === "string"
+            ? options.body
+            : JSON.stringify(options.body),
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Network request failed";
+    throw new ApiError(message || "Failed to fetch", 0);
+  }
 
   if (res.status === 401) {
     clearSession();

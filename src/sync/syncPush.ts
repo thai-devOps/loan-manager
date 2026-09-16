@@ -4,11 +4,12 @@ import {
   listPendingOps,
   markDone,
   markFailed,
+  markPendingRetry,
   markSyncing,
+  reclaimSyncingOps,
+  MAX_SYNC_RETRIES,
 } from "@/sync/syncQueue";
 import type { SyncTransport } from "@/sync/transports/types";
-
-const MAX_RETRIES = 8;
 
 async function remapLoanCreate(
   localLoanId: string,
@@ -113,10 +114,14 @@ async function remapSimpleEntity(
 export async function syncPush(transport: SyncTransport): Promise<{
   pushed: number;
   failed: number;
+  /** Retryable network/offline deferrals kept as pending */
+  deferred: number;
 }> {
+  await reclaimSyncingOps();
   const pending = await listPendingOps();
   let pushed = 0;
   let failed = 0;
+  let deferred = 0;
 
   for (const item of pending) {
     if (item.localId == null) continue;
@@ -131,7 +136,23 @@ export async function syncPush(transport: SyncTransport): Promise<{
     }
 
     await markSyncing(item.localId);
-    const result = await transport.pushOne(item);
+
+    let result;
+    try {
+      result = await transport.pushOne(item);
+    } catch (error) {
+      const nextRetry = item.retryCount + 1;
+      const message =
+        error instanceof Error ? error.message : "Unexpected push error";
+      if (nextRetry >= MAX_SYNC_RETRIES) {
+        await markFailed(item.localId, nextRetry, message, "failed");
+        failed += 1;
+      } else {
+        await markPendingRetry(item.localId, nextRetry, message);
+        deferred += 1;
+      }
+      continue;
+    }
 
     if (result.ok) {
       if (
@@ -166,20 +187,19 @@ export async function syncPush(transport: SyncTransport): Promise<{
     }
 
     const nextRetry = item.retryCount + 1;
-    if (!result.retryable || nextRetry >= MAX_RETRIES) {
-      await markFailed(
-        item.localId,
-        nextRetry,
-        result.error ?? "Failed",
-        "failed",
-      );
+    const errMsg = result.error ?? "Failed";
+
+    // Non-retryable or exhausted (max 10) → hard failed, no further auto-retry
+    if (!result.retryable || nextRetry >= MAX_SYNC_RETRIES) {
+      await markFailed(item.localId, nextRetry, errMsg, "failed");
       failed += 1;
       continue;
     }
 
-    await markFailed(item.localId, nextRetry, result.error ?? "Failed", "failed");
-    failed += 1;
+    // Retryable network/offline → keep pending (design: do not drop queue)
+    await markPendingRetry(item.localId, nextRetry, errMsg);
+    deferred += 1;
   }
 
-  return { pushed, failed };
+  return { pushed, failed, deferred };
 }

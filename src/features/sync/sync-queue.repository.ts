@@ -1,9 +1,11 @@
 import type { SyncConflictRow, SyncQueueItem } from "@/db/schema";
 import { isDbOpen } from "@/db/database";
 import {
+  clearFailedOps,
   listAllActiveOps,
   listUnresolvedConflicts,
   markConflictResolved,
+  removeQueueOp,
   retryAllFailed,
 } from "@/sync/syncQueue";
 import { runSync } from "@/sync/syncManager";
@@ -34,6 +36,16 @@ export const syncQueueRepository = {
   async markConflictSeen(id: string): Promise<void> {
     if (!isDbOpen()) return;
     await markConflictResolved(id);
+  },
+
+  async removeError(localId: number): Promise<void> {
+    if (!isDbOpen()) return;
+    await removeQueueOp(localId);
+  },
+
+  async clearErrors(): Promise<number> {
+    if (!isDbOpen()) return 0;
+    return clearFailedOps();
   },
 };
 

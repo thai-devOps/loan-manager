@@ -14,6 +14,8 @@ import {
   enqueueSyncOp,
   listPendingOps,
   markDone,
+  markSyncing,
+  reclaimSyncingOps,
 } from "@/sync/syncQueue";
 import { syncPush } from "@/sync/syncPush";
 import { syncPull } from "@/sync/syncPull";
@@ -44,7 +46,7 @@ describe("local-first IndexedDB", () => {
     expect(dbNameForUser("alice")).not.toBe(dbNameForUser("bob"));
   });
 
-  it("persists finance create offline and keeps queue", async () => {
+  it("persists finance create offline and keeps queue as pending", async () => {
     const created = await financeRepository.create({
       type: "expense",
       category: "food",
@@ -58,7 +60,9 @@ describe("local-first IndexedDB", () => {
 
     const listed = await financeRepository.list();
     expect(listed.some((r) => r.id === created.id)).toBe(true);
-    expect(await countPendingOps()).toBeGreaterThanOrEqual(1);
+    const pending = await listPendingOps();
+    expect(pending.length).toBeGreaterThanOrEqual(1);
+    expect(pending.every((p) => p.status === "pending")).toBe(true);
   });
 
   it("update and soft-delete offline survive reload", async () => {
@@ -110,7 +114,7 @@ describe("local-first IndexedDB", () => {
     expect(pending.filter((p) => p.opId === opId)).toHaveLength(1);
   });
 
-  it("keeps queue when push fails", async () => {
+  it("network retryable failure keeps status pending (not failed)", async () => {
     await borrowerRepository.create({ name: "Offline User" });
     const failingTransport: SyncTransport = {
       pullAll: async () => [],
@@ -122,8 +126,44 @@ describe("local-first IndexedDB", () => {
     };
 
     const result = await syncPush(failingTransport);
-    expect(result.failed).toBeGreaterThan(0);
-    expect(await countPendingOps()).toBeGreaterThan(0);
+    expect(result.failed).toBe(0);
+    expect(result.deferred).toBeGreaterThan(0);
+    const pending = await listPendingOps();
+    expect(pending.length).toBeGreaterThan(0);
+    expect(pending.every((p) => p.status === "pending")).toBe(true);
+    expect(pending.some((p) => p.lastError === "network")).toBe(true);
+  });
+
+  it("reclaims orphaned syncing ops so they can push again", async () => {
+    const item = await enqueueSyncOp({
+      entity: "borrower",
+      entityId: "orphan",
+      action: "create",
+      payload: { name: "Orphan" },
+    });
+    expect(item.localId).toBeDefined();
+    await markSyncing(item.localId!);
+
+    const stuck = await getDb().syncQueue.get(item.localId!);
+    expect(stuck?.status).toBe("syncing");
+
+    const reclaimed = await reclaimSyncingOps();
+    expect(reclaimed).toBe(1);
+    expect((await getDb().syncQueue.get(item.localId!))?.status).toBe(
+      "pending",
+    );
+
+    let pushCalls = 0;
+    const transport: SyncTransport = {
+      pullAll: async () => [],
+      pushOne: async () => {
+        pushCalls += 1;
+        return { ok: true, serverRecord: { id: "orphan" } };
+      },
+    };
+    await syncPush(transport);
+    expect(pushCalls).toBe(1);
+    expect(await countPendingOps()).toBe(0);
   });
 
   it("pushes once then removes queue item on success", async () => {
@@ -146,6 +186,32 @@ describe("local-first IndexedDB", () => {
 
     await syncPush(transport);
     expect(pushCalls).toBe(1);
+  });
+
+  it("after network deferral, successful push clears queue", async () => {
+    const borrower = await borrowerRepository.create({ name: "Retry User" });
+    let attempts = 0;
+    const transport: SyncTransport = {
+      pullAll: async () => [],
+      pushOne: async (item) => {
+        attempts += 1;
+        if (attempts === 1) {
+          return { ok: false, error: "offline", retryable: true };
+        }
+        return {
+          ok: true,
+          serverRecord: { id: borrower.id, ...item.payload },
+        };
+      },
+    };
+
+    const first = await syncPush(transport);
+    expect(first.deferred).toBeGreaterThan(0);
+    expect(await countPendingOps()).toBeGreaterThan(0);
+
+    const second = await syncPush(transport);
+    expect(second.pushed).toBeGreaterThan(0);
+    expect(await countPendingOps()).toBe(0);
   });
 
   it("pull reconcile upserts and deletes missing remote rows", async () => {
@@ -221,6 +287,39 @@ describe("local-first IndexedDB", () => {
 
     await openUserDatabase("testuser");
     expect((await financeRepository.list()).length).toBeGreaterThan(0);
+  });
+
+  it("stops auto-retry after max retries and keeps failed", async () => {
+    await enqueueSyncOp({
+      entity: "borrower",
+      entityId: "max-retry",
+      action: "create",
+      payload: { name: "Max" },
+    });
+    // Simulate already at 9 retries → next failure marks failed
+    const rows = await getDb().syncQueue.toArray();
+    const row = rows[0]!;
+    await getDb().syncQueue.update(row.localId!, { retryCount: 9 });
+
+    const transport: SyncTransport = {
+      pullAll: async () => [],
+      pushOne: async () => ({
+        ok: false,
+        error: "still failing",
+        retryable: true,
+      }),
+    };
+    const result = await syncPush(transport);
+    expect(result.failed).toBe(1);
+    expect(result.deferred).toBe(0);
+
+    const after = await getDb().syncQueue.toArray();
+    expect(after[0]?.status).toBe("failed");
+    expect(after[0]?.retryCount).toBe(10);
+
+    // Auto push must not pick failed again
+    const second = await syncPush(transport);
+    expect(second.pushed + second.failed + second.deferred).toBe(0);
   });
 
   it("markDone removes queue item", async () => {

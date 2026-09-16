@@ -1,7 +1,7 @@
 import { getDb, isDbOpen } from "@/db/database";
 import { SYNC_META_KEYS } from "@/db/schema";
 import { emitSyncEvent } from "@/sync/syncEvents";
-import { countPendingOps } from "@/sync/syncQueue";
+import { countPendingOps, reclaimSyncingOps } from "@/sync/syncQueue";
 import { syncPull } from "@/sync/syncPull";
 import { syncPush } from "@/sync/syncPush";
 import { restReplayTransport } from "@/sync/transports/restReplayTransport";
@@ -76,33 +76,56 @@ export async function runSync(options?: {
   if (!isDbOpen()) return;
   if (syncing) return;
   if (typeof navigator !== "undefined" && !navigator.onLine) {
+    await reclaimSyncingOps();
     await refreshStatus({ isSyncing: false });
     return;
   }
 
   syncing = true;
-  await refreshStatus({ isSyncing: true, hasSyncError: false });
+  await refreshStatus({ isSyncing: true });
+
+  let hardFailed = 0;
+  let deferred = 0;
+  let pushClean = true;
 
   try {
     if (!options?.pullOnly) {
-      const { failed } = await syncPush(transport);
-      if (failed > 0) {
+      const result = await syncPush(transport);
+      hardFailed = result.failed;
+      deferred = result.deferred;
+      pushClean = hardFailed === 0 && deferred === 0;
+
+      if (hardFailed > 0) {
         useSyncStore.getState().setStatus({ hasSyncError: true });
+        scheduleBackoffRetry();
+      } else if (deferred > 0) {
+        // Network deferrals — keep pending, retry with backoff, no hard error flag
+        useSyncStore.getState().setStatus({ hasSyncError: false });
         scheduleBackoffRetry();
       } else {
         backoffIndex = 0;
       }
     }
-    if (!options?.pushOnly) {
+
+    // Never pull when push still has unresolved ops (avoids wiping local pending writes)
+    const shouldPull = !options?.pushOnly && pushClean;
+    if (shouldPull) {
       await syncPull(transport);
+      emitSyncEvent("synced");
+      await queryClient.invalidateQueries();
+      await refreshStatus({ isSyncing: false, hasSyncError: false });
+    } else {
+      await queryClient.invalidateQueries();
+      await refreshStatus({
+        isSyncing: false,
+        hasSyncError: hardFailed > 0,
+      });
     }
-    emitSyncEvent("synced");
-    await queryClient.invalidateQueries();
-    await refreshStatus({ isSyncing: false, hasSyncError: false });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Sync failed";
     emitSyncEvent("error", { message });
+    await reclaimSyncingOps();
     await refreshStatus({ isSyncing: false, hasSyncError: true });
     scheduleBackoffRetry();
   } finally {
@@ -127,11 +150,21 @@ export function startSyncManager(): void {
 
   onlineHandler = () => {
     backoffIndex = 0;
-    void refreshStatus();
-    requestSync();
+    void (async () => {
+      if (isDbOpen()) await reclaimSyncingOps();
+      await refreshStatus();
+      requestSync();
+    })();
   };
   offlineHandler = () => {
-    void refreshStatus({ isSyncing: false });
+    if (backoffTimer) {
+      clearTimeout(backoffTimer);
+      backoffTimer = null;
+    }
+    void (async () => {
+      if (isDbOpen()) await reclaimSyncingOps();
+      await refreshStatus({ isSyncing: false });
+    })();
   };
 
   window.addEventListener("online", onlineHandler);
