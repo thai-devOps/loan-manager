@@ -1,5 +1,5 @@
-import type { SuitableFor } from "../_lib/ride-types.js";
-import type { RideVehicle } from "../_lib/ride-types.js";
+import type { SuitableFor } from "./ride-types.js";
+import type { RideVehicle } from "./ride-types.js";
 
 /** Seed fleet when collection is empty — mirrors customer mock catalog. */
 export const SEED_VEHICLES: Omit<RideVehicle, "_id" | "createdAt" | "updatedAt">[] =

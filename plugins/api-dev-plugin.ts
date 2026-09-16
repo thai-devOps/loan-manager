@@ -2,6 +2,8 @@ import type { Plugin } from "vite";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { config as loadEnv } from "dotenv";
 import { resolve } from "node:path";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { dispatchApi } from "../api/_lib/api-router.ts";
 
 type VercelLikeRes = ServerResponse & {
   status: (code: number) => VercelLikeRes;
@@ -36,151 +38,6 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
   }
 }
 
-type Route = {
-  method?: string;
-  pattern: RegExp;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  load: () => Promise<{ default: (req: any, res: any) => Promise<void> }>;
-  params?: (match: RegExpMatchArray) => Record<string, string>;
-};
-
-const routes: Route[] = [
-  {
-    method: "POST",
-    pattern: /^\/api\/auth\/login\/?$/,
-    load: () => import("../api/auth/login.ts"),
-  },
-  {
-    method: "GET",
-    pattern: /^\/api\/auth\/me\/?$/,
-    load: () => import("../api/auth/me.ts"),
-  },
-  {
-    pattern: /^\/api\/users\/?$/,
-    load: () => import("../api/users/index.ts"),
-  },
-  {
-    pattern: /^\/api\/users\/([^/]+)\/roles\/?$/,
-    load: () => import("../api/users/[id]/roles.ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-  {
-    pattern: /^\/api\/users\/([^/]+)\/reset-password\/?$/,
-    load: () => import("../api/users/[id]/reset-password.ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-  {
-    pattern: /^\/api\/users\/([^/]+)\/?$/,
-    load: () => import("../api/users/[id].ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-  {
-    pattern: /^\/api\/roles\/?$/,
-    load: () => import("../api/roles/index.ts"),
-  },
-  {
-    pattern: /^\/api\/roles\/([^/]+)\/permissions\/?$/,
-    load: () => import("../api/roles/[id]/permissions.ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-  {
-    pattern: /^\/api\/roles\/([^/]+)\/?$/,
-    load: () => import("../api/roles/[id].ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-  {
-    pattern: /^\/api\/permissions\/?$/,
-    load: () => import("../api/permissions/index.ts"),
-  },
-  {
-    pattern: /^\/api\/audit-logs\/?$/,
-    load: () => import("../api/audit-logs/index.ts"),
-  },
-  {
-    pattern: /^\/api\/borrowers\/?$/,
-    load: () => import("../api/borrowers/index.ts"),
-  },
-  {
-    pattern: /^\/api\/borrowers\/([^/]+)\/?$/,
-    load: () => import("../api/borrowers/[id].ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-  {
-    pattern: /^\/api\/loans\/?$/,
-    load: () => import("../api/loans/index.ts"),
-  },
-  {
-    pattern: /^\/api\/loans\/([^/]+)\/payments\/?$/,
-    load: () => import("../api/loans/[id]/payments.ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-  {
-    pattern: /^\/api\/loans\/([^/]+)\/?$/,
-    load: () => import("../api/loans/[id]/index.ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-  {
-    pattern: /^\/api\/schedules\/?$/,
-    load: () => import("../api/schedules/index.ts"),
-  },
-  {
-    pattern: /^\/api\/transactions\/?$/,
-    load: () => import("../api/transactions/index.ts"),
-  },
-  {
-    pattern: /^\/api\/finance\/?$/,
-    load: () => import("../api/finance/index.ts"),
-  },
-  {
-    pattern: /^\/api\/assets\/?$/,
-    load: () => import("../api/assets/index.ts"),
-  },
-  {
-    pattern: /^\/api\/stats\/?$/,
-    load: () => import("../api/stats/index.ts"),
-  },
-  {
-    pattern: /^\/api\/admin\/([^/]+)\/?$/,
-    load: () => import("../api/admin/[action].ts"),
-    params: (m) => ({ action: m[1] }),
-  },
-  {
-    pattern: /^\/api\/ride\/dashboard\/?$/,
-    load: () => import("../api/ride/dashboard.ts"),
-  },
-  {
-    pattern: /^\/api\/ride\/bookings\/lookup\/?$/,
-    load: () => import("../api/ride/bookings/lookup.ts"),
-  },
-  {
-    pattern: /^\/api\/ride\/bookings\/?$/,
-    load: () => import("../api/ride/bookings/index.ts"),
-  },
-  {
-    pattern: /^\/api\/ride\/bookings\/([^/]+)\/?$/,
-    load: () => import("../api/ride/bookings/[id].ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-  {
-    pattern: /^\/api\/ride\/vehicles\/?$/,
-    load: () => import("../api/ride/vehicles/index.ts"),
-  },
-  {
-    pattern: /^\/api\/ride\/vehicles\/([^/]+)\/?$/,
-    load: () => import("../api/ride/vehicles/[id].ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-  {
-    pattern: /^\/api\/ride\/drivers\/?$/,
-    load: () => import("../api/ride/drivers/index.ts"),
-  },
-  {
-    pattern: /^\/api\/ride\/drivers\/([^/]+)\/?$/,
-    load: () => import("../api/ride/drivers/[id].ts"),
-    params: (m) => ({ id: m[1] }),
-  },
-];
-
 export function loanApiDevPlugin(): Plugin {
   return {
     name: "loan-api-dev",
@@ -200,29 +57,21 @@ export function loanApiDevPlugin(): Plugin {
             new URL(url, "http://localhost").searchParams.entries(),
           );
 
-          for (const route of routes) {
-            if (route.method && req.method !== route.method) continue;
-            const match = pathOnly.match(route.pattern);
-            if (!match) continue;
+          const body = ["POST", "PATCH", "PUT"].includes(req.method ?? "")
+            ? await readBody(req)
+            : {};
 
-            const body = ["POST", "PATCH", "PUT"].includes(req.method ?? "")
-              ? await readBody(req)
-              : {};
+          const vercelReq = {
+            method: req.method,
+            headers: req.headers,
+            body,
+            query,
+            url: pathOnly,
+          } as unknown as VercelRequest;
 
-            const vercelReq = {
-              method: req.method,
-              headers: req.headers,
-              body,
-              query: {
-                ...query,
-                ...(route.params ? route.params(match) : {}),
-              },
-            };
-
-            const mod = await route.load();
-            await mod.default(vercelReq, adaptRes(res));
-            return;
-          }
+          const vercelRes = adaptRes(res) as unknown as VercelResponse;
+          const handled = await dispatchApi(vercelReq, vercelRes);
+          if (handled) return;
 
           res.statusCode = 404;
           res.setHeader("Content-Type", "application/json");
@@ -233,7 +82,9 @@ export function loanApiDevPlugin(): Plugin {
           res.end(
             JSON.stringify({
               error:
-                error instanceof Error ? error.message : "Internal server error",
+                error instanceof Error
+                  ? error.message
+                  : "Internal server error",
             }),
           );
         }
