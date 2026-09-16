@@ -155,7 +155,7 @@ function GoldPurchaseFields({
         <Label htmlFor="gold-type">Loại vàng</Label>
         <select
           id="gold-type"
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
           {...form.register("type")}
         >
           {(Object.keys(GOLD_TYPE_LABELS) as Array<keyof typeof GOLD_TYPE_LABELS>).map(
@@ -182,7 +182,7 @@ function GoldPurchaseFields({
           <Label htmlFor="gold-unit">Đơn vị</Label>
           <select
             id="gold-unit"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
             {...form.register("unit")}
           >
             <option value="cay">Cây</option>

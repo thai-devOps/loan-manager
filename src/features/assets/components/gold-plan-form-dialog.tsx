@@ -35,7 +35,7 @@ import type { AssetSettings, GoldPlan, GoldPurchase, GoldType } from "@/types/as
 import { cn } from "@/lib/utils";
 
 const selectClass =
-  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm";
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm";
 
 const GOLD_TYPE_OPTIONS = (Object.keys(GOLD_TYPE_LABELS) as GoldType[]).filter(
   (t) => t === "9999" || t === "18k" || t === "other",
