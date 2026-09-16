@@ -71,10 +71,6 @@ export function useSchedulesQuery(status?: string) {
   return useQuery({
     queryKey: queryKeys.schedules.all(status),
     queryFn: async () => {
-      // Best-effort server schedule horizon extension when online
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        await syncSchedules().catch(() => undefined);
-      }
       let rows = await loanRepository.listSchedules();
       rows = rows.map((s) => ({
         ...s,
@@ -83,10 +79,24 @@ export function useSchedulesQuery(status?: string) {
       if (status && status !== "ALL") {
         rows = rows.filter((s) => s.status === status);
       }
+
+      // Server horizon extension — do not await; local list is source of truth
+      scheduleHorizonSyncInBackground();
+
       return rows;
     },
     enabled: dbReady && isDbOpen(),
   });
+}
+
+/** At most once per 5 minutes so remounts don't spam POST /api/schedules. */
+let lastScheduleHorizonSyncAt = 0;
+function scheduleHorizonSyncInBackground(): void {
+  if (typeof navigator === "undefined" || !navigator.onLine) return;
+  const now = Date.now();
+  if (now - lastScheduleHorizonSyncAt < 5 * 60_000) return;
+  lastScheduleHorizonSyncAt = now;
+  void syncSchedules().catch(() => undefined);
 }
 
 export function useStatsQuery() {

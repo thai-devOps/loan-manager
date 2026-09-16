@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { FeatureSubNav } from "@/components/layout/feature-sub-nav";
@@ -21,7 +21,6 @@ import {
 import type { FinanceTransaction } from "@/types/finance";
 
 export function FinanceLayout() {
-  const location = useLocation();
   const [preset, setPresetState] = useState<DateRangePreset>("this_month");
   const [range, setRange] = useState(() =>
     resolveDateRangePreset("this_month"),
@@ -112,7 +111,7 @@ export function FinanceLayout() {
           onCustomRangeChange={setCustomRange}
         />
 
-        <Outlet key={location.pathname} context={outletContext} />
+        <Outlet context={outletContext} />
 
         <TransactionFormDialog
           open={dialogOpen}

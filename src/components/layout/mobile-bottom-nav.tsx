@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { MOBILE_BOTTOM_TABS } from "@/components/layout/nav-items";
+import { prefetchFeatureRoute } from "@/lib/prefetch-feature";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,6 +54,7 @@ export function MobileBottomNav() {
                 <NavLink
                   key={tab.id}
                   to={tab.href}
+                  onPointerDown={() => prefetchFeatureRoute(tab.href)}
                   className="relative flex flex-col items-center gap-1"
                   aria-current={active ? "page" : undefined}
                 >
@@ -86,6 +88,7 @@ export function MobileBottomNav() {
               <NavLink
                 key={tab.id}
                 to={tab.href}
+                onPointerDown={() => prefetchFeatureRoute(tab.href)}
                 className="relative flex flex-col items-center gap-1"
                 aria-current={active ? "page" : undefined}
               >

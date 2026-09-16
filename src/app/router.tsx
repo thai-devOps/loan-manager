@@ -42,10 +42,11 @@ export const router = createBrowserRouter([
       {
         element: <AuthenticatedShell />,
         children: [
-          { path: "apps", element: <AppsHubPage /> },
+          // Keep AppLayout mounted across /apps ↔ modules so chrome doesn't remount
           {
             element: <AppLayout />,
             children: [
+              { path: "apps", element: <AppsHubPage /> },
               {
                 element: <LoansLayout />,
                 children: [

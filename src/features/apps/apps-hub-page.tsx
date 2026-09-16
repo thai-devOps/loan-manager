@@ -6,6 +6,7 @@ import { APP_FEATURES, type AppFeatureId } from "@/components/layout/nav-items";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth.store";
 import { APP_NAME } from "@/lib/brand";
+import { prefetchFeatureRoute } from "@/lib/prefetch-feature";
 import { cn } from "@/lib/utils";
 
 const FEATURE_ACCENT: Record<
@@ -58,9 +59,10 @@ export function AppsHubPage() {
             backgroundSize: "22px 22px",
           }}
         />
-        <div className="absolute -top-32 -right-20 size-112 rounded-full bg-teal-300/35 blur-3xl dark:bg-teal-500/15" />
-        <div className="absolute -bottom-40 -left-24 size-120 rounded-full bg-emerald-200/50 blur-3xl dark:bg-emerald-500/10" />
-        <div className="absolute top-1/3 left-1/2 size-72 -translate-x-1/2 rounded-full bg-amber-200/20 blur-3xl dark:bg-amber-400/10" />
+        {/* Heavy blurs only on md+ — avoid mobile GPU lag on hub paint */}
+        <div className="absolute -top-32 -right-20 hidden size-112 rounded-full bg-teal-300/35 blur-3xl md:block dark:bg-teal-500/15" />
+        <div className="absolute -bottom-40 -left-24 hidden size-120 rounded-full bg-emerald-200/50 blur-3xl md:block dark:bg-emerald-500/10" />
+        <div className="absolute top-1/3 left-1/2 hidden size-72 -translate-x-1/2 rounded-full bg-amber-200/20 blur-3xl md:block dark:bg-amber-400/10" />
       </div>
 
       <header className="relative z-10 flex w-full min-w-0 items-center justify-between gap-3 px-5 py-5 sm:px-8">
@@ -96,7 +98,7 @@ export function AppsHubPage() {
       </header>
 
       <main className="relative z-10 flex w-full min-w-0 flex-1 flex-col items-center justify-center px-5 py-10 sm:px-8">
-        <div className="mb-10 w-full max-w-xl text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="mb-10 w-full max-w-xl text-center">
           <p className="mb-3 text-xs font-medium tracking-[0.22em] text-teal-800/70 uppercase dark:text-teal-300/70">
             Workspace
           </p>
@@ -110,27 +112,27 @@ export function AppsHubPage() {
         </div>
 
         <div className="grid w-full max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {APP_FEATURES.map((feature, index) => {
+          {APP_FEATURES.map((feature) => {
             const Icon = feature.icon;
             const accent = FEATURE_ACCENT[feature.id];
             return (
               <Link
                 key={feature.id}
                 to={feature.href}
-                style={{ animationDelay: `${80 + index * 70}ms` }}
+                onPointerDown={() => prefetchFeatureRoute(feature.href)}
                 className={cn(
-                  "group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card/85 p-5 text-left shadow-sm backdrop-blur-sm",
-                  "transition-all duration-300 ease-out",
-                  "hover:-translate-y-1 hover:shadow-xl",
+                  "group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card/85 p-5 text-left shadow-sm",
+                  "transition-colors duration-150",
+                  "active:bg-muted/60",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40",
-                  "animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500",
+                  "md:backdrop-blur-sm md:transition-all md:duration-300 md:ease-out md:hover:-translate-y-1 md:hover:shadow-xl",
                   accent.ring,
                 )}
               >
                 <div
                   aria-hidden
                   className={cn(
-                    "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-100",
+                    "pointer-events-none absolute inset-0 hidden bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-100 md:block",
                     accent.glow,
                   )}
                 />

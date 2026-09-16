@@ -145,11 +145,12 @@ export async function runSync(options?: {
     if (shouldPull) {
       await syncPull(transport);
       emitSyncEvent("synced");
-      await queryClient.invalidateQueries();
+      // Don't await — refetch active queries in background so UI stays responsive
+      void queryClient.invalidateQueries({ refetchType: "active" });
       await refreshStatus({ isSyncing: false, hasSyncError: false });
       await markInitialReadyIfDone();
     } else {
-      await queryClient.invalidateQueries();
+      void queryClient.invalidateQueries({ refetchType: "active" });
       await refreshStatus({
         isSyncing: false,
         hasSyncError: hardFailed > 0,
