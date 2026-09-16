@@ -22,12 +22,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveFormFooter,
+  ResponsiveFormShell,
+} from "@/components/ui/responsive-form-shell";
 import {
   Table,
   TableBody,
@@ -309,14 +306,17 @@ export function BorrowersPage() {
         </>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={closeDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editing ? "Cập nhật người vay" : "Thêm người vay"}
-            </DialogTitle>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+      <ResponsiveFormShell
+        open={dialogOpen}
+        onOpenChange={closeDialog}
+        title={editing ? "Cập nhật người vay" : "Thêm người vay"}
+        desktopClassName="max-w-lg"
+      >
+        <form
+          className="flex min-h-0 flex-1 flex-col"
+          onSubmit={form.handleSubmit(onSubmit)}
+        >
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
             <div className="space-y-2">
               <Label htmlFor="name">Tên *</Label>
               <Input id="name" {...form.register("name")} />
@@ -348,25 +348,25 @@ export function BorrowersPage() {
             {saveError && (
               <p className="text-sm text-destructive">{saveError}</p>
             )}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => closeDialog(false)}
-              >
-                Hủy
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving
-                  ? "Đang lưu..."
-                  : editing
-                    ? "Lưu thay đổi"
-                    : "Lưu"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </div>
+          <ResponsiveFormFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => closeDialog(false)}
+            >
+              Hủy
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving
+                ? "Đang lưu..."
+                : editing
+                  ? "Lưu thay đổi"
+                  : "Lưu"}
+            </Button>
+          </ResponsiveFormFooter>
+        </form>
+      </ResponsiveFormShell>
     </PageShell>
   );
 }

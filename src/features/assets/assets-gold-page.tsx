@@ -357,18 +357,22 @@ export function AssetsGoldPage() {
                       <Button
                         size="sm"
                         variant="outline"
+                        className="flex-1"
                         onClick={() => {
                           setEditing(p);
                           setPurchaseOpen(true);
                         }}
                       >
+                        <EditIcon size={14} />
                         Sửa
                       </Button>
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="outline"
+                        className="flex-1 text-destructive"
                         onClick={() => setDeleting(p)}
                       >
+                        <DeleteIcon size={14} />
                         Xóa
                       </Button>
                     </div>

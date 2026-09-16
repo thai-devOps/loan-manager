@@ -2,12 +2,9 @@ import { useState } from "react";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveFormFooter,
+  ResponsiveFormShell,
+} from "@/components/ui/responsive-form-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,24 +90,22 @@ export function TransactionFormDialog({
     : `new-${defaultType}-${defaultDate ?? "today"}`;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {editing ? "Sửa giao dịch" : "Thêm giao dịch"}
-          </DialogTitle>
-        </DialogHeader>
-        {open ? (
-          <TransactionFormFields
-            key={formKey}
-            editing={editing}
-            defaultType={defaultType}
-            defaultDate={defaultDate}
-            onOpenChange={onOpenChange}
-          />
-        ) : null}
-      </DialogContent>
-    </Dialog>
+    <ResponsiveFormShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title={editing ? "Sửa giao dịch" : "Thêm giao dịch"}
+      desktopClassName="max-w-lg"
+    >
+      {open ? (
+        <TransactionFormFields
+          key={formKey}
+          editing={editing}
+          defaultType={defaultType}
+          defaultDate={defaultDate}
+          onOpenChange={onOpenChange}
+        />
+      ) : null}
+    </ResponsiveFormShell>
   );
 }
 
@@ -164,7 +159,11 @@ function TransactionFormFields({
   const pending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+    <form
+      className="flex min-h-0 flex-1 flex-col"
+      onSubmit={form.handleSubmit(onSubmit)}
+    >
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
       <div className="space-y-2">
         <Label>Loại *</Label>
         <Controller
@@ -297,8 +296,9 @@ function TransactionFormFields({
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
 
-      <DialogFooter>
+      <ResponsiveFormFooter>
         <Button
           type="button"
           variant="outline"
@@ -309,7 +309,7 @@ function TransactionFormFields({
         <Button type="submit" disabled={pending}>
           {isEdit ? "Lưu thay đổi" : "Thêm giao dịch"}
         </Button>
-      </DialogFooter>
+      </ResponsiveFormFooter>
     </form>
   );
 }

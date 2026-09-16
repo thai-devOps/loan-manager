@@ -111,6 +111,7 @@ export function AssetsHoldingsPage() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          aria-label="Sửa"
                           onClick={() => {
                             setEditing(asset);
                             setDialogOpen(true);
@@ -121,6 +122,7 @@ export function AssetsHoldingsPage() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          aria-label="Xóa"
                           onClick={() => setDeleting(asset)}
                         >
                           <DeleteIcon />
@@ -180,27 +182,30 @@ export function AssetsHoldingsPage() {
                     {formatCurrency(asset.value)}
                   </p>
                 </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Cập nhật{" "}
-                    {formatDate(asset.updatedAt)}
+                <div className="mt-3">
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Cập nhật {formatDate(asset.updatedAt)}
                   </p>
-                  <div className="flex gap-1">
+                  <div className="flex gap-2">
                     <Button
                       size="sm"
                       variant="outline"
+                      className="flex-1"
                       onClick={() => {
                         setEditing(asset);
                         setDialogOpen(true);
                       }}
                     >
+                      <EditIcon size={14} />
                       Sửa
                     </Button>
                     <Button
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
+                      className="flex-1 text-destructive"
                       onClick={() => setDeleting(asset)}
                     >
+                      <DeleteIcon size={14} />
                       Xóa
                     </Button>
                   </div>

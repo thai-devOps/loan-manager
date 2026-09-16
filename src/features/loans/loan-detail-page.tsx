@@ -27,12 +27,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveFormFooter,
+  ResponsiveFormShell,
+} from "@/components/ui/responsive-form-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -383,18 +380,25 @@ export function LoanDetailPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={payMode !== null} onOpenChange={() => setPayMode(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {payMode === "INTEREST"
-                ? "Thu tiền lời"
-                : payMode === "PRINCIPAL"
-                  ? "Thu tiền gốc"
-                  : "Thu gốc + lời"}
-            </DialogTitle>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+      <ResponsiveFormShell
+        open={payMode !== null}
+        onOpenChange={(next) => {
+          if (!next) setPayMode(null);
+        }}
+        title={
+          payMode === "INTEREST"
+            ? "Thu tiền lời"
+            : payMode === "PRINCIPAL"
+              ? "Thu tiền gốc"
+              : "Thu gốc + lời"
+        }
+        desktopClassName="max-w-lg"
+      >
+        <form
+          className="flex min-h-0 flex-1 flex-col"
+          onSubmit={form.handleSubmit(onSubmit)}
+        >
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
             {payMode === "INTEREST" && currentSchedule && (
               <div className="rounded-lg border bg-muted/40 p-3 text-sm">
                 <p>Kỳ hiện tại: {formatPeriod(currentSchedule.period)}</p>
@@ -498,29 +502,29 @@ export function LoanDetailPage() {
               <Textarea {...form.register("note")} />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setPayMode(null)}
-              >
-                Hủy
-              </Button>
-              <Button
-                type="submit"
-                disabled={recordPaymentMutation.isPending}
-                onClick={() => {
-                  if (payMode === "BOTH") {
-                    form.setValue("amount", 1);
-                  }
-                }}
-              >
-                Ghi nhận
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </div>
+          <ResponsiveFormFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPayMode(null)}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="submit"
+              disabled={recordPaymentMutation.isPending}
+              onClick={() => {
+                if (payMode === "BOTH") {
+                  form.setValue("amount", 1);
+                }
+              }}
+            >
+              Ghi nhận
+            </Button>
+          </ResponsiveFormFooter>
+        </form>
+      </ResponsiveFormShell>
     </PageShell>
   );
 }

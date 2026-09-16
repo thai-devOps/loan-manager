@@ -6,12 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveFormFooter,
+  ResponsiveFormShell,
+} from "@/components/ui/responsive-form-shell";
 import { MoneyInput } from "@/features/finance/components/money-input";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -59,21 +56,19 @@ export function AssetFormDialog({
   editing: ManualAsset | null;
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {editing ? "Sửa tài sản" : "Thêm tài sản"}
-          </DialogTitle>
-        </DialogHeader>
-        {open && (
-          <AssetFormFields
-            editing={editing}
-            onDone={() => onOpenChange(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+    <ResponsiveFormShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title={editing ? "Sửa tài sản" : "Thêm tài sản"}
+      desktopClassName="max-w-md"
+    >
+      {open && (
+        <AssetFormFields
+          editing={editing}
+          onDone={() => onOpenChange(false)}
+        />
+      )}
+    </ResponsiveFormShell>
   );
 }
 
@@ -210,7 +205,11 @@ function AssetFormFields({
   const pending = createM.isPending || updateM.isPending;
 
   return (
-    <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+    <form
+      className="flex min-h-0 flex-1 flex-col"
+      onSubmit={form.handleSubmit(onSubmit)}
+    >
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
       <div className="space-y-2">
         <Label htmlFor="asset-type">Loại tài sản</Label>
         <select
@@ -411,12 +410,13 @@ function AssetFormFields({
           {error}
         </p>
       )}
+      </div>
 
-      <DialogFooter>
+      <ResponsiveFormFooter>
         <Button type="submit" disabled={pending}>
           {pending ? "Đang lưu..." : editing ? "Cập nhật" : "Thêm tài sản"}
         </Button>
-      </DialogFooter>
+      </ResponsiveFormFooter>
     </form>
   );
 }

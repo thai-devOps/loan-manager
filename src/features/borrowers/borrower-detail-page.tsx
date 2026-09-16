@@ -30,12 +30,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveFormFooter,
+  ResponsiveFormShell,
+} from "@/components/ui/responsive-form-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -352,12 +349,17 @@ export function BorrowerDetailPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cập nhật người vay</DialogTitle>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={form.handleSubmit(onSave)}>
+      <ResponsiveFormShell
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        title="Cập nhật người vay"
+        desktopClassName="max-w-lg"
+      >
+        <form
+          className="flex min-h-0 flex-1 flex-col"
+          onSubmit={form.handleSubmit(onSave)}
+        >
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Tên *</Label>
               <Input id="edit-name" {...form.register("name")} />
@@ -389,26 +391,26 @@ export function BorrowerDetailPage() {
             {saveError && (
               <p className="text-sm text-destructive">{saveError}</p>
             )}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setEditOpen(false)}
-              >
-                Hủy
-              </Button>
-              <Button
-                type="submit"
-                disabled={updateBorrowerMutation.isPending}
-              >
-                {updateBorrowerMutation.isPending
-                  ? "Đang lưu..."
-                  : "Lưu thay đổi"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </div>
+          <ResponsiveFormFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="submit"
+              disabled={updateBorrowerMutation.isPending}
+            >
+              {updateBorrowerMutation.isPending
+                ? "Đang lưu..."
+                : "Lưu thay đổi"}
+            </Button>
+          </ResponsiveFormFooter>
+        </form>
+      </ResponsiveFormShell>
     </PageShell>
   );
 }
