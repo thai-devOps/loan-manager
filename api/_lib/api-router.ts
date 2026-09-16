@@ -121,6 +121,15 @@ export const API_ROUTES: ApiRoute[] = [
     load: () => import("../_routes/ride/dashboard.js"),
   },
   {
+    pattern: /^\/api\/ride\/geo\/search\/?$/,
+    load: () => import("../_routes/ride/geo/search.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/quote\/?$/,
+    method: "POST",
+    load: () => import("../_routes/ride/quote.js"),
+  },
+  {
     pattern: /^\/api\/ride\/bookings\/lookup\/?$/,
     load: () => import("../_routes/ride/bookings/lookup.js"),
   },

@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { vehicleAdminService } from "@/features/ride-admin/services/admin-api";
 import type { Vehicle, VehicleStatus } from "@/features/ride/types/ride";
+import { DEFAULT_VEHICLE_PRICING } from "@shared/ride/vehicle-pricing";
 import { ApiError } from "@/api/client";
 
 const STATUS_LABEL: Record<VehicleStatus, string> = {
@@ -38,6 +39,14 @@ const emptyForm = {
   fuel: "Xăng",
   status: "AVAILABLE" as VehicleStatus,
   active: true,
+  fuelConsumptionPer100Km: String(DEFAULT_VEHICLE_PRICING.fuelConsumptionPer100Km),
+  fuelPricePerLiter: String(DEFAULT_VEHICLE_PRICING.fuelPricePerLiter),
+  driverRate: String(DEFAULT_VEHICLE_PRICING.driverRate),
+  baseFare: String(DEFAULT_VEHICLE_PRICING.baseFare),
+  pricePerKm: String(DEFAULT_VEHICLE_PRICING.pricePerKm),
+  dailyRate: String(DEFAULT_VEHICLE_PRICING.dailyRate),
+  includedKm: String(DEFAULT_VEHICLE_PRICING.includedKm),
+  extraKmRate: String(DEFAULT_VEHICLE_PRICING.extraKmRate),
 };
 
 export function RideAdminVehiclesPage() {
@@ -68,6 +77,7 @@ export function RideAdminVehiclesPage() {
   }
 
   function openEdit(v: Vehicle) {
+    const p = v.pricing ?? DEFAULT_VEHICLE_PRICING;
     setEditing(v);
     setForm({
       name: v.name,
@@ -79,6 +89,14 @@ export function RideAdminVehiclesPage() {
       fuel: v.fuel,
       status: (v.status as VehicleStatus) || "AVAILABLE",
       active: v.active,
+      fuelConsumptionPer100Km: String(p.fuelConsumptionPer100Km),
+      fuelPricePerLiter: String(p.fuelPricePerLiter),
+      driverRate: String(p.driverRate),
+      baseFare: String(p.baseFare),
+      pricePerKm: String(p.pricePerKm),
+      dailyRate: String(p.dailyRate),
+      includedKm: String(p.includedKm),
+      extraKmRate: String(p.extraKmRate),
     });
     setOpen(true);
   }
@@ -100,6 +118,17 @@ export function RideAdminVehiclesPage() {
         images: editing?.images ?? [],
         features: editing?.features ?? ["Xe riêng + tài xế"],
         suitableFor: editing?.suitableFor ?? ["travel"],
+        pricing: {
+          fuelType: form.fuel,
+          fuelConsumptionPer100Km: Number(form.fuelConsumptionPer100Km) || 0,
+          fuelPricePerLiter: Number(form.fuelPricePerLiter) || 0,
+          driverRate: Number(form.driverRate) || 0,
+          baseFare: Number(form.baseFare) || 0,
+          pricePerKm: Number(form.pricePerKm) || 0,
+          dailyRate: Number(form.dailyRate) || 0,
+          includedKm: Number(form.includedKm) || 0,
+          extraKmRate: Number(form.extraKmRate) || 0,
+        },
       };
       if (editing) await vehicleAdminService.update(editing.id, payload);
       else await vehicleAdminService.create(payload);
@@ -208,6 +237,32 @@ export function RideAdminVehiclesPage() {
                 </SelectContent>
               </Select>
             </div>
+            <p className="pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Cấu hình giá / nhiên liệu
+            </p>
+            {(
+              [
+                ["fuelConsumptionPer100Km", "Tiêu hao (L/100km)"],
+                ["fuelPricePerLiter", "Giá nhiên liệu (đ/L)"],
+                ["driverRate", "Phí tài xế / giờ"],
+                ["baseFare", "Cước cơ bản"],
+                ["pricePerKm", "Giá / km"],
+                ["dailyRate", "Giá theo ngày"],
+                ["includedKm", "Km định mức / ngày"],
+                ["extraKmRate", "Giá km vượt"],
+              ] as const
+            ).map(([key, label]) => (
+              <div key={key} className="space-y-1.5">
+                <Label>{label}</Label>
+                <Input
+                  inputMode="decimal"
+                  value={form[key]}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, [key]: e.target.value }))
+                  }
+                />
+              </div>
+            ))}
             <Button
               disabled={busy || !form.name.trim()}
               className="bg-teal-800 hover:bg-teal-700"

@@ -6,6 +6,7 @@ import { methodNotAllowed, readJsonBody, withHandler } from "../../../_lib/http.
 import type { RideVehicle, SuitableFor, VehicleStatus } from "../../../_lib/ride-types.js";
 import { rideVehiclesCol, stripDoc } from "../../../_lib/mongo.js";
 import { SEED_VEHICLES } from "../../../_lib/ride-seed.js";
+import { resolveVehiclePricing } from "../../../../shared/ride/vehicle-pricing.js";
 
 async function ensureSeed(): Promise<void> {
   const col = await rideVehiclesCol();
@@ -62,6 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         suitableFor: (Array.isArray(body.suitableFor)
           ? body.suitableFor
           : ["travel"]) as SuitableFor[],
+        pricing: resolveVehiclePricing(body.pricing, (body.fuel ?? "Xăng").trim()),
         active: body.active !== false,
         status: (body.status as VehicleStatus) || "AVAILABLE",
         createdAt: now,

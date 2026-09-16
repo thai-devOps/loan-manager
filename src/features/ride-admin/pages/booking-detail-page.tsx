@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -24,14 +23,27 @@ import {
   TRIP_TYPE_LABELS,
 } from "@/features/ride/lib/labels";
 import type {
+  BookingQuoteSnapshot,
   BookingStatus,
   Driver,
+  PriceQuote,
   TripBooking,
   Vehicle,
 } from "@/features/ride/types/ride";
+import { pricingService } from "@/features/ride/services/pricingService";
+import { MoneyInput } from "@/features/finance/components/money-input";
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
 import { PERMISSIONS } from "@/config/permissions";
+
+function formatDurationMinutes(totalMinutes: number): string {
+  const mins = Math.max(0, Math.round(totalMinutes));
+  if (mins < 60) return `${mins} phút`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (m === 0) return `${h} giờ`;
+  return `${h} giờ ${m} phút`;
+}
 
 export function RideAdminBookingDetailPage() {
   const { id = "" } = useParams();
@@ -43,12 +55,17 @@ export function RideAdminBookingDetailPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [quote, setQuote] = useState("");
-  const [deposit, setDeposit] = useState("");
-  const [paid, setPaid] = useState("");
+  const [quote, setQuote] = useState(0);
+  const [deposit, setDeposit] = useState(0);
+  const [paid, setPaid] = useState(0);
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
   const [creatingTrip, setCreatingTrip] = useState(false);
+  const [calcBusy, setCalcBusy] = useState(false);
+  const [draftQuote, setDraftQuote] = useState<PriceQuote | null>(null);
+  const [draftSnapshot, setDraftSnapshot] = useState<BookingQuoteSnapshot | null>(
+    null,
+  );
 
   async function load() {
     setError(null);
@@ -61,9 +78,9 @@ export function RideAdminBookingDetailPage() {
       setBooking(b);
       setVehicles(v);
       setDrivers(d);
-      setQuote(b.quotedPrice != null ? String(b.quotedPrice) : "");
-      setDeposit(String(b.deposit ?? 0));
-      setPaid(String(b.paidAmount ?? 0));
+      setQuote(b.quotedPrice ?? 0);
+      setDeposit(b.deposit ?? 0);
+      setPaid(b.paidAmount ?? 0);
       setVehicleId(b.vehicleId || "");
       setDriverId(b.driverId || "");
     } catch (e) {
@@ -85,13 +102,15 @@ export function RideAdminBookingDetailPage() {
     try {
       const updated = await bookingAdminService.action(id, body);
       setBooking(updated);
-      setQuote(updated.quotedPrice != null ? String(updated.quotedPrice) : "");
-      setDeposit(String(updated.deposit ?? 0));
-      setPaid(String(updated.paidAmount ?? 0));
+      setQuote(updated.quotedPrice ?? 0);
+      setDeposit(updated.deposit ?? 0);
+      setPaid(updated.paidAmount ?? 0);
       setVehicleId(updated.vehicleId || "");
       setDriverId(updated.driverId || "");
+      return true;
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Thao tác thất bại");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -110,6 +129,74 @@ export function RideAdminBookingDetailPage() {
       return null;
     } finally {
       setCreatingTrip(false);
+    }
+  }
+
+  async function calculateAutoQuote() {
+    if (!booking) return;
+    setCalcBusy(true);
+    setError(null);
+    try {
+      const pickup = {
+        address: booking.pickup?.address ?? "",
+        latitude:
+          booking.pickup?.latitude == null
+            ? null
+            : Number(booking.pickup.latitude),
+        longitude:
+          booking.pickup?.longitude == null
+            ? null
+            : Number(booking.pickup.longitude),
+      };
+      const destination = {
+        address: booking.destination?.address ?? "",
+        latitude:
+          booking.destination?.latitude == null
+            ? null
+            : Number(booking.destination.latitude),
+        longitude:
+          booking.destination?.longitude == null
+            ? null
+            : Number(booking.destination.longitude),
+      };
+      // Drop invalid / null-island coords so server geocodes from address
+      if (
+        !Number.isFinite(pickup.latitude as number) ||
+        !Number.isFinite(pickup.longitude as number) ||
+        (pickup.latitude === 0 && pickup.longitude === 0)
+      ) {
+        pickup.latitude = null;
+        pickup.longitude = null;
+      }
+      if (
+        !Number.isFinite(destination.latitude as number) ||
+        !Number.isFinite(destination.longitude as number) ||
+        (destination.latitude === 0 && destination.longitude === 0)
+      ) {
+        destination.latitude = null;
+        destination.longitude = null;
+      }
+
+      const result = await pricingService.getQuote({
+        tripType: booking.tripType,
+        vehicleId: vehicleId || booking.vehicleId,
+        pickup,
+        destination,
+      });
+      setDraftQuote(result);
+      if (result.snapshot && result.amount != null) {
+        setDraftSnapshot(result.snapshot);
+        setQuote(result.amount);
+      } else {
+        setDraftSnapshot(null);
+      }
+      if (result.errorMessage && !result.autoQuote) {
+        setError(result.errorMessage);
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Không tính được báo giá");
+    } finally {
+      setCalcBusy(false);
     }
   }
 
@@ -295,31 +382,116 @@ export function RideAdminBookingDetailPage() {
         <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
           Báo giá / Tài chính
         </h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={busy || calcBusy || booking.tripType === "CUSTOM"}
+            onClick={() => void calculateAutoQuote()}
+          >
+            {calcBusy ? "Đang tính…" : "Tính báo giá tự động"}
+          </Button>
+          {booking.tripType === "CUSTOM" ? (
+            <p className="self-center text-xs text-muted-foreground">
+              Chuyến tùy chỉnh — nhập giá thủ công
+            </p>
+          ) : null}
+        </div>
+
+        {(draftQuote ?? booking.quoteSnapshot) ? (
+          <div className="mt-4 space-y-2 rounded-xl border border-border bg-muted/30 p-3 text-sm">
+            <p className="font-medium">
+              {draftQuote ? "Báo giá dự kiến (chưa lưu)" : "Snapshot đã lưu"}
+            </p>
+            <ul className="grid gap-1 sm:grid-cols-2">
+              <li>
+                Quãng đường:{" "}
+                {(draftQuote?.distanceKm ?? booking.quoteSnapshot?.distanceKm) !=
+                null
+                  ? `${draftQuote?.distanceKm ?? booking.quoteSnapshot?.distanceKm} km`
+                  : "—"}
+              </li>
+              <li>
+                Thời gian:{" "}
+                {(draftQuote?.durationMinutes ??
+                  booking.quoteSnapshot?.durationMinutes) != null
+                  ? formatDurationMinutes(
+                      draftQuote?.durationMinutes ??
+                        booking.quoteSnapshot!.durationMinutes,
+                    )
+                  : "—"}
+              </li>
+              <li>
+                Nhiên liệu:{" "}
+                {draftQuote?.fuelLiters != null
+                  ? `${draftQuote.fuelLiters} L (${formatCurrency(draftQuote.fuelCost ?? 0)})`
+                  : booking.quoteSnapshot
+                    ? `${booking.quoteSnapshot.fuelLiters} L (${formatCurrency(booking.quoteSnapshot.fuelCost)})`
+                    : "—"}
+              </li>
+              <li>
+                Phí tài xế:{" "}
+                {formatCurrency(
+                  draftQuote?.driverCost ??
+                    booking.quoteSnapshot?.driverFee ??
+                    0,
+                )}
+              </li>
+            </ul>
+            <ul className="space-y-1 border-t border-border pt-2">
+              {(
+                draftQuote?.breakdown ??
+                booking.quoteSnapshot?.breakdown ??
+                []
+              ).map((line) => (
+                <li
+                  key={line.label}
+                  className="flex justify-between gap-2 text-muted-foreground"
+                >
+                  <span>{line.label}</span>
+                  <span>{formatCurrency(line.amount)}</span>
+                </li>
+              ))}
+            </ul>
+            {draftQuote?.errorMessage ? (
+              <p className="text-xs text-amber-800 dark:text-amber-200">
+                {draftQuote.errorMessage}
+              </p>
+            ) : null}
+            {booking.quoteSnapshot && !draftQuote ? (
+              <p className="text-xs text-muted-foreground">
+                Lúc{" "}
+                {new Date(booking.quoteSnapshot.quotedAt).toLocaleString(
+                  "vi-VN",
+                )}
+                {booking.quoteSnapshot.provider
+                  ? ` · ${booking.quoteSnapshot.provider}`
+                  : ""}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div className="space-y-2">
             <Label>Giá chuyến</Label>
-            <Input
-              inputMode="numeric"
+            <MoneyInput
               value={quote}
-              onChange={(e) => setQuote(e.target.value)}
+              onChange={(v) => {
+                setQuote(v);
+                setDraftSnapshot(null);
+              }}
               placeholder="Chưa báo giá"
             />
           </div>
           <div className="space-y-2">
             <Label>Tiền cọc</Label>
-            <Input
-              inputMode="numeric"
-              value={deposit}
-              onChange={(e) => setDeposit(e.target.value)}
-            />
+            <MoneyInput value={deposit} onChange={setDeposit} />
           </div>
           <div className="space-y-2">
             <Label>Đã thanh toán</Label>
-            <Input
-              inputMode="numeric"
-              value={paid}
-              onChange={(e) => setPaid(e.target.value)}
-            />
+            <MoneyInput value={paid} onChange={setPaid} />
           </div>
         </div>
         <p className="mt-3 text-sm text-muted-foreground">
@@ -330,14 +502,21 @@ export function RideAdminBookingDetailPage() {
         <Button
           className="mt-3 bg-teal-800 hover:bg-teal-700"
           disabled={busy}
-          onClick={() =>
-            void run({
-              action: "quote",
-              quotedPrice: quote.trim() === "" ? null : Number(quote),
-              deposit: Number(deposit) || 0,
-              paidAmount: Number(paid) || 0,
-            })
-          }
+          onClick={() => {
+            void (async () => {
+              const ok = await run({
+                action: "quote",
+                quotedPrice: quote > 0 ? quote : null,
+                deposit,
+                paidAmount: paid,
+                quoteSnapshot: draftSnapshot ?? booking.quoteSnapshot ?? null,
+              });
+              if (ok) {
+                setDraftQuote(null);
+                setDraftSnapshot(null);
+              }
+            })();
+          }}
         >
           Lưu báo giá
         </Button>

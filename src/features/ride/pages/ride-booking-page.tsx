@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AddressSearchInput } from "@/features/ride/components/address-search-input";
 import { VehicleCard } from "@/features/ride/components/vehicle-card";
 import {
   tripBookingFormSchema,
@@ -24,10 +25,10 @@ import {
   TRIP_TYPE_LABELS,
 } from "@/features/ride/lib/labels";
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
-import { pricingService } from "@/features/ride/services/pricingService";
 import { tripService } from "@/features/ride/services/tripService";
 import { vehicleService } from "@/features/ride/services/vehicleService";
 import type {
+  Place,
   ServiceType,
   TripType,
   Vehicle,
@@ -61,9 +62,18 @@ export function RideBookingPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [suitable, setSuitable] = useState<Vehicle[] | null>(null);
-  const [quoteDisplay, setQuoteDisplay] = useState("Liên hệ báo giá");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [pickupPlace, setPickupPlace] = useState<Place>({
+    address: searchParams.get("pickup") ?? "",
+    latitude: Number(searchParams.get("pickupLat")) || null,
+    longitude: Number(searchParams.get("pickupLng")) || null,
+  });
+  const [destPlace, setDestPlace] = useState<Place>({
+    address: searchParams.get("destination") ?? "",
+    latitude: Number(searchParams.get("destLat")) || null,
+    longitude: Number(searchParams.get("destLng")) || null,
+  });
 
   const defaults = useMemo<TripBookingFormValues>(
     () => ({
@@ -95,7 +105,23 @@ export function RideBookingPage() {
 
   useEffect(() => {
     form.reset(defaults);
-  }, [defaults, form]);
+    const pickupLat = Number(searchParams.get("pickupLat"));
+    const pickupLng = Number(searchParams.get("pickupLng"));
+    const destLat = Number(searchParams.get("destLat"));
+    const destLng = Number(searchParams.get("destLng"));
+    setPickupPlace({
+      address: defaults.pickupAddress,
+      latitude: Number.isFinite(pickupLat) ? pickupLat : null,
+      longitude: Number.isFinite(pickupLng) ? pickupLng : null,
+    });
+    setDestPlace({
+      address: defaults.destinationAddress,
+      latitude: Number.isFinite(destLat) ? destLat : null,
+      longitude: Number.isFinite(destLng) ? destLng : null,
+    });
+    // Only re-seed when URL/query defaults change — `form` identity changes every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaults, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,16 +146,6 @@ export function RideBookingPage() {
     };
   }, [passengers, serviceType, form]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void pricingService.getQuote({ serviceType, tripType, vehicleId }).then((q) => {
-      if (!cancelled) setQuoteDisplay(q.display);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [serviceType, tripType, vehicleId]);
-
   const selectedVehicle = suitable?.find((v) => v.id === vehicleId) ?? null;
 
   async function onSubmit(data: TripBookingFormValues) {
@@ -138,8 +154,16 @@ export function RideBookingPage() {
     try {
       const trip = await tripService.createTrip({
         serviceType: data.serviceType,
-        pickup: { address: data.pickupAddress },
-        destination: { address: data.destinationAddress },
+        pickup: {
+          address: pickupPlace.address || data.pickupAddress,
+          latitude: pickupPlace.latitude,
+          longitude: pickupPlace.longitude,
+        },
+        destination: {
+          address: destPlace.address || data.destinationAddress,
+          latitude: destPlace.latitude,
+          longitude: destPlace.longitude,
+        },
         pickupDate: data.pickupDate,
         pickupTime: data.pickupTime,
         tripType: data.tripType,
@@ -149,19 +173,19 @@ export function RideBookingPage() {
         note: data.note,
       });
       try {
-        sessionStorage.setItem(
-          "ride.lastBooking",
-          JSON.stringify(trip),
-        );
+        sessionStorage.setItem("ride.lastBooking", JSON.stringify(trip));
       } catch {
         /* ignore */
       }
-      void navigate(`/ride/booking/success?code=${encodeURIComponent(trip.bookingCode)}`, {
-        state: { trip },
-      });
+      void navigate(
+        `/ride/booking/success?code=${encodeURIComponent(trip.bookingCode)}`,
+        { state: { trip } },
+      );
     } catch (e) {
       setSubmitError(
-        e instanceof Error ? e.message : "Không gửi được yêu cầu. Vui lòng thử lại.",
+        e instanceof Error
+          ? e.message
+          : "Không gửi được yêu cầu. Vui lòng thử lại.",
       );
     } finally {
       setSubmitting(false);
@@ -180,7 +204,6 @@ export function RideBookingPage() {
         onSubmit={form.handleSubmit(onSubmit)}
         className="mt-8 space-y-10"
       >
-        {/* Trip info */}
         <section className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-6">
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Thông tin chuyến đi
@@ -211,25 +234,32 @@ export function RideBookingPage() {
 
           <div className="space-y-2">
             <Label htmlFor="pickupAddress">Điểm đón</Label>
-            <Input id="pickupAddress" {...form.register("pickupAddress")} />
-            {form.formState.errors.pickupAddress ? (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.pickupAddress.message}
-              </p>
-            ) : null}
+            <AddressSearchInput
+              id="pickupAddress"
+              value={pickupPlace}
+              onChange={(place) => {
+                setPickupPlace(place);
+                form.setValue("pickupAddress", place.address, {
+                  shouldValidate: true,
+                });
+              }}
+              error={form.formState.errors.pickupAddress?.message}
+            />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="destinationAddress">Điểm đến</Label>
-            <Input
+            <AddressSearchInput
               id="destinationAddress"
-              {...form.register("destinationAddress")}
+              value={destPlace}
+              onChange={(place) => {
+                setDestPlace(place);
+                form.setValue("destinationAddress", place.address, {
+                  shouldValidate: true,
+                });
+              }}
+              error={form.formState.errors.destinationAddress?.message}
             />
-            {form.formState.errors.destinationAddress ? (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.destinationAddress.message}
-              </p>
-            ) : null}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -299,7 +329,6 @@ export function RideBookingPage() {
           </div>
         </section>
 
-        {/* Vehicles */}
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Xe phù hợp với chuyến đi</h2>
           {suitable === null ? (
@@ -334,12 +363,8 @@ export function RideBookingPage() {
               {form.formState.errors.vehicleId.message}
             </p>
           ) : null}
-          <p className="text-sm text-muted-foreground">
-            Giá chuyến: <span className="font-medium text-foreground">{quoteDisplay}</span>
-          </p>
         </section>
 
-        {/* Customer */}
         <section className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-6">
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Thông tin liên hệ
@@ -373,22 +398,19 @@ export function RideBookingPage() {
               id="note"
               rows={4}
               placeholder={
-                "Ví dụ:\n- Có người lớn tuổi\n- Có trẻ em\n- Có nhiều hành lý\n- Cần đón tại bệnh viện\n- Có nhiều điểm dừng"
+                "Ví dụ:\n- Có người lớn tuổi\n- Có trẻ em\n- Có nhiều hành lý"
               }
               {...form.register("note")}
             />
           </div>
         </section>
 
-        {/* Summary */}
         <section className="space-y-3 rounded-2xl border border-teal-800/20 bg-teal-50/50 p-4 dark:bg-teal-950/30 sm:p-6">
           <h2 className="text-sm font-semibold tracking-wide text-teal-900 uppercase dark:text-teal-200">
             Thông tin chuyến
           </h2>
           <ul className="space-y-2 text-sm">
-            <li>
-              {selectedVehicle?.name ?? "Chưa chọn xe"} · Có tài xế
-            </li>
+            <li>{selectedVehicle?.name ?? "Chưa chọn xe"} · Có tài xế</li>
             <li>
               {values.pickupAddress || "—"} → {values.destinationAddress || "—"}
             </li>
@@ -398,12 +420,11 @@ export function RideBookingPage() {
             <li>{values.passengers || "—"} khách</li>
             <li>{TRIP_TYPE_LABELS[values.tripType]}</li>
             <li>
-              Giá chuyến:{" "}
-              <strong>Đang xác nhận</strong>
+              Giá chuyến: <strong>Liên hệ báo giá</strong>
             </li>
           </ul>
           <p className="text-sm text-muted-foreground">
-            Giá sẽ được xác nhận sau khi nhân viên kiểm tra lộ trình.
+            Giá sẽ được nhân viên tính và gửi sau khi kiểm tra lộ trình.
           </p>
         </section>
 

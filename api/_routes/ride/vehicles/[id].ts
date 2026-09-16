@@ -2,8 +2,9 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { PERMISSIONS } from "../../../_lib/access/catalog.js";
 import { requirePermission } from "../../../_lib/auth.js";
 import { methodNotAllowed, readJsonBody, withHandler } from "../../../_lib/http.js";
-import type { SuitableFor, VehicleStatus } from "../../../_lib/ride-types.js";
+import type { SuitableFor, VehiclePricingConfig, VehicleStatus } from "../../../_lib/ride-types.js";
 import { rideVehiclesCol, stripDoc } from "../../../_lib/mongo.js";
+import { resolveVehiclePricing } from "../../../../shared/ride/vehicle-pricing.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
@@ -49,6 +50,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             suitableFor: (Array.isArray(body.suitableFor)
               ? body.suitableFor
               : []) as SuitableFor[],
+            pricing: resolveVehiclePricing(
+              body.pricing as Partial<VehiclePricingConfig> | undefined,
+              String(body.fuel ?? "Xăng").trim(),
+            ),
             active: body.active !== false,
             status: (body.status as VehicleStatus) || "AVAILABLE",
             updatedAt: new Date().toISOString(),

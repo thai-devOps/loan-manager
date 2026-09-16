@@ -222,10 +222,6 @@ export function RideMyBookingPage() {
           ) : null}
         </div>
       ) : null}
-
-      <p className="mt-6 text-xs text-muted-foreground">
-        Gợi ý demo: mã <code>TRIP1025</code> · SĐT <code>0900000000</code>
-      </p>
     </div>
   );
 }

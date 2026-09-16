@@ -1,14 +1,16 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AddressSearchInput } from "@/features/ride/components/address-search-input";
 import {
   quickBookingSchema,
   type QuickBookingFormValues,
 } from "@/features/ride/schemas/trip-booking.schema";
-import type { TripType } from "@/features/ride/types/ride";
+import type { Place, TripType } from "@/features/ride/types/ride";
 import { TRIP_TYPE_LABELS } from "@/features/ride/lib/labels";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +31,17 @@ type Props = {
 
 export function QuickBookingForm({ className, defaultServiceType }: Props) {
   const navigate = useNavigate();
+  const [pickupPlace, setPickupPlace] = useState<Place>({
+    address: "",
+    latitude: null,
+    longitude: null,
+  });
+  const [destPlace, setDestPlace] = useState<Place>({
+    address: "",
+    latitude: null,
+    longitude: null,
+  });
+
   const form = useForm<QuickBookingFormValues>({
     resolver: zodResolver(quickBookingSchema),
     defaultValues: {
@@ -45,13 +58,21 @@ export function QuickBookingForm({ className, defaultServiceType }: Props) {
 
   function onSubmit(values: QuickBookingFormValues) {
     const params = new URLSearchParams({
-      pickup: values.pickup,
-      destination: values.destination,
+      pickup: pickupPlace.address || values.pickup,
+      destination: destPlace.address || values.destination,
       date: values.pickupDate,
       time: values.pickupTime,
       passengers: String(values.passengers),
       tripType: values.tripType,
     });
+    if (pickupPlace.latitude != null && pickupPlace.longitude != null) {
+      params.set("pickupLat", String(pickupPlace.latitude));
+      params.set("pickupLng", String(pickupPlace.longitude));
+    }
+    if (destPlace.latitude != null && destPlace.longitude != null) {
+      params.set("destLat", String(destPlace.latitude));
+      params.set("destLng", String(destPlace.longitude));
+    }
     if (defaultServiceType) {
       params.set("serviceType", defaultServiceType);
     }
@@ -94,29 +115,31 @@ export function QuickBookingForm({ className, defaultServiceType }: Props) {
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="qb-pickup">Điểm đón</Label>
-          <Input
+          <AddressSearchInput
             id="qb-pickup"
             placeholder="Ví dụ: địa chỉ đón của bạn"
-            {...form.register("pickup")}
+            value={pickupPlace}
+            onChange={(place) => {
+              setPickupPlace(place);
+              form.setValue("pickup", place.address, { shouldValidate: true });
+            }}
+            error={form.formState.errors.pickup?.message}
           />
-          {form.formState.errors.pickup ? (
-            <p className="text-sm text-destructive">
-              {form.formState.errors.pickup.message}
-            </p>
-          ) : null}
         </div>
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="qb-destination">Điểm đến</Label>
-          <Input
+          <AddressSearchInput
             id="qb-destination"
             placeholder="Ví dụ: địa chỉ đến của bạn"
-            {...form.register("destination")}
+            value={destPlace}
+            onChange={(place) => {
+              setDestPlace(place);
+              form.setValue("destination", place.address, {
+                shouldValidate: true,
+              });
+            }}
+            error={form.formState.errors.destination?.message}
           />
-          {form.formState.errors.destination ? (
-            <p className="text-sm text-destructive">
-              {form.formState.errors.destination.message}
-            </p>
-          ) : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor="qb-date">Ngày đi</Label>

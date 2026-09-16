@@ -49,6 +49,43 @@ export type Place = {
   longitude?: number | null;
 };
 
+export type VehiclePricingConfig = {
+  fuelType?: string;
+  fuelConsumptionPer100Km: number;
+  fuelPricePerLiter: number;
+  driverRate: number;
+  baseFare: number;
+  pricePerKm: number;
+  dailyRate: number;
+  includedKm: number;
+  extraKmRate: number;
+};
+
+export type QuoteBreakdownLine = {
+  label: string;
+  amount: number;
+};
+
+export type BookingQuoteSnapshot = {
+  distanceKm: number;
+  durationMinutes: number;
+  fuelPricePerLiter: number;
+  fuelConsumptionPer100Km: number;
+  fuelLiters: number;
+  fuelCost: number;
+  driverFee: number;
+  tollFee: number;
+  parkingFee: number;
+  waitingFee: number;
+  additionalFee: number;
+  operatingCost: number;
+  subtotal: number;
+  totalPrice: number;
+  breakdown: QuoteBreakdownLine[];
+  provider?: string;
+  quotedAt: string;
+};
+
 export type Vehicle = {
   id: string;
   name: string;
@@ -62,6 +99,7 @@ export type Vehicle = {
   images: string[];
   features: string[];
   suitableFor: SuitableFor[];
+  pricing?: VehiclePricingConfig;
   active: boolean;
   status?: VehicleStatus;
   createdAt?: string;
@@ -126,6 +164,7 @@ export type TripBooking = {
   customer: TripCustomer;
   note?: string;
   quotedPrice: number | null;
+  quoteSnapshot?: BookingQuoteSnapshot | null;
   deposit?: number;
   paidAmount?: number;
   status: BookingStatus;
@@ -184,6 +223,30 @@ export type RideCustomerDetail = RideCustomer & {
 export type PriceQuote = {
   display: string;
   amount: number | null;
+  autoQuote?: boolean;
+  distanceKm?: number;
+  durationMinutes?: number;
+  fuelLiters?: number;
+  fuelCost?: number;
+  driverCost?: number;
+  tollFee?: number;
+  parkingFee?: number;
+  waitingFee?: number;
+  additionalFee?: number;
+  operatingCost?: number;
+  subtotal?: number;
+  totalPrice?: number | null;
+  breakdown?: QuoteBreakdownLine[];
+  provider?: string;
+  snapshot?: BookingQuoteSnapshot | null;
+  errorCode?: "NO_ROUTE" | "TIMEOUT" | "UPSTREAM" | "MISSING_KEY" | "CUSTOM";
+  errorMessage?: string;
+};
+
+export type GeoSearchResult = {
+  label: string;
+  latitude: number;
+  longitude: number;
 };
 
 export type CreateTripInput = {
@@ -197,6 +260,7 @@ export type CreateTripInput = {
   vehicleId: string;
   customer: TripCustomer;
   note?: string;
+  quoteSnapshot?: BookingQuoteSnapshot | null;
 };
 
 export type RideDashboardData = {

@@ -9,7 +9,7 @@ import {
   hasDriverConflict,
   hasVehicleConflict,
 } from "../../../_lib/ride-booking.js";
-import type { BookingStatus } from "../../../_lib/ride-types.js";
+import type { BookingQuoteSnapshot, BookingStatus } from "../../../_lib/ride-types.js";
 import {
   rideBookingsCol,
   rideDriversCol,
@@ -22,6 +22,7 @@ type ActionBody = {
   vehicleId?: string;
   driverId?: string;
   quotedPrice?: number | null;
+  quoteSnapshot?: BookingQuoteSnapshot | null;
   deposit?: number;
   paidAmount?: number;
   status?: BookingStatus;
@@ -102,16 +103,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         const deposit = Number(body.deposit ?? booking.deposit ?? 0);
         const paidAmount = Number(body.paidAmount ?? booking.paidAmount ?? 0);
+        const patch: Record<string, unknown> = {
+          quotedPrice,
+          deposit: Number.isFinite(deposit) ? deposit : 0,
+          paidAmount: Number.isFinite(paidAmount) ? paidAmount : 0,
+          updatedAt: now,
+        };
+        if (body.quoteSnapshot !== undefined) {
+          patch.quoteSnapshot = body.quoteSnapshot;
+        }
         const result = await col.findOneAndUpdate(
           { id },
-          {
-            $set: {
-              quotedPrice,
-              deposit: Number.isFinite(deposit) ? deposit : 0,
-              paidAmount: Number.isFinite(paidAmount) ? paidAmount : 0,
-              updatedAt: now,
-            },
-          },
+          { $set: patch },
           { returnDocument: "after" },
         );
         res.status(200).json(stripDoc(result!));

@@ -17,9 +17,11 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your-strong-password
 JWT_SECRET=long-random-string
 MONGODB_URI=mongodb+srv://USER:PASS@cluster0....mongodb.net/loan-db?retryWrites=true&w=majority
+# OpenRouteService — geocode + directions for auto quote (server-only, no VITE_ prefix)
+ORS_API_KEY=your-ors-api-key
 ```
 
-Trên Vercel → Project → Environment Variables, thêm cùng 4 key (Production). **Không** dùng prefix `VITE_` cho các biến này.
+Trên Vercel → Project → Environment Variables, thêm cùng các key trên (Production). **Không** dùng prefix `VITE_` cho các biến này (đặc biệt `ORS_API_KEY` — chỉ dùng trên server).
 
 Atlas Network Access: cho phép IP serverless (thường `0.0.0.0/0`) và user DB có quyền read/write.
 

@@ -60,6 +60,43 @@ export type TripDriverSnapshot = {
   vehiclePlate: string;
 };
 
+export type VehiclePricingConfig = {
+  fuelType?: string;
+  fuelConsumptionPer100Km: number;
+  fuelPricePerLiter: number;
+  driverRate: number;
+  baseFare: number;
+  pricePerKm: number;
+  dailyRate: number;
+  includedKm: number;
+  extraKmRate: number;
+};
+
+export type QuoteBreakdownLine = {
+  label: string;
+  amount: number;
+};
+
+export type BookingQuoteSnapshot = {
+  distanceKm: number;
+  durationMinutes: number;
+  fuelPricePerLiter: number;
+  fuelConsumptionPer100Km: number;
+  fuelLiters: number;
+  fuelCost: number;
+  driverFee: number;
+  tollFee: number;
+  parkingFee: number;
+  waitingFee: number;
+  additionalFee: number;
+  operatingCost: number;
+  subtotal: number;
+  totalPrice: number;
+  breakdown: QuoteBreakdownLine[];
+  provider?: string;
+  quotedAt: string;
+};
+
 export type RideVehicle = {
   _id?: string;
   id: string;
@@ -74,6 +111,7 @@ export type RideVehicle = {
   images: string[];
   features: string[];
   suitableFor: SuitableFor[];
+  pricing?: VehiclePricingConfig;
   active: boolean;
   status: VehicleStatus;
   createdAt: string;
@@ -130,6 +168,7 @@ export type RideBooking = {
   customer: TripCustomer;
   note?: string;
   quotedPrice: number | null;
+  quoteSnapshot?: BookingQuoteSnapshot | null;
   deposit: number;
   paidAmount: number;
   status: BookingStatus;

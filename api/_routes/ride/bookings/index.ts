@@ -9,6 +9,7 @@ import {
 } from "../../../_lib/ride-booking.js";
 import { upsertCustomer } from "../../../_lib/ride-customer.js";
 import type {
+  Place,
   RideBooking,
   ServiceType,
   TripType,
@@ -28,6 +29,22 @@ const SERVICE_TYPES = new Set([
   "CUSTOM",
 ]);
 const TRIP_TYPES = new Set(["ONE_WAY", "ROUND_TRIP", "DAILY", "CUSTOM"]);
+
+function parsePlace(raw?: {
+  address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+}): Place | null {
+  const address = (raw?.address ?? "").trim();
+  if (!address) return null;
+  const lat = raw?.latitude != null ? Number(raw.latitude) : null;
+  const lng = raw?.longitude != null ? Number(raw.longitude) : null;
+  return {
+    address,
+    latitude: Number.isFinite(lat) ? lat : null,
+    longitude: Number.isFinite(lng) ? lng : null,
+  };
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
@@ -72,11 +89,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === "POST") {
-      // Public create — customer website (no auth)
       const body = readJsonBody<{
         serviceType?: string;
-        pickup?: { address?: string };
-        destination?: { address?: string };
+        pickup?: Place;
+        destination?: Place;
         pickupDate?: string;
         pickupTime?: string;
         tripType?: string;
@@ -87,9 +103,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }>(req);
 
       const serviceType = (body.serviceType ?? "").trim();
-      const tripType = (body.tripType ?? "ONE_WAY").trim();
-      const pickupAddress = (body.pickup?.address ?? "").trim();
-      const destAddress = (body.destination?.address ?? "").trim();
+      const tripType = (body.tripType ?? "ONE_WAY").trim() as TripType;
+      const pickup = parsePlace(body.pickup);
+      const destination = parsePlace(body.destination);
       const pickupDate = (body.pickupDate ?? "").trim();
       const pickupTime = (body.pickupTime ?? "").trim();
       const vehicleId = (body.vehicleId ?? "").trim();
@@ -105,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(400).json({ error: "Hình thức chuyến không hợp lệ" });
         return;
       }
-      if (!pickupAddress || !destAddress) {
+      if (!pickup || !destination) {
         res.status(400).json({ error: "Vui lòng nhập điểm đón và điểm đến" });
         return;
       }
@@ -150,11 +166,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         id,
         bookingCode,
         serviceType: serviceType as ServiceType,
-        pickup: { address: pickupAddress },
-        destination: { address: destAddress },
+        pickup,
+        destination,
         pickupDate,
         pickupTime,
-        tripType: tripType as TripType,
+        tripType,
         passengers,
         vehicleId,
         driverId: null,
@@ -165,6 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
         note: body.note?.trim() || undefined,
         quotedPrice: null,
+        quoteSnapshot: null,
         deposit: 0,
         paidAmount: 0,
         status: "PENDING",
