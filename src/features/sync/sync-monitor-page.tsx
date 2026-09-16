@@ -165,45 +165,44 @@ export function SyncMonitorPage() {
       header={
         <AppHeader
           title="Đồng bộ"
-          description={`Theo dõi hàng đợi offline (tối đa ${MAX_SYNC_RETRIES} lần thử tự động)`}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy || failedCount === 0}
-                onClick={() => void handleClearErrors()}
-              >
-                <DeleteIcon />
-                Xóa lỗi
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={actionsDisabled || failedCount === 0}
-                onClick={() => void handleRetryFailed()}
-              >
-                <RotateCcw className="size-4" />
-                Thử lại lỗi
-              </Button>
-              <Button
-                size="sm"
-                disabled={actionsDisabled}
-                onClick={() => void handleSyncNow()}
-              >
-                {isSyncing || busy ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="size-4" />
-                )}
-                Đồng bộ ngay
-              </Button>
-            </div>
-          }
+          description={`Hàng đợi offline · tối đa ${MAX_SYNC_RETRIES} lần thử`}
         />
       }
       subNav={<ProfileModuleChrome />}
     >
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy || failedCount === 0}
+          onClick={() => void handleClearErrors()}
+        >
+          <DeleteIcon />
+          Xóa lỗi
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={actionsDisabled || failedCount === 0}
+          onClick={() => void handleRetryFailed()}
+        >
+          <RotateCcw className="size-4" />
+          Thử lại lỗi
+        </Button>
+        <Button
+          size="sm"
+          disabled={actionsDisabled}
+          onClick={() => void handleSyncNow()}
+        >
+          {isSyncing || busy ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <RefreshCw className="size-4" />
+          )}
+          Đồng bộ ngay
+        </Button>
+      </div>
+
       {(message || error) && (
         <div
           className={cn(

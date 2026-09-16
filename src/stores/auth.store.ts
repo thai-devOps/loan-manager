@@ -8,7 +8,7 @@ import {
   type AuthSession,
 } from "@/lib/auth";
 import { queryClient } from "@/lib/query-client";
-import { closeUserDatabase, openUserDatabase } from "@/db/database";
+import { closeUserDatabase, isDbOpen, openUserDatabase } from "@/db/database";
 import {
   ensureInitialSync,
   startSyncManager,
@@ -26,7 +26,7 @@ interface AuthState {
   ) => Promise<{ ok: true } | { ok: false; message: string }>;
   logout: () => void;
   touch: () => void;
-  /** Open IndexedDB for session user and kick background sync (non-blocking). */
+  /** Open IndexedDB for session user and await first-time sync gate. */
   prepareLocalDb: () => Promise<void>;
 }
 
@@ -79,13 +79,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   prepareLocalDb: async () => {
     const session = get().session ?? getSession();
     if (!session?.username) {
-      useSyncStore.getState().setStatus({ dbReady: false });
+      useSyncStore.getState().setStatus({
+        dbReady: false,
+        initialSyncReady: false,
+        initialSyncPhase: "error",
+        initialSyncError: "Phiên đăng nhập không hợp lệ",
+      });
       return;
     }
+
+    // login + RequireAuth both call this; skip re-entry once gate is ready
+    if (isDbOpen() && useSyncStore.getState().initialSyncReady) {
+      return;
+    }
+
+    useSyncStore.getState().setStatus({
+      initialSyncReady: false,
+      initialSyncPhase: "checking",
+      initialSyncError: null,
+    });
     await openUserDatabase(session.username);
     useSyncStore.getState().setStatus({ dbReady: true });
     startSyncManager();
-    // Non-blocking initial / background sync
-    void ensureInitialSync();
+    await ensureInitialSync();
   },
 }));

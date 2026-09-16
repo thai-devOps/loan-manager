@@ -1,4 +1,4 @@
-import { PanelLeftClose, PanelLeft, UserRound, LayoutGrid, ArrowLeft } from "lucide-react";
+import { PanelLeftClose, PanelLeft, UserRound, LayoutGrid } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { SyncStatusIndicator } from "@/components/common/sync-status-indicator";
@@ -28,7 +28,6 @@ export function AppHeader({ title, description, actions }: AppHeaderProps) {
       {onProfile ? (
         <Button variant="ghost" size="sm" className="shrink-0 gap-1.5 px-2" asChild>
           <Link to="/apps" aria-label="Quay lại menu chính">
-            <ArrowLeft className="size-4" />
             <LayoutGrid className="size-4" />
             <span className="hidden sm:inline">Ứng dụng</span>
           </Link>
@@ -60,17 +59,23 @@ export function AppHeader({ title, description, actions }: AppHeaderProps) {
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {actions}
-        <SyncStatusIndicator />
-        <ThemeToggle />
-        <Button variant="outline" size="icon" asChild>
-          <Link
-            to="/profile"
-            aria-label="Tài khoản"
-            title={username ? `Tài khoản · ${username}` : "Tài khoản"}
-          >
-            <UserRound className="size-4" />
-          </Link>
-        </Button>
+        {/* Profile section already has tabs + account entry — keep header lean */}
+        {!onProfile && (
+          <>
+            <SyncStatusIndicator />
+            <ThemeToggle />
+            <Button variant="outline" size="icon" asChild>
+              <Link
+                to="/profile"
+                aria-label="Tài khoản"
+                title={username ? `Tài khoản · ${username}` : "Tài khoản"}
+              >
+                <UserRound className="size-4" />
+              </Link>
+            </Button>
+          </>
+        )}
+        {onProfile && <ThemeToggle />}
       </div>
     </header>
   );

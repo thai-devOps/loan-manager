@@ -18,6 +18,7 @@ let backoffIndex = 0;
 let backoffTimer: ReturnType<typeof setTimeout> | null = null;
 let onlineHandler: (() => void) | null = null;
 let offlineHandler: (() => void) | null = null;
+let initialSyncInFlight: Promise<void> | null = null;
 
 export function setSyncTransport(next: SyncTransport): void {
   transport = next;
@@ -48,6 +49,38 @@ async function refreshStatus(partial?: {
     hasSyncError: partial?.hasSyncError ?? useSyncStore.getState().hasSyncError,
   });
   emitSyncEvent("status");
+}
+
+async function isInitialSyncDone(): Promise<boolean> {
+  if (!isDbOpen()) return false;
+  const done = await getDb().syncMetadata.get(SYNC_META_KEYS.initialSyncDone);
+  return done?.value === "1";
+}
+
+async function markInitialReadyIfDone(): Promise<boolean> {
+  if (!(await isInitialSyncDone())) return false;
+  useSyncStore.getState().setStatus({
+    initialSyncReady: true,
+    initialSyncPhase: "ready",
+    initialSyncError: null,
+  });
+  return true;
+}
+
+function markInitialSyncError(message: string): void {
+  useSyncStore.getState().setStatus({
+    initialSyncReady: false,
+    initialSyncPhase: "error",
+    initialSyncError: message,
+    isSyncing: false,
+  });
+}
+
+function clearBackoff(): void {
+  if (backoffTimer) {
+    clearTimeout(backoffTimer);
+    backoffTimer = null;
+  }
 }
 
 function scheduleBackoffRetry(): void {
@@ -114,6 +147,7 @@ export async function runSync(options?: {
       emitSyncEvent("synced");
       await queryClient.invalidateQueries();
       await refreshStatus({ isSyncing: false, hasSyncError: false });
+      await markInitialReadyIfDone();
     } else {
       await queryClient.invalidateQueries();
       await refreshStatus({
@@ -134,14 +168,75 @@ export async function runSync(options?: {
   }
 }
 
-export async function ensureInitialSync(): Promise<void> {
-  if (!isDbOpen()) return;
-  const done = await getDb().syncMetadata.get(SYNC_META_KEYS.initialSyncDone);
-  if (done?.value === "1") {
+async function runEnsureInitialSync(): Promise<void> {
+  clearBackoff();
+  backoffIndex = 0;
+
+  if (!isDbOpen()) {
+    markInitialSyncError("Cơ sở dữ liệu cục bộ chưa sẵn sàng");
+    return;
+  }
+
+  useSyncStore.getState().setStatus({
+    initialSyncPhase: "checking",
+    initialSyncError: null,
+  });
+
+  if (await isInitialSyncDone()) {
+    useSyncStore.getState().setStatus({
+      initialSyncReady: true,
+      initialSyncPhase: "ready",
+      initialSyncError: null,
+    });
     requestSync();
     return;
   }
-  await runSync();
+
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    markInitialSyncError("Không có kết nối mạng");
+    await refreshStatus({ isSyncing: false });
+    return;
+  }
+
+  useSyncStore.getState().setStatus({
+    initialSyncReady: false,
+    initialSyncPhase: "syncing",
+    initialSyncError: null,
+  });
+
+  try {
+    await runSync();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Đồng bộ thất bại";
+    markInitialSyncError(message);
+    return;
+  }
+
+  if (await markInitialReadyIfDone()) return;
+
+  const offline =
+    typeof navigator !== "undefined" && !navigator.onLine;
+  markInitialSyncError(
+    offline
+      ? "Không có kết nối mạng"
+      : "Không đồng bộ được dữ liệu. Vui lòng thử lại.",
+  );
+}
+
+export async function ensureInitialSync(): Promise<void> {
+  if (initialSyncInFlight !== null) return initialSyncInFlight;
+  initialSyncInFlight = runEnsureInitialSync().finally(() => {
+    initialSyncInFlight = null;
+  });
+  return initialSyncInFlight;
+}
+
+/** Retry first-time sync from the gate UI (or online event). */
+export async function retryInitialSync(): Promise<void> {
+  const { initialSyncReady } = useSyncStore.getState();
+  if (initialSyncReady) return;
+  await ensureInitialSync();
 }
 
 export function startSyncManager(): void {
@@ -153,14 +248,16 @@ export function startSyncManager(): void {
     void (async () => {
       if (isDbOpen()) await reclaimSyncingOps();
       await refreshStatus();
+      const { initialSyncReady, initialSyncPhase } = useSyncStore.getState();
+      if (!initialSyncReady && initialSyncPhase === "error") {
+        await retryInitialSync();
+        return;
+      }
       requestSync();
     })();
   };
   offlineHandler = () => {
-    if (backoffTimer) {
-      clearTimeout(backoffTimer);
-      backoffTimer = null;
-    }
+    clearBackoff();
     void (async () => {
       if (isDbOpen()) await reclaimSyncingOps();
       await refreshStatus({ isSyncing: false });
@@ -179,8 +276,6 @@ export function stopSyncManager(): void {
   if (offlineHandler) window.removeEventListener("offline", offlineHandler);
   onlineHandler = null;
   offlineHandler = null;
-  if (backoffTimer) {
-    clearTimeout(backoffTimer);
-    backoffTimer = null;
-  }
+  clearBackoff();
+  initialSyncInFlight = null;
 }

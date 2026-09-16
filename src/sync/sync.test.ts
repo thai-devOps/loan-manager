@@ -6,7 +6,7 @@ import {
   openUserDatabase,
   MonelyDatabase,
 } from "@/db/database";
-import { dbNameForUser } from "@/db/schema";
+import { dbNameForUser, SYNC_META_KEYS } from "@/db/schema";
 import { financeRepository } from "@/db/repositories/financeRepository";
 import { borrowerRepository } from "@/db/repositories/borrowerRepository";
 import {
@@ -19,7 +19,44 @@ import {
 } from "@/sync/syncQueue";
 import { syncPush } from "@/sync/syncPush";
 import { syncPull } from "@/sync/syncPull";
+import {
+  ensureInitialSync,
+  retryInitialSync,
+  setSyncTransport,
+  stopSyncManager,
+} from "@/sync/syncManager";
 import type { SyncTransport } from "@/sync/transports/types";
+import { useSyncStore } from "@/stores/sync.store";
+
+function emptyPullTransport(
+  overrides?: Partial<SyncTransport>,
+): SyncTransport {
+  return {
+    pullAll: async () => [
+      { entity: "borrower", rows: [] },
+      { entity: "loan", rows: [] },
+      { entity: "loanTransaction", rows: [] },
+      { entity: "interestSchedule", rows: [] },
+      { entity: "financeTransaction", rows: [] },
+      { entity: "manualAsset", rows: [] },
+      { entity: "goldPurchase", rows: [] },
+      { entity: "goldPlan", rows: [] },
+      {
+        entity: "assetSettings",
+        rows: [
+          {
+            id: "default",
+            goldReferencePricePerChi: { "9999": 0, "18k": 0, other: 0 },
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    ],
+    pushOne: async () => ({ ok: true }),
+    ...overrides,
+  };
+}
 
 async function resetUserDb(username: string): Promise<void> {
   closeUserDatabase();
@@ -30,13 +67,22 @@ async function resetUserDb(username: string): Promise<void> {
 describe("local-first IndexedDB", () => {
   beforeEach(async () => {
     await resetUserDb("testuser");
+    useSyncStore.getState().reset();
+    stopSyncManager();
+    setSyncTransport(emptyPullTransport());
+    Object.defineProperty(navigator, "onLine", {
+      configurable: true,
+      get: () => true,
+    });
   });
 
   afterEach(async () => {
+    stopSyncManager();
     closeUserDatabase();
     await Dexie.delete(dbNameForUser("testuser"));
     await Dexie.delete(dbNameForUser("otheruser"));
     await Dexie.delete(dbNameForUser("migrate_user"));
+    useSyncStore.getState().reset();
     vi.restoreAllMocks();
   });
 
@@ -332,5 +378,79 @@ describe("local-first IndexedDB", () => {
     expect(item.localId).toBeDefined();
     await markDone(item.localId!);
     expect(await countPendingOps()).toBe(0);
+  });
+
+  it("ensureInitialSync marks ready after successful pull", async () => {
+    setSyncTransport(emptyPullTransport());
+    await ensureInitialSync();
+
+    const meta = await getDb().syncMetadata.get(SYNC_META_KEYS.initialSyncDone);
+    expect(meta?.value).toBe("1");
+    expect(useSyncStore.getState().initialSyncReady).toBe(true);
+    expect(useSyncStore.getState().initialSyncPhase).toBe("ready");
+  });
+
+  it("ensureInitialSync errors offline without setting meta", async () => {
+    Object.defineProperty(navigator, "onLine", {
+      configurable: true,
+      get: () => false,
+    });
+
+    await ensureInitialSync();
+
+    const meta = await getDb().syncMetadata.get(SYNC_META_KEYS.initialSyncDone);
+    expect(meta?.value).not.toBe("1");
+    expect(useSyncStore.getState().initialSyncReady).toBe(false);
+    expect(useSyncStore.getState().initialSyncPhase).toBe("error");
+    expect(useSyncStore.getState().initialSyncError).toMatch(/mạng/i);
+  });
+
+  it("retryInitialSync recovers after transport failure", async () => {
+    let attempts = 0;
+    setSyncTransport(
+      emptyPullTransport({
+        pullAll: async () => {
+          attempts += 1;
+          if (attempts === 1) throw new Error("pull failed");
+          return emptyPullTransport().pullAll();
+        },
+      }),
+    );
+
+    await ensureInitialSync();
+    expect(useSyncStore.getState().initialSyncPhase).toBe("error");
+    expect(
+      (await getDb().syncMetadata.get(SYNC_META_KEYS.initialSyncDone))?.value,
+    ).not.toBe("1");
+
+    await retryInitialSync();
+    expect(useSyncStore.getState().initialSyncReady).toBe(true);
+    expect(useSyncStore.getState().initialSyncPhase).toBe("ready");
+    expect(
+      (await getDb().syncMetadata.get(SYNC_META_KEYS.initialSyncDone))?.value,
+    ).toBe("1");
+  });
+
+  it("ensureInitialSync skips gate when meta already done", async () => {
+    await getDb().syncMetadata.put({
+      key: SYNC_META_KEYS.initialSyncDone,
+      value: "1",
+    });
+
+    let pullCalls = 0;
+    setSyncTransport(
+      emptyPullTransport({
+        pullAll: async () => {
+          pullCalls += 1;
+          return emptyPullTransport().pullAll();
+        },
+      }),
+    );
+
+    await ensureInitialSync();
+    expect(useSyncStore.getState().initialSyncReady).toBe(true);
+    expect(useSyncStore.getState().initialSyncPhase).toBe("ready");
+    // Background requestSync may pull; gate itself must be ready without awaiting it
+    expect(pullCalls).toBeLessThanOrEqual(1);
   });
 });

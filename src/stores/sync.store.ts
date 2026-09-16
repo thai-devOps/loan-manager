@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+export type InitialSyncPhase = "checking" | "syncing" | "ready" | "error";
+
 export interface SyncStatusState {
   isOnline: boolean;
   isSyncing: boolean;
@@ -8,6 +10,10 @@ export interface SyncStatusState {
   hasSyncError: boolean;
   /** True when per-user Dexie DB is open for the authenticated session. */
   dbReady: boolean;
+  /** True once initialSyncDone meta is confirmed for this session. */
+  initialSyncReady: boolean;
+  initialSyncPhase: InitialSyncPhase;
+  initialSyncError: string | null;
   setStatus: (
     partial: Partial<Omit<SyncStatusState, "setStatus" | "reset">>,
   ) => void;
@@ -21,6 +27,9 @@ const initial = {
   lastSyncAt: null as string | null,
   hasSyncError: false,
   dbReady: false,
+  initialSyncReady: false,
+  initialSyncPhase: "checking" as InitialSyncPhase,
+  initialSyncError: null as string | null,
 };
 
 export const useSyncStore = create<SyncStatusState>((set) => ({

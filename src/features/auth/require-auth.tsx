@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { InitialSyncPage } from "@/features/auth/initial-sync-page";
 import { useAuthStore } from "@/stores/auth.store";
 import { useSyncStore } from "@/stores/sync.store";
 
@@ -11,7 +12,7 @@ export function RequireAuth() {
   const hydrate = useAuthStore((s) => s.hydrate);
   const touch = useAuthStore((s) => s.touch);
   const prepareLocalDb = useAuthStore((s) => s.prepareLocalDb);
-  const dbReady = useSyncStore((s) => s.dbReady);
+  const initialSyncReady = useSyncStore((s) => s.initialSyncReady);
   const lastTouchRef = useRef(0);
 
   useEffect(() => {
@@ -51,13 +52,8 @@ export function RequireAuth() {
     );
   }
 
-  // Open Dexie quickly; do not wait for API sync before rendering shell.
-  if (!dbReady) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center text-sm text-muted-foreground">
-        Đang mở dữ liệu cục bộ…
-      </div>
-    );
+  if (!initialSyncReady) {
+    return <InitialSyncPage />;
   }
 
   return <Outlet />;
