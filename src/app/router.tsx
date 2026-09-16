@@ -29,11 +29,38 @@ import { AssetsHoldingsPage } from "@/features/assets/assets-holdings-page";
 import { AssetsAllocationPage } from "@/features/assets/assets-allocation-page";
 import { AssetsGoldPage } from "@/features/assets/assets-gold-page";
 import { AssetsGoldPlanPage } from "@/features/assets/assets-gold-plan-page";
+import { RidePublicLayout } from "@/features/ride/components/ride-public-layout";
+import { RideHomePage } from "@/features/ride/pages/ride-home-page";
+import { RideServicesPage } from "@/features/ride/pages/ride-services-page";
+import { RideServiceLandingPage } from "@/features/ride/pages/ride-service-landing-page";
+import { RideCarsPage } from "@/features/ride/pages/ride-cars-page";
+import { RideCarDetailPage } from "@/features/ride/pages/ride-car-detail-page";
+import { RideBookingPage } from "@/features/ride/pages/ride-booking-page";
+import { RideBookingSuccessPage } from "@/features/ride/pages/ride-booking-success-page";
+import { RideMyBookingPage } from "@/features/ride/pages/ride-my-booking-page";
+import { RidePricingPage } from "@/features/ride/pages/ride-pricing-page";
+import { RideContactPage } from "@/features/ride/pages/ride-contact-page";
 
 export const router = createBrowserRouter([
   {
     path: "/login",
     element: <LoginPage />,
+  },
+  {
+    path: "/ride",
+    element: <RidePublicLayout />,
+    children: [
+      { index: true, element: <RideHomePage /> },
+      { path: "services", element: <RideServicesPage /> },
+      { path: "services/:slug", element: <RideServiceLandingPage /> },
+      { path: "cars", element: <RideCarsPage /> },
+      { path: "cars/:id", element: <RideCarDetailPage /> },
+      { path: "booking", element: <RideBookingPage /> },
+      { path: "booking/success", element: <RideBookingSuccessPage /> },
+      { path: "my-booking", element: <RideMyBookingPage /> },
+      { path: "pricing", element: <RidePricingPage /> },
+      { path: "contact", element: <RideContactPage /> },
+    ],
   },
   {
     path: "/",
