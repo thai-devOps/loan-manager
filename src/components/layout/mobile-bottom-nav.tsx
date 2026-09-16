@@ -2,6 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { MOBILE_BOTTOM_TABS } from "@/components/layout/nav-items";
 import { prefetchFeatureRoute } from "@/lib/prefetch-feature";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth.store";
 
 /**
  * Continuous bar: flat top above side icons, modest center bump around the FAB.
@@ -35,6 +36,13 @@ function NavBarShell() {
 
 export function MobileBottomNav() {
   const location = useLocation();
+  const hasModuleAccess = useAuthStore((s) => s.hasModuleAccess);
+
+  const tabs = MOBILE_BOTTOM_TABS.filter((tab) => {
+    if (tab.fab) return true;
+    if (tab.accessModule) return hasModuleAccess(tab.accessModule);
+    return true;
+  });
 
   return (
     <nav
@@ -44,8 +52,13 @@ export function MobileBottomNav() {
       <div className="relative mx-auto h-[calc(6rem+env(safe-area-inset-bottom,0px))] max-w-lg">
         <NavBarShell />
 
-        <div className="pointer-events-auto relative z-10 grid h-24 grid-cols-5 items-end px-0.5 pb-[calc(0.85rem+env(safe-area-inset-bottom,0px))]">
-          {MOBILE_BOTTOM_TABS.map((tab) => {
+        <div
+          className="pointer-events-auto relative z-10 grid h-24 items-end px-0.5 pb-[calc(0.85rem+env(safe-area-inset-bottom,0px))]"
+          style={{
+            gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`,
+          }}
+        >
+          {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = tab.isActive(location.pathname);
 

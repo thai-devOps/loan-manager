@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth } from "../../_lib/auth.js";
+import { PERMISSIONS } from "../../_lib/access/catalog.js";
+import { requirePermission } from "../../_lib/auth.js";
 import { methodNotAllowed, readJsonBody, withHandler } from "../../_lib/http.js";
 import {
   borrowersCol,
@@ -11,7 +12,7 @@ import {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
-    if (!(await requireAuth(req, res))) return;
+    if (!(await requirePermission(req, res, req.method === "GET" ? PERMISSIONS.LOAN_LOAN_VIEW : req.method === "DELETE" ? PERMISSIONS.LOAN_LOAN_DELETE : PERMISSIONS.LOAN_LOAN_UPDATE))) return;
     const id = req.query.id;
     if (typeof id !== "string" || !id) {
       res.status(400).json({ error: "Missing id" });

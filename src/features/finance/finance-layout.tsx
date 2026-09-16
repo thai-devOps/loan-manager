@@ -19,6 +19,9 @@ import {
   type DateRangePreset,
 } from "@/features/finance/lib/date-range";
 import type { FinanceTransaction } from "@/types/finance";
+import { Can } from "@/features/auth/can";
+import { PERMISSIONS } from "@/config/permissions";
+import { useAuthStore } from "@/stores/auth.store";
 
 export function FinanceLayout() {
   const [preset, setPresetState] = useState<DateRangePreset>("this_month");
@@ -30,6 +33,7 @@ export function FinanceLayout() {
     "expense",
   );
   const [editing, setEditing] = useState<FinanceTransaction | null>(null);
+  const hasPermission = useAuthStore((s) => s.hasPermission);
 
   const setPreset = (next: DateRangePreset) => {
     setPresetState(next);
@@ -56,17 +60,19 @@ export function FinanceLayout() {
       setPreset,
       setCustomRange,
       openCreate: (type = "expense") => {
+        if (!hasPermission(PERMISSIONS.FINANCE_TRANSACTION_CREATE)) return;
         setEditing(null);
         setDefaultType(type);
         setDialogOpen(true);
       },
     }),
-    [preset, range.from, range.to, month],
+    [preset, range.from, range.to, month, hasPermission],
   );
 
   const outletContext = useMemo(
     () => ({
       openEdit: (tx: FinanceTransaction) => {
+        if (!hasPermission(PERMISSIONS.FINANCE_TRANSACTION_UPDATE)) return;
         setEditing(tx);
         setDefaultType(tx.type);
         setDialogOpen(true);
@@ -76,7 +82,7 @@ export function FinanceLayout() {
       from: range.from,
       to: range.to,
     }),
-    [ctx.openCreate, month, range.from, range.to],
+    [ctx.openCreate, month, range.from, range.to, hasPermission],
   );
 
   const feature = getFeatureById("finance");
@@ -89,15 +95,17 @@ export function FinanceLayout() {
             title="Tài chính"
             description="Theo dõi thu chi cá nhân theo thời gian"
             actions={
-              <Button
-                size="sm"
-                onClick={() => ctx.openCreate("expense")}
-                className="gap-1.5"
-              >
-                <Plus className="size-4" />
-                <span className="hidden sm:inline">Thêm giao dịch</span>
-                <span className="sm:hidden">Thêm</span>
-              </Button>
+              <Can permission={PERMISSIONS.FINANCE_TRANSACTION_CREATE}>
+                <Button
+                  size="sm"
+                  onClick={() => ctx.openCreate("expense")}
+                  className="gap-1.5"
+                >
+                  <Plus className="size-4" />
+                  <span className="hidden sm:inline">Thêm giao dịch</span>
+                  <span className="sm:hidden">Thêm</span>
+                </Button>
+              </Can>
             }
           />
         }

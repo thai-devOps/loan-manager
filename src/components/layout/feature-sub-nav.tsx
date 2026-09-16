@@ -1,6 +1,10 @@
 import { NavLink } from "react-router-dom";
-import type { NavItem } from "@/components/layout/nav-items";
+import {
+  filterNavItems,
+  type NavItem,
+} from "@/components/layout/nav-items";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth.store";
 
 interface FeatureSubNavProps {
   items: NavItem[];
@@ -9,7 +13,11 @@ interface FeatureSubNavProps {
 
 /** Horizontal in-page tabs for module sub-routes (mobile only). */
 export function FeatureSubNav({ items, className }: FeatureSubNavProps) {
-  if (items.length <= 1) return null;
+  const hasModuleAccess = useAuthStore((s) => s.hasModuleAccess);
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const visible = filterNavItems(items, { hasModuleAccess, hasPermission });
+
+  if (visible.length <= 1) return null;
 
   return (
     <nav
@@ -20,7 +28,7 @@ export function FeatureSubNav({ items, className }: FeatureSubNavProps) {
       )}
     >
       <div className="flex gap-1 overflow-x-auto px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {items.map((item) => {
+        {visible.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink

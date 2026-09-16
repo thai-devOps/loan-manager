@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, LogOut, UserRound } from "lucide-react";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { AppLogo } from "@/components/common/app-logo";
-import { APP_FEATURES, type AppFeatureId } from "@/components/layout/nav-items";
+import { APP_FEATURES, canAccessFeature, type AppFeatureId } from "@/components/layout/nav-items";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth.store";
 import { APP_NAME } from "@/lib/brand";
@@ -33,13 +33,28 @@ const FEATURE_ACCENT: Record<
     icon: "bg-slate-800 text-slate-50 group-hover:bg-slate-700 dark:bg-slate-700",
     ring: "group-hover:border-slate-500/40 group-hover:shadow-slate-900/10 dark:group-hover:shadow-slate-400/10",
   },
+  rideOps: {
+    glow: "from-cyan-500/20 via-cyan-600/5 to-transparent",
+    icon: "bg-cyan-800 text-cyan-50 group-hover:bg-cyan-700",
+    ring: "group-hover:border-cyan-600/40 group-hover:shadow-cyan-900/10 dark:group-hover:shadow-cyan-400/10",
+  },
+  accessAdmin: {
+    glow: "from-rose-500/20 via-rose-600/5 to-transparent",
+    icon: "bg-rose-800 text-rose-50 group-hover:bg-rose-700",
+    ring: "group-hover:border-rose-600/40 group-hover:shadow-rose-900/10 dark:group-hover:shadow-rose-400/10",
+  },
 };
 
 export function AppsHubPage() {
   const navigate = useNavigate();
   const logout = useAuthStore((s) => s.logout);
   const username = useAuthStore((s) => s.session?.username);
+  const hasModuleAccess = useAuthStore((s) => s.hasModuleAccess);
+  const hasAnyPermission = useAuthStore((s) => s.hasAnyPermission);
 
+  const visibleFeatures = APP_FEATURES.filter((feature) =>
+    canAccessFeature(feature, { hasModuleAccess, hasAnyPermission }),
+  );
   function handleLogout() {
     logout();
     void navigate("/login", { replace: true });
@@ -59,10 +74,9 @@ export function AppsHubPage() {
             backgroundSize: "22px 22px",
           }}
         />
-        {/* Heavy blurs only on md+ — avoid mobile GPU lag on hub paint */}
-        <div className="absolute -top-32 -right-20 hidden size-112 rounded-full bg-teal-300/35 blur-3xl md:block dark:bg-teal-500/15" />
-        <div className="absolute -bottom-40 -left-24 hidden size-120 rounded-full bg-emerald-200/50 blur-3xl md:block dark:bg-emerald-500/10" />
-        <div className="absolute top-1/3 left-1/2 hidden size-72 -translate-x-1/2 rounded-full bg-amber-200/20 blur-3xl md:block dark:bg-amber-400/10" />
+        {/* Soft atmospheric orbs — keep fully behind content, no clipped “panels” */}
+        <div className="absolute -top-24 right-[-10%] hidden h-72 w-72 rounded-full bg-teal-300/25 blur-3xl md:block dark:bg-teal-500/10" />
+        <div className="absolute bottom-[-15%] left-[-8%] hidden h-80 w-80 rounded-full bg-emerald-200/30 blur-3xl md:block dark:bg-emerald-500/10" />
       </div>
 
       <header className="relative z-10 flex w-full min-w-0 items-center justify-between gap-3 px-5 py-5 sm:px-8">
@@ -97,8 +111,8 @@ export function AppsHubPage() {
         </div>
       </header>
 
-      <main className="relative z-10 flex w-full min-w-0 flex-1 flex-col items-center justify-center px-5 py-10 sm:px-8">
-        <div className="mb-10 w-full max-w-xl text-center">
+      <main className="relative z-10 flex w-full min-w-0 flex-1 flex-col items-center px-5 py-8 sm:px-8 sm:py-12">
+        <div className="mb-8 w-full max-w-xl text-center sm:mb-10">
           <p className="mb-3 text-xs font-medium tracking-[0.22em] text-teal-800/70 uppercase dark:text-teal-300/70">
             Workspace
           </p>
@@ -111,8 +125,14 @@ export function AppsHubPage() {
           </p>
         </div>
 
-        <div className="grid w-full max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {APP_FEATURES.map((feature) => {
+        <div
+          className={cn(
+            "grid w-full gap-4",
+            "max-w-5xl",
+            "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+          )}
+        >
+          {visibleFeatures.map((feature) => {
             const Icon = feature.icon;
             const accent = FEATURE_ACCENT[feature.id];
             return (
@@ -121,11 +141,11 @@ export function AppsHubPage() {
                 to={feature.href}
                 onPointerDown={() => prefetchFeatureRoute(feature.href)}
                 className={cn(
-                  "group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card/85 p-5 text-left shadow-sm",
+                  "group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 text-left shadow-sm",
                   "transition-colors duration-150",
                   "active:bg-muted/60",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40",
-                  "md:backdrop-blur-sm md:transition-all md:duration-300 md:ease-out md:hover:-translate-y-1 md:hover:shadow-xl",
+                  "md:transition-shadow md:duration-300 md:ease-out md:hover:shadow-lg",
                   accent.ring,
                 )}
               >

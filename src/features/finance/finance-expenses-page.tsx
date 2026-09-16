@@ -14,6 +14,8 @@ import {
 } from "@/features/finance/lib/calculations";
 import { formatDateRangeLabel } from "@/features/finance/lib/date-range";
 import { formatCurrency } from "@/lib/currency";
+import { Can } from "@/features/auth/can";
+import { PERMISSIONS } from "@/config/permissions";
 
 export function FinanceExpensesPage() {
   const { from, to, preset } = useFinanceMonth();
@@ -46,10 +48,12 @@ export function FinanceExpensesPage() {
           value={formatCurrency(total)}
           hint={formatDateRangeLabel(from, to, preset)}
         />
-        <Button className="gap-1.5" onClick={() => openCreate("expense")}>
-          <Plus className="size-4" />
-          Thêm chi tiêu
-        </Button>
+        <Can permission={PERMISSIONS.FINANCE_TRANSACTION_CREATE}>
+          <Button className="gap-1.5" onClick={() => openCreate("expense")}>
+            <Plus className="size-4" />
+            Thêm chi tiêu
+          </Button>
+        </Can>
       </div>
 
       <Card>
@@ -62,9 +66,11 @@ export function FinanceExpensesPage() {
               title="Chưa có chi tiêu trong tháng"
               description="Ghi nhận chi sinh hoạt để theo dõi còn lại."
               action={
-                <Button onClick={() => openCreate("expense")}>
-                  Thêm chi tiêu
-                </Button>
+                <Can permission={PERMISSIONS.FINANCE_TRANSACTION_CREATE}>
+                  <Button onClick={() => openCreate("expense")}>
+                    Thêm chi tiêu
+                  </Button>
+                </Can>
               }
             />
           ) : (

@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
 import { addMonths, subMonths } from "date-fns";
-import { requireAuth } from "../_lib/auth.js";
+import { PERMISSIONS } from "../_lib/access/catalog.js";
+import { requirePermission } from "../_lib/auth.js";
 import { generateInterestSchedules } from "../_lib/calculations.js";
 import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http.js";
 import {
@@ -26,7 +27,7 @@ import type {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
-    if (!(await requireAuth(req, res))) return;
+    if (!(await requirePermission(req, res, PERMISSIONS.SETTINGS_UPDATE))) return;
 
     const action = req.query.action;
     if (typeof action !== "string" || !action) {

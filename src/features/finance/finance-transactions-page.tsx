@@ -40,6 +40,8 @@ import { useDeleteFinanceTransactionMutation } from "@/api/mutations";
 import { useFinanceTransactionsQuery } from "@/api/queries";
 import { useFinanceMonth } from "@/features/finance/finance-context";
 import { useFinanceOutlet } from "@/features/finance/use-finance-outlet";
+import { Can } from "@/features/auth/can";
+import { PERMISSIONS } from "@/config/permissions";
 import {
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
@@ -177,24 +179,28 @@ export function FinanceTransactionsPage() {
                 }
                 footer={
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => openEdit(tx)}
-                    >
-                      <EditIcon size={14} />
-                      Sửa
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 text-destructive"
-                      onClick={() => setDeleting(tx)}
-                    >
-                      <DeleteIcon size={14} />
-                      Xóa
-                    </Button>
+                    <Can permission={PERMISSIONS.FINANCE_TRANSACTION_UPDATE}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => openEdit(tx)}
+                      >
+                        <EditIcon size={14} />
+                        Sửa
+                      </Button>
+                    </Can>
+                    <Can permission={PERMISSIONS.FINANCE_TRANSACTION_DELETE}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-destructive"
+                        onClick={() => setDeleting(tx)}
+                      >
+                        <DeleteIcon size={14} />
+                        Xóa
+                      </Button>
+                    </Can>
                   </div>
                 }
               />
@@ -218,22 +224,26 @@ export function FinanceTransactionsPage() {
                   <TableRow key={tx.id}>
                     <TableCell>
                       <div className="inline-flex gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openEdit(tx)}
-                          aria-label="Sửa"
-                        >
-                          <EditIcon />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setDeleting(tx)}
-                          aria-label="Xóa"
-                        >
-                          <DeleteIcon />
-                        </Button>
+                        <Can permission={PERMISSIONS.FINANCE_TRANSACTION_UPDATE}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openEdit(tx)}
+                            aria-label="Sửa"
+                          >
+                            <EditIcon />
+                          </Button>
+                        </Can>
+                        <Can permission={PERMISSIONS.FINANCE_TRANSACTION_DELETE}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setDeleting(tx)}
+                            aria-label="Xóa"
+                          >
+                            <DeleteIcon />
+                          </Button>
+                        </Can>
                       </div>
                     </TableCell>
                     <TableCell>{formatDate(tx.createdAt)}</TableCell>

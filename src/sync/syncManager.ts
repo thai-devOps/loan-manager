@@ -1,3 +1,4 @@
+import { ApiError } from "@/api/client";
 import { getDb, isDbOpen } from "@/db/database";
 import { SYNC_META_KEYS } from "@/db/schema";
 import { emitSyncEvent } from "@/sync/syncEvents";
@@ -10,6 +11,28 @@ import { useSyncStore } from "@/stores/sync.store";
 import { queryClient } from "@/lib/query-client";
 
 const BACKOFF_MS = [1000, 2000, 5000, 10000, 30000] as const;
+
+function isTransientSyncFailure(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    // Auth / permission / client errors will not fix themselves by retrying
+    if (error.status === 401 || error.status === 403) return false;
+    if (error.status >= 400 && error.status < 500 && error.status !== 408) {
+      return false;
+    }
+    return error.status === 0 || error.status >= 500 || error.status === 408;
+  }
+  if (error instanceof TypeError) return true;
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    return (
+      msg.includes("network") ||
+      msg.includes("fetch") ||
+      msg.includes("offline") ||
+      msg.includes("failed to fetch")
+    );
+  }
+  return true;
+}
 
 let transport: SyncTransport = restReplayTransport;
 let syncing = false;
@@ -162,7 +185,14 @@ export async function runSync(options?: {
     emitSyncEvent("error", { message });
     await reclaimSyncingOps();
     await refreshStatus({ isSyncing: false, hasSyncError: true });
-    scheduleBackoffRetry();
+    // Only auto-retry transient failures — 403/4xx used to spam "Đồng bộ ngay"
+    // forever while the offline queue stayed empty.
+    if (isTransientSyncFailure(error)) {
+      scheduleBackoffRetry();
+    } else {
+      clearBackoff();
+      backoffIndex = 0;
+    }
   } finally {
     syncing = false;
     await refreshStatus({ isSyncing: false });

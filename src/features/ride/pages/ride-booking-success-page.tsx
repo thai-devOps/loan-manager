@@ -8,7 +8,6 @@ import {
   rideBrand,
 } from "@/features/ride/config/ride-brand";
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
-import { tripService } from "@/features/ride/services/tripService";
 import { vehicleService } from "@/features/ride/services/vehicleService";
 import type { TripBooking, Vehicle } from "@/features/ride/types/ride";
 
@@ -28,9 +27,20 @@ export function RideBookingSuccessPage() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const found =
-        stateTrip ??
-        (codeParam ? await tripService.getTrip(codeParam) : null);
+      let found = stateTrip ?? null;
+      if (!found) {
+        try {
+          const raw = sessionStorage.getItem("ride.lastBooking");
+          if (raw) {
+            const parsed = JSON.parse(raw) as TripBooking;
+            if (!codeParam || parsed.bookingCode === codeParam) {
+              found = parsed;
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
       if (cancelled) return;
       setTrip(found);
       if (found) {

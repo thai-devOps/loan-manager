@@ -33,14 +33,26 @@ import {
 } from "@/lib/calculations";
 import { formatCurrency } from "@/lib/currency";
 import { getPeriodFromISO } from "@/lib/date";
+import { ForbiddenPage } from "@/features/auth/forbidden-page";
+import { useAuthStore } from "@/stores/auth.store";
+import { PERMISSIONS } from "@/config/permissions";
 
 export function ReportsPage() {
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canViewLoanReport = hasPermission(PERMISSIONS.REPORT_LOAN_VIEW);
+
   const loansQ = useLoansQuery();
   const transactionsQ = useTransactionsQuery();
   const isLoading = loansQ.isLoading || transactionsQ.isLoading;
 
-  const loans = loansQ.data ?? EMPTY_ARRAY;
-  const transactions = transactionsQ.data ?? EMPTY_ARRAY;
+  const loans = canViewLoanReport ? (loansQ.data ?? EMPTY_ARRAY) : EMPTY_ARRAY;
+  const transactions = canViewLoanReport
+    ? (transactionsQ.data ?? EMPTY_ARRAY)
+    : EMPTY_ARRAY;
+
+  if (!canViewLoanReport) {
+    return <ForbiddenPage />;
+  }
 
   const totalDisbursed = transactions
     .filter((t) => t.type === "DISBURSEMENT")

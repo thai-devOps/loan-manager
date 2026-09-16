@@ -53,6 +53,28 @@ function isRetryable(error: unknown): boolean {
   return true;
 }
 
+/** 401/403: skip entity — do not wipe local Dexie rows or fail the whole pull. */
+function isForbiddenPull(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.status === 401 || error.status === 403)
+  );
+}
+
+async function pullOptional<T>(
+  entity: PullEntityResult["entity"],
+  fetcher: () => Promise<T>,
+  toRows: (data: T) => PullEntityResult["rows"],
+): Promise<PullEntityResult | null> {
+  try {
+    const data = await fetcher();
+    return { entity, rows: toRows(data) };
+  } catch (error) {
+    if (isForbiddenPull(error)) return null;
+    throw error;
+  }
+}
+
 function asFormBorrower(payload: Record<string, unknown>): BorrowerFormValues {
   return {
     name: String(payload.name ?? ""),
@@ -77,44 +99,21 @@ function asFormLoan(payload: Record<string, unknown>): LoanFormValues {
 
 export const restReplayTransport: SyncTransport = {
   async pullAll(): Promise<PullEntityResult[]> {
-    const [
-      borrowers,
-      loans,
-      loanTransactions,
-      interestSchedules,
-      financeTransactions,
-      manualAssets,
-      goldPurchases,
-      goldPlan,
-      assetSettings,
-    ] = await Promise.all([
-      fetchBorrowers(),
-      fetchLoans(),
-      fetchTransactions(),
-      fetchSchedules(),
-      fetchFinanceTransactions(),
-      fetchManualAssets(),
-      fetchGoldPurchases(),
-      fetchGoldPlan(),
-      fetchAssetSettings(),
+    // Fetch independently so one module's 403 (RBAC) does not abort the whole sync
+    // and trigger infinite backoff while the offline queue stays empty.
+    const settled = await Promise.all([
+      pullOptional("borrower", fetchBorrowers, (rows) => rows),
+      pullOptional("loan", fetchLoans, (rows) => rows),
+      pullOptional("loanTransaction", fetchTransactions, (rows) => rows),
+      pullOptional("interestSchedule", fetchSchedules, (rows) => rows),
+      pullOptional("financeTransaction", fetchFinanceTransactions, (rows) => rows),
+      pullOptional("manualAsset", fetchManualAssets, (rows) => rows),
+      pullOptional("goldPurchase", fetchGoldPurchases, (rows) => rows),
+      pullOptional("goldPlan", fetchGoldPlan, (plan) => (plan ? [plan] : [])),
+      pullOptional("assetSettings", fetchAssetSettings, (settings) => [settings]),
     ]);
 
-    const results: PullEntityResult[] = [
-      { entity: "borrower", rows: borrowers },
-      { entity: "loan", rows: loans },
-      { entity: "loanTransaction", rows: loanTransactions },
-      { entity: "interestSchedule", rows: interestSchedules },
-      { entity: "financeTransaction", rows: financeTransactions },
-      { entity: "manualAsset", rows: manualAssets },
-      { entity: "goldPurchase", rows: goldPurchases },
-      { entity: "assetSettings", rows: [assetSettings] },
-    ];
-    if (goldPlan) {
-      results.push({ entity: "goldPlan", rows: [goldPlan] });
-    } else {
-      results.push({ entity: "goldPlan", rows: [] });
-    }
-    return results;
+    return settled.filter((r): r is PullEntityResult => r !== null);
   },
 
   async pushOne(item: SyncQueueItem): Promise<PushResult> {

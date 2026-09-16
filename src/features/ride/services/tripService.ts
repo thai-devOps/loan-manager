@@ -1,91 +1,118 @@
-import {
-  generateBookingCode,
-  normalizeBookingCode,
-  normalizePhone,
-} from "@/features/ride/lib/booking-code";
-import { readTrips, saveTrip } from "@/features/ride/lib/booking-storage";
+import { ApiError } from "@/api/client";
 import type {
   CreateTripInput,
   TripBooking,
+  Vehicle,
 } from "@/features/ride/types/ride";
-import { vehicleService } from "@/features/ride/services/vehicleService";
 
-function createId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+/** Public fetch — no auth redirect on 401. */
+async function publicFetch<T>(
+  path: string,
+  options: Omit<RequestInit, "body"> & { body?: unknown } = {},
+): Promise<T> {
+  const headers = new Headers(options.headers);
+  if (!headers.has("Content-Type") && options.body !== undefined) {
+    headers.set("Content-Type", "application/json");
   }
-  return `trip-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      ...options,
+      headers,
+      body:
+        options.body === undefined
+          ? undefined
+          : typeof options.body === "string"
+            ? options.body
+            : JSON.stringify(options.body),
+    });
+  } catch (error) {
+    throw new ApiError(
+      error instanceof Error ? error.message : "Network request failed",
+      0,
+    );
+  }
+  const data = (await res.json().catch(() => ({}))) as { error?: string } & T;
+  if (!res.ok) {
+    throw new ApiError(data.error ?? "Request failed", res.status);
+  }
+  return data as T;
 }
 
 export const tripService = {
   async createTrip(input: CreateTripInput): Promise<TripBooking> {
-    const vehicle = await vehicleService.getVehicleById(input.vehicleId);
-    if (!vehicle) {
-      throw new Error("Xe không còn khả dụng. Vui lòng chọn xe khác.");
-    }
-    if (vehicle.seats < input.passengers) {
-      throw new Error("Số khách vượt quá số chỗ của xe đã chọn.");
-    }
-
-    const existing = readTrips();
-    const bookingCode = generateBookingCode(
-      existing.map((t) => t.bookingCode),
-    );
-
-    const trip: TripBooking = {
-      id: createId(),
-      bookingCode,
-      serviceType: input.serviceType,
-      pickup: {
-        address: input.pickup.address.trim(),
-        latitude: input.pickup.latitude ?? null,
-        longitude: input.pickup.longitude ?? null,
-      },
-      destination: {
-        address: input.destination.address.trim(),
-        latitude: input.destination.latitude ?? null,
-        longitude: input.destination.longitude ?? null,
-      },
-      pickupDate: input.pickupDate,
-      pickupTime: input.pickupTime,
-      tripType: input.tripType,
-      passengers: input.passengers,
-      vehicleId: input.vehicleId,
-      customer: {
-        name: input.customer.name.trim(),
-        phone: input.customer.phone.trim(),
-      },
-      note: input.note?.trim() || undefined,
-      quotedPrice: null,
-      status: "PENDING",
-      driver: null,
-      createdAt: new Date().toISOString(),
-    };
-
-    return saveTrip(trip);
+    return publicFetch<TripBooking>("/api/ride/bookings", {
+      method: "POST",
+      body: input,
+    });
   },
 
   async getTrip(idOrCode: string): Promise<TripBooking | null> {
-    const trips = readTrips();
-    const code = normalizeBookingCode(idOrCode);
-    return (
-      trips.find((t) => t.id === idOrCode || t.bookingCode === code) ?? null
-    );
+    try {
+      return await publicFetch<TripBooking>(
+        `/api/ride/bookings/lookup?code=${encodeURIComponent(idOrCode)}&phone=0000000000`,
+      );
+    } catch {
+      return null;
+    }
   },
 
   async lookupTrip(params: {
     bookingCode: string;
     phone: string;
   }): Promise<TripBooking | null> {
-    const code = normalizeBookingCode(params.bookingCode);
-    const phone = normalizePhone(params.phone);
-    const trips = readTrips();
-    return (
-      trips.find(
-        (t) =>
-          t.bookingCode === code &&
-          normalizePhone(t.customer.phone) === phone,
-      ) ?? null
-    );
+    try {
+      return await publicFetch<TripBooking>(
+        `/api/ride/bookings/lookup?code=${encodeURIComponent(params.bookingCode)}&phone=${encodeURIComponent(params.phone)}`,
+      );
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
+    }
+  },
+};
+
+export const publicVehicleService = {
+  async getVehicles(): Promise<Vehicle[]> {
+    return publicFetch<Vehicle[]>("/api/ride/vehicles?active=1");
+  },
+
+  async getVehicleById(id: string): Promise<Vehicle | null> {
+    try {
+      return await publicFetch<Vehicle>(`/api/ride/vehicles/${id}`);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
+    }
+  },
+
+  async getSuitableVehicles(params: {
+    passengers: number;
+    serviceType?: string;
+  }): Promise<Vehicle[]> {
+    const list = await publicVehicleService.getVehicles();
+    const tagMap: Record<string, string> = {
+      TRAVEL: "travel",
+      MEDICAL: "medical",
+      PILGRIMAGE: "pilgrimage",
+      AIRPORT: "airport",
+      BUSINESS: "business",
+      CUSTOM: "custom",
+    };
+    const tag = params.serviceType
+      ? tagMap[params.serviceType]
+      : undefined;
+
+    return list
+      .filter((v) => {
+        if (!v.active) return false;
+        if (v.seats < params.passengers) return false;
+        if (!tag || tag === "custom") return true;
+        if (v.suitableFor.includes(tag as Vehicle["suitableFor"][number]))
+          return true;
+        if (tag === "travel" && v.suitableFor.includes("family")) return true;
+        return false;
+      })
+      .sort((a, b) => a.seats - b.seats);
   },
 };

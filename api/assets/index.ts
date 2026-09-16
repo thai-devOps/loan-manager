@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
-import { requireAuth } from "../_lib/auth.js";
+import { PERMISSIONS } from "../_lib/access/catalog.js";
+import { requirePermission } from "../_lib/auth.js";
 import {
   buildAllocation,
   calculateAvailableCash,
@@ -535,7 +536,15 @@ function validatePlanBody(
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
-    if (!(await requireAuth(req, res))) return;
+    const assetPerm =
+      req.method === "GET"
+        ? PERMISSIONS.ASSET_ASSET_VIEW
+        : req.method === "POST"
+          ? PERMISSIONS.ASSET_ASSET_CREATE
+          : req.method === "DELETE"
+            ? PERMISSIONS.ASSET_ASSET_DELETE
+            : PERMISSIONS.ASSET_ASSET_UPDATE;
+    if (!(await requirePermission(req, res, assetPerm))) return;
     const resource = resourceOf(req);
 
     // ─── SUMMARY ───────────────────────────────────────────

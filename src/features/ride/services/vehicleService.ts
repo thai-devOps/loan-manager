@@ -1,25 +1,31 @@
-import { MOCK_VEHICLES } from "@/features/ride/data/mock-vehicles";
 import type {
   ServiceType,
-  SuitableFor,
   Vehicle,
 } from "@/features/ride/types/ride";
+import { publicVehicleService } from "@/features/ride/services/tripService";
+import { MOCK_VEHICLES } from "@/features/ride/data/mock-vehicles";
 
-const SERVICE_TO_SUITABLE: Record<ServiceType, SuitableFor> = {
-  TRAVEL: "travel",
-  MEDICAL: "medical",
-  PILGRIMAGE: "pilgrimage",
-  AIRPORT: "airport",
-  BUSINESS: "business",
-  CUSTOM: "custom",
-};
-
+/**
+ * Customer-facing vehicle reads — prefer API, fall back to mock for offline/dev.
+ */
 export const vehicleService = {
   async getVehicles(): Promise<Vehicle[]> {
+    try {
+      const list = await publicVehicleService.getVehicles();
+      if (list.length > 0) return list;
+    } catch {
+      /* fall through */
+    }
     return MOCK_VEHICLES.filter((v) => v.active);
   },
 
   async getVehicleById(id: string): Promise<Vehicle | null> {
+    try {
+      const v = await publicVehicleService.getVehicleById(id);
+      if (v) return v;
+    } catch {
+      /* fall through */
+    }
     return MOCK_VEHICLES.find((v) => v.id === id && v.active) ?? null;
   },
 
@@ -27,18 +33,16 @@ export const vehicleService = {
     passengers: number;
     serviceType?: ServiceType;
   }): Promise<Vehicle[]> {
-    const tag = params.serviceType
-      ? SERVICE_TO_SUITABLE[params.serviceType]
-      : undefined;
-
+    try {
+      const list = await publicVehicleService.getSuitableVehicles(params);
+      if (list.length > 0) return list;
+    } catch {
+      /* fall through */
+    }
     return MOCK_VEHICLES.filter((v) => {
       if (!v.active) return false;
       if (v.seats < params.passengers) return false;
-      // CUSTOM / no serviceType: any vehicle that fits seats
-      if (!tag || tag === "custom") return true;
-      if (v.suitableFor.includes(tag)) return true;
-      if (tag === "travel" && v.suitableFor.includes("family")) return true;
-      return false;
+      return true;
     }).sort((a, b) => a.seats - b.seats);
   },
 };

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth } from "../_lib/auth.js";
+import { PERMISSIONS } from "../_lib/access/catalog.js";
+import { requireAnyPermission } from "../_lib/auth.js";
 import { methodNotAllowed, withHandler } from "../_lib/http.js";
 import {
   borrowersCol,
@@ -10,7 +11,14 @@ import {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
-    if (!(await requireAuth(req, res))) return;
+    if (
+      !(await requireAnyPermission(req, res, [
+        PERMISSIONS.LOAN_DASHBOARD_VIEW,
+        PERMISSIONS.REPORT_LOAN_VIEW,
+      ]))
+    ) {
+      return;
+    }
     if (req.method !== "GET") {
       methodNotAllowed(res, ["GET"]);
       return;

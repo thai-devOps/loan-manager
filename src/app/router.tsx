@@ -3,6 +3,10 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { RequireAuth } from "@/features/auth/require-auth";
 import { LoginPage } from "@/features/auth/login-page";
+import {
+  ModuleRoute,
+  PermissionRoute,
+} from "@/features/auth/permission-route";
 import { AppsHubPage } from "@/features/apps/apps-hub-page";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { BorrowersPage } from "@/features/borrowers/borrowers-page";
@@ -40,6 +44,23 @@ import { RideBookingSuccessPage } from "@/features/ride/pages/ride-booking-succe
 import { RideMyBookingPage } from "@/features/ride/pages/ride-my-booking-page";
 import { RidePricingPage } from "@/features/ride/pages/ride-pricing-page";
 import { RideContactPage } from "@/features/ride/pages/ride-contact-page";
+import { RideAdminLayout } from "@/features/ride-admin/components/ride-admin-layout";
+import { RideAdminDashboardPage } from "@/features/ride-admin/pages/dashboard-page";
+import { RideAdminBookingsPage } from "@/features/ride-admin/pages/bookings-page";
+import { RideAdminBookingDetailPage } from "@/features/ride-admin/pages/booking-detail-page";
+import { RideAdminVehiclesPage } from "@/features/ride-admin/pages/vehicles-page";
+import { RideAdminVehicleDetailPage } from "@/features/ride-admin/pages/vehicle-detail-page";
+import { RideAdminDriversPage } from "@/features/ride-admin/pages/drivers-page";
+import { RideAdminDriverDetailPage } from "@/features/ride-admin/pages/driver-detail-page";
+import { RideAdminComingSoonPage } from "@/features/ride-admin/pages/coming-soon-page";
+import { AccessControlLayout } from "@/features/access-control/components/access-control-layout";
+import { UsersPage } from "@/features/access-control/pages/users-page";
+import { UserDetailPage } from "@/features/access-control/pages/user-detail-page";
+import { RolesPage } from "@/features/access-control/pages/roles-page";
+import { RoleDetailPage } from "@/features/access-control/pages/role-detail-page";
+import { AccessMatrixPage } from "@/features/access-control/pages/access-matrix-page";
+import { AuditLogsPage } from "@/features/access-control/pages/audit-logs-page";
+import { PERMISSIONS } from "@/config/permissions";
 
 export const router = createBrowserRouter([
   {
@@ -67,24 +88,224 @@ export const router = createBrowserRouter([
     element: <RequireAuth />,
     children: [
       {
+        path: "admin",
+        children: [
+          {
+            element: <AuthenticatedShell />,
+            children: [
+              {
+                element: (
+                  <PermissionRoute
+                    anyOf={[
+                      PERMISSIONS.USER_VIEW,
+                      PERMISSIONS.ROLE_VIEW,
+                      PERMISSIONS.SETTINGS_VIEW,
+                    ]}
+                  />
+                ),
+                children: [
+                  {
+                    element: <AccessControlLayout />,
+                    children: [
+                      {
+                        path: "users",
+                        element: (
+                          <PermissionRoute permission={PERMISSIONS.USER_VIEW} />
+                        ),
+                        children: [
+                          { index: true, element: <UsersPage /> },
+                          { path: ":id", element: <UserDetailPage /> },
+                        ],
+                      },
+                      {
+                        path: "roles",
+                        element: (
+                          <PermissionRoute permission={PERMISSIONS.ROLE_VIEW} />
+                        ),
+                        children: [
+                          { index: true, element: <RolesPage /> },
+                          { path: ":id", element: <RoleDetailPage /> },
+                        ],
+                      },
+                      {
+                        path: "access-control",
+                        element: (
+                          <PermissionRoute permission={PERMISSIONS.ROLE_VIEW}>
+                            <AccessMatrixPage />
+                          </PermissionRoute>
+                        ),
+                      },
+                      {
+                        path: "audit-logs",
+                        element: (
+                          <PermissionRoute
+                            permission={PERMISSIONS.SETTINGS_VIEW}
+                          >
+                            <AuditLogsPage />
+                          </PermissionRoute>
+                        ),
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            element: <ModuleRoute module="fleet" />,
+            children: [
+              {
+                element: <RideAdminLayout />,
+                children: [
+                  {
+                    index: true,
+                    element: <Navigate to="/admin/dashboard" replace />,
+                  },
+                  {
+                    path: "dashboard",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_DASHBOARD_VIEW}
+                      >
+                        <RideAdminDashboardPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "bookings",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_BOOKING_VIEW}
+                      >
+                        <RideAdminBookingsPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "bookings/:id",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_BOOKING_VIEW}
+                      >
+                        <RideAdminBookingDetailPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "vehicles",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_VEHICLE_VIEW}
+                      >
+                        <RideAdminVehiclesPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "vehicles/:id",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_VEHICLE_VIEW}
+                      >
+                        <RideAdminVehicleDetailPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "drivers",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_DRIVER_VIEW}
+                      >
+                        <RideAdminDriversPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "drivers/:id",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_DRIVER_VIEW}
+                      >
+                        <RideAdminDriverDetailPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "trips",
+                    element: (
+                      <RideAdminComingSoonPage title="Chuyến xe" />
+                    ),
+                  },
+                  {
+                    path: "customers",
+                    element: (
+                      <RideAdminComingSoonPage title="Khách hàng" />
+                    ),
+                  },
+                  {
+                    path: "pricing",
+                    element: (
+                      <RideAdminComingSoonPage title="Bảng giá" />
+                    ),
+                  },
+                  {
+                    path: "expenses",
+                    element: <RideAdminComingSoonPage title="Chi phí" />,
+                  },
+                  {
+                    path: "revenue",
+                    element: (
+                      <RideAdminComingSoonPage title="Doanh thu" />
+                    ),
+                  },
+                  {
+                    path: "reports",
+                    element: (
+                      <RideAdminComingSoonPage title="Báo cáo" />
+                    ),
+                  },
+                  {
+                    path: "settings",
+                    element: (
+                      <RideAdminComingSoonPage title="Cài đặt vận hành" />
+                    ),
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
         element: <AuthenticatedShell />,
         children: [
-          // Keep AppLayout mounted across /apps ↔ modules so chrome doesn't remount
           {
             element: <AppLayout />,
             children: [
               { path: "apps", element: <AppsHubPage /> },
               {
-                element: <LoansLayout />,
+                element: <ModuleRoute module="loan" />,
                 children: [
-                  { index: true, element: <DashboardPage /> },
-                  { path: "borrowers", element: <BorrowersPage /> },
-                  { path: "borrowers/:id", element: <BorrowerDetailPage /> },
-                  { path: "loans", element: <LoansPage /> },
-                  { path: "loans/:id", element: <LoanDetailPage /> },
-                  { path: "payments", element: <PaymentsPage /> },
-                  { path: "schedules", element: <SchedulesPage /> },
-                  { path: "transactions", element: <TransactionsPage /> },
+                  {
+                    element: <LoansLayout />,
+                    children: [
+                      { index: true, element: <DashboardPage /> },
+                      { path: "borrowers", element: <BorrowersPage /> },
+                      {
+                        path: "borrowers/:id",
+                        element: <BorrowerDetailPage />,
+                      },
+                      { path: "loans", element: <LoansPage /> },
+                      { path: "loans/:id", element: <LoanDetailPage /> },
+                      { path: "payments", element: <PaymentsPage /> },
+                      { path: "schedules", element: <SchedulesPage /> },
+                      {
+                        path: "transactions",
+                        element: <TransactionsPage />,
+                      },
+                    ],
+                  },
                 ],
               },
               {
@@ -92,34 +313,98 @@ export const router = createBrowserRouter([
                 element: <ProfileLayout />,
                 children: [
                   { index: true, element: <ProfilePage /> },
-                  { path: "settings", element: <SettingsPage /> },
+                  {
+                    path: "settings",
+                    element: (
+                      <PermissionRoute permission={PERMISSIONS.SETTINGS_VIEW}>
+                        <SettingsPage />
+                      </PermissionRoute>
+                    ),
+                  },
                   { path: "sync", element: <SyncMonitorPage /> },
                 ],
               },
               {
                 path: "finance",
-                element: <FinanceLayout />,
+                element: <ModuleRoute module="finance" />,
                 children: [
-                  { index: true, element: <FinanceOverviewPage /> },
-                  { path: "income", element: <FinanceIncomePage /> },
-                  { path: "expenses", element: <FinanceExpensesPage /> },
-                  { path: "transactions", element: <FinanceTransactionsPage /> },
+                  {
+                    element: <FinanceLayout />,
+                    children: [
+                      { index: true, element: <FinanceOverviewPage /> },
+                      { path: "income", element: <FinanceIncomePage /> },
+                      {
+                        path: "expenses",
+                        element: <FinanceExpensesPage />,
+                      },
+                      {
+                        path: "transactions",
+                        element: <FinanceTransactionsPage />,
+                      },
+                    ],
+                  },
                 ],
               },
               {
                 path: "assets",
-                element: <AssetsLayout />,
+                element: <ModuleRoute module="asset" />,
                 children: [
-                  { index: true, element: <AssetsOverviewPage /> },
-                  { path: "holdings", element: <AssetsHoldingsPage /> },
-                  { path: "allocation", element: <AssetsAllocationPage /> },
-                  { path: "gold", element: <AssetsGoldPage /> },
-                  { path: "gold-plan", element: <AssetsGoldPlanPage /> },
+                  {
+                    element: <AssetsLayout />,
+                    children: [
+                      { index: true, element: <AssetsOverviewPage /> },
+                      {
+                        path: "holdings",
+                        element: <AssetsHoldingsPage />,
+                      },
+                      {
+                        path: "allocation",
+                        element: <AssetsAllocationPage />,
+                      },
+                      {
+                        path: "gold",
+                        element: (
+                          <ModuleRoute module="gold">
+                            <AssetsGoldPage />
+                          </ModuleRoute>
+                        ),
+                      },
+                      {
+                        path: "gold-plan",
+                        element: (
+                          <ModuleRoute module="gold">
+                            <AssetsGoldPlanPage />
+                          </ModuleRoute>
+                        ),
+                      },
+                    ],
+                  },
                 ],
               },
-              { path: "reports", element: <ReportsPage /> },
-              { path: "settings/sync", element: <Navigate to="/profile/sync" replace /> },
-              { path: "settings", element: <Navigate to="/profile/settings" replace /> },
+              {
+                path: "reports",
+                element: <ModuleRoute module="report" />,
+                children: [
+                  {
+                    index: true,
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.REPORT_LOAN_VIEW}
+                      >
+                        <ReportsPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                ],
+              },
+              {
+                path: "settings/sync",
+                element: <Navigate to="/profile/sync" replace />,
+              },
+              {
+                path: "settings",
+                element: <Navigate to="/profile/settings" replace />,
+              },
             ],
           },
         ],

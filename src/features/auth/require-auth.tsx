@@ -12,6 +12,8 @@ export function RequireAuth() {
   const hydrate = useAuthStore((s) => s.hydrate);
   const touch = useAuthStore((s) => s.touch);
   const prepareLocalDb = useAuthStore((s) => s.prepareLocalDb);
+  const loadMe = useAuthStore((s) => s.loadMe);
+  const meLoaded = useAuthStore((s) => s.meLoaded);
   const initialSyncReady = useSyncStore((s) => s.initialSyncReady);
   const lastTouchRef = useRef(0);
 
@@ -21,8 +23,13 @@ export function RequireAuth() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    void loadMe();
+  }, [isAuthenticated, loadMe]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !meLoaded) return;
     void prepareLocalDb();
-  }, [isAuthenticated, prepareLocalDb]);
+  }, [isAuthenticated, meLoaded, prepareLocalDb]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -52,7 +59,7 @@ export function RequireAuth() {
     );
   }
 
-  if (!initialSyncReady) {
+  if (!meLoaded || !initialSyncReady) {
     return <InitialSyncPage />;
   }
 

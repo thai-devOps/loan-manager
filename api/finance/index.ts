@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
-import { requireAuth } from "../_lib/auth.js";
+import { PERMISSIONS } from "../_lib/access/catalog.js";
+import { requirePermission } from "../_lib/auth.js";
 import { methodNotAllowed, readJsonBody, withHandler } from "../_lib/http.js";
 import { financeTransactionsCol, stripDoc } from "../_lib/mongo.js";
 import type {
@@ -84,10 +85,10 @@ function validateBody(body: {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
-    if (!(await requireAuth(req, res))) return;
     const col = await financeTransactionsCol();
 
     if (req.method === "GET") {
+      if (!(await requirePermission(req, res, PERMISSIONS.FINANCE_TRANSACTION_VIEW))) return;
       const month =
         typeof req.query.month === "string" ? req.query.month : undefined;
       const from =
@@ -116,6 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === "POST") {
+      if (!(await requirePermission(req, res, PERMISSIONS.FINANCE_TRANSACTION_CREATE))) return;
       const body = readJsonBody<{
         type?: string;
         category?: string;
@@ -141,6 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === "PATCH") {
+      if (!(await requirePermission(req, res, PERMISSIONS.FINANCE_TRANSACTION_UPDATE))) return;
       const id = typeof req.query.id === "string" ? req.query.id : "";
       if (!id) {
         res.status(400).json({ error: "Missing id" });
@@ -175,6 +178,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === "DELETE") {
+      if (!(await requirePermission(req, res, PERMISSIONS.FINANCE_TRANSACTION_DELETE))) return;
       const id = typeof req.query.id === "string" ? req.query.id : "";
       if (!id) {
         res.status(400).json({ error: "Missing id" });

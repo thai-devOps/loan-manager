@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
-import { requireAuth } from "../_lib/auth.js";
+import { PERMISSIONS } from "../_lib/access/catalog.js";
+import { requireAnyPermission, requirePermission } from "../_lib/auth.js";
 import {
   generateInterestSchedules,
 } from "../_lib/calculations.js";
@@ -16,10 +17,17 @@ import type { Loan, Transaction } from "../_lib/types.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
-    if (!(await requireAuth(req, res))) return;
     const loans = await loansCol();
 
     if (req.method === "GET") {
+      if (
+        !(await requireAnyPermission(req, res, [
+          PERMISSIONS.LOAN_LOAN_VIEW,
+          PERMISSIONS.REPORT_LOAN_VIEW,
+        ]))
+      ) {
+        return;
+      }
       const status =
         typeof req.query.status === "string" ? req.query.status : undefined;
       const filter =
@@ -30,6 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === "POST") {
+      if (!(await requirePermission(req, res, PERMISSIONS.LOAN_LOAN_CREATE))) return;
       const body = readJsonBody<{
         borrowerId?: string;
         principalAmount?: number;

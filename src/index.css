@@ -150,6 +150,66 @@
   }
 
   .login-page {
-    --font-login-display: "Be Vietnam Pro", system-ui, sans-serif;
+    --font-login-display: "Outfit", "Be Vietnam Pro", system-ui, sans-serif;
+  }
+
+  @keyframes login-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes login-hero-ken {
+    from {
+      transform: scale(1.06);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes login-soft-pulse {
+    0%,
+    100% {
+      opacity: 0.45;
+    }
+    50% {
+      opacity: 0.75;
+    }
+  }
+
+  .login-animate-fade-up {
+    animation: login-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .login-animate-fade-up-delay {
+    animation: login-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+  }
+
+  .login-animate-fade-up-delay-2 {
+    animation: login-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
+  }
+
+  .login-hero-image {
+    animation: login-hero-ken 18s ease-out both;
+  }
+
+  .login-ambient {
+    animation: login-soft-pulse 8s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .login-animate-fade-up,
+    .login-animate-fade-up-delay,
+    .login-animate-fade-up-delay-2,
+    .login-hero-image,
+    .login-ambient {
+      animation: none;
+    }
   }
 }

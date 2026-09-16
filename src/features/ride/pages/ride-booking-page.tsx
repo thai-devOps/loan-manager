@@ -148,6 +148,14 @@ export function RideBookingPage() {
         customer: { name: data.customerName, phone: data.customerPhone },
         note: data.note,
       });
+      try {
+        sessionStorage.setItem(
+          "ride.lastBooking",
+          JSON.stringify(trip),
+        );
+      } catch {
+        /* ignore */
+      }
       void navigate(`/ride/booking/success?code=${encodeURIComponent(trip.bookingCode)}`, {
         state: { trip },
       });

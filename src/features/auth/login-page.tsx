@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { ArrowRight, LockKeyhole } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { AppLogo } from "@/components/common/app-logo";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import {
   loginSchema,
   type LoginFormValues,
 } from "@/schemas/login.schema";
-import { APP_NAME } from "@/lib/brand";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
+import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 
 function resolvePostLoginPath(from?: string): string {
@@ -27,8 +28,10 @@ export function LoginPage() {
   const location = useLocation();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const login = useAuthStore((s) => s.login);
+  const formErrorId = useId();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -45,7 +48,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const result = await login(values.username, values.password);
-      if (!result.ok) {
+      if (result.ok === false) {
         setError(result.message);
         return;
       }
@@ -57,36 +60,39 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login-page grid min-h-full lg:grid-cols-2">
+    <div className="login-page grid min-h-full lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
       <section className="relative hidden overflow-hidden lg:block">
         <img
           src="/login-hero.jpg"
           alt=""
-          className="absolute inset-0 size-full object-cover"
+          className="login-hero-image absolute inset-0 size-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0b3d3a]/92 via-[#0b3d3a]/45 to-[#0b3d3a]/20" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(45_166_154_/_0.35),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[#071a1f]/55" />
+        <div className="absolute inset-0 bg-linear-to-t from-[#041216] via-[#041216]/55 to-transparent" />
+        <div
+          aria-hidden
+          className="login-ambient absolute -top-24 right-[-10%] size-112 rounded-full bg-teal-400/25 blur-3xl"
+        />
 
         <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
-          <div className="flex items-center gap-3">
-            <AppLogo size="lg" className="rounded-2xl ring-white/20" />
-            <p className="font-[family-name:var(--font-login-display)] text-lg font-semibold tracking-wide text-teal-50">
+          <div className="login-animate-fade-up">
+            <AppLogo
+              size="lg"
+              className="rounded-2xl ring-1 ring-white/25 shadow-none"
+            />
+          </div>
+
+          <div className="login-animate-fade-up-delay max-w-lg space-y-5">
+            <h1 className="font-(family-name:--font-login-display) text-5xl leading-[1.05] font-semibold tracking-tight text-balance text-white xl:text-6xl">
               {APP_NAME}
-            </p>
-          </div>
-
-          <div className="max-w-md space-y-4">
-            <h1 className="font-[family-name:var(--font-login-display)] text-4xl leading-tight font-semibold text-balance text-teal-50 xl:text-5xl">
-              Quản lý tài chính rõ ràng, mỗi module một không gian
             </h1>
-            <p className="max-w-sm text-base leading-relaxed text-teal-50/75">
-              Theo dõi người vay, dư nợ và lịch thu trong một không gian gọn
-              nhẹ dành cho quản trị viên.
+            <p className="max-w-md text-base leading-relaxed text-white/70 xl:text-lg">
+              {APP_TAGLINE}
             </p>
           </div>
 
-          <p className="text-xs tracking-wide text-teal-50/55">
-            Bảo mật phiên đăng nhập · Chỉ dành cho admin
+          <p className="login-animate-fade-up-delay-2 text-xs tracking-wide text-white/45">
+            Phiên đăng nhập được bảo vệ · Phân quyền theo vai trò
           </p>
         </div>
       </section>
@@ -95,38 +101,51 @@ export function LoginPage() {
         <div className="absolute top-4 right-4 z-10 sm:top-6 sm:right-6">
           <ThemeToggle />
         </div>
+
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-[0.15]"
+          className="pointer-events-none absolute inset-0 opacity-[0.4] dark:opacity-[0.18]"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 1px 1px, rgb(15 118 110 / 0.18) 1px, transparent 0)",
-            backgroundSize: "22px 22px",
+              "radial-gradient(circle at 1px 1px, rgb(15 118 110 / 0.14) 1px, transparent 0)",
+            backgroundSize: "24px 24px",
           }}
         />
-        <div className="pointer-events-none absolute -top-24 right-[-4rem] size-72 rounded-full bg-teal-200/40 blur-3xl dark:bg-teal-500/15" />
-        <div className="pointer-events-none absolute bottom-[-5rem] left-[-3rem] size-80 rounded-full bg-emerald-100/70 blur-3xl dark:bg-emerald-500/10" />
+        <div
+          aria-hidden
+          className="login-ambient pointer-events-none absolute -top-28 -right-20 size-80 rounded-full bg-teal-200/35 blur-3xl dark:bg-teal-500/12"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-24 -left-16 size-96 rounded-full bg-slate-300/40 blur-3xl dark:bg-slate-500/10"
+        />
 
-        <div className="relative w-full max-w-[24rem]">
-          <div className="mb-8 space-y-3 lg:mb-10">
-            <div className="mb-2 flex items-center gap-3 lg:hidden">
-              <AppLogo size="lg" className="rounded-2xl" />
-              <p className="font-[family-name:var(--font-login-display)] text-lg font-semibold text-foreground">
-                {APP_NAME}
-              </p>
+        <div className="relative w-full max-w-90">
+          <div className="login-animate-fade-up mb-9 space-y-4 lg:mb-10">
+            <div className="flex items-center gap-3 lg:hidden">
+              <AppLogo size="lg" className="rounded-2xl shadow-none" />
+              <div>
+                <p className="font-(family-name:--font-login-display) text-xl font-semibold tracking-tight text-foreground">
+                  {APP_NAME}
+                </p>
+                <p className="text-xs text-muted-foreground">Workspace</p>
+              </div>
             </div>
 
-            <h2 className="font-[family-name:var(--font-login-display)] text-3xl font-semibold tracking-tight text-foreground">
-              Đăng nhập
-            </h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Nhập tài khoản quản trị để tiếp tục làm việc.
-            </p>
+            <div className="space-y-2">
+              <h2 className="font-(family-name:--font-login-display) text-[1.75rem] leading-tight font-semibold tracking-tight text-foreground sm:text-3xl">
+                Chào mừng trở lại
+              </h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Đăng nhập để mở không gian làm việc của bạn.
+              </p>
+            </div>
           </div>
 
           <form
-            className="space-y-5"
+            className="login-animate-fade-up-delay space-y-5"
             onSubmit={form.handleSubmit(onSubmit)}
+            noValidate
           >
             <div className="space-y-2">
               <Label htmlFor="username">Tên đăng nhập</Label>
@@ -134,7 +153,12 @@ export function LoginPage() {
                 id="username"
                 autoComplete="username"
                 autoFocus
-                className="h-11"
+                inputMode="text"
+                spellCheck={false}
+                disabled={submitting}
+                className="h-11 rounded-xl bg-background/80"
+                placeholder="Nhập tên đăng nhập"
+                aria-invalid={!!form.formState.errors.username}
                 {...form.register("username")}
               />
               {form.formState.errors.username && (
@@ -146,13 +170,38 @@ export function LoginPage() {
 
             <div className="space-y-2">
               <Label htmlFor="password">Mật khẩu</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                className="h-11"
-                {...form.register("password")}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  disabled={submitting}
+                  className="h-11 rounded-xl bg-background/80 pr-11"
+                  placeholder="Nhập mật khẩu"
+                  aria-invalid={!!form.formState.errors.password}
+                  aria-describedby={error ? formErrorId : undefined}
+                  {...form.register("password")}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  disabled={submitting}
+                  onClick={() => setShowPassword((v) => !v)}
+                  className={cn(
+                    "absolute top-1/2 right-1.5 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors",
+                    "hover:bg-muted hover:text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "disabled:pointer-events-none disabled:opacity-50",
+                  )}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </button>
+              </div>
               {form.formState.errors.password && (
                 <p className="text-xs text-destructive">
                   {form.formState.errors.password.message}
@@ -161,7 +210,12 @@ export function LoginPage() {
             </div>
 
             {error && (
-              <p className="rounded-lg border border-destructive/25 bg-destructive/8 px-3 py-2.5 text-sm text-destructive">
+              <p
+                id={formErrorId}
+                role="alert"
+                aria-live="polite"
+                className="rounded-xl border border-destructive/20 bg-destructive/8 px-3.5 py-2.5 text-sm text-destructive"
+              >
                 {error}
               </p>
             )}
@@ -169,19 +223,22 @@ export function LoginPage() {
             <Button
               type="submit"
               disabled={submitting}
-              className="h-11 w-full gap-2 bg-teal-700 text-teal-50 shadow-none hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-500"
+              className="h-11 w-full rounded-xl bg-teal-800 text-teal-50 shadow-none transition-[background-color,transform] hover:bg-teal-700 active:scale-[0.99] dark:bg-teal-600 dark:hover:bg-teal-500"
             >
               {submitting ? (
-                "Đang đăng nhập..."
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Đang đăng nhập…
+                </span>
               ) : (
-                <>
-                  <LockKeyhole className="size-4" />
-                  Đăng nhập
-                  <ArrowRight className="size-4 opacity-80" />
-                </>
+                "Đăng nhập"
               )}
             </Button>
           </form>
+
+          <p className="login-animate-fade-up-delay-2 mt-8 text-center text-xs leading-relaxed text-muted-foreground">
+            Truy cập theo quyền được cấp · Dữ liệu đồng bộ an toàn
+          </p>
         </div>
       </section>
     </div>

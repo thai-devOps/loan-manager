@@ -4,6 +4,7 @@ const LEGACY_AUTH_STORAGE_KEYS = ["vayly.auth", "loan-manager.auth"];
 export interface AuthSession {
   token: string;
   username: string;
+  userId?: string;
   loggedInAt: string;
   lastActiveAt: string;
 }
@@ -76,6 +77,7 @@ export async function loginRequest(
     const data = (await res.json()) as {
       token?: string;
       username?: string;
+      userId?: string;
       error?: string;
     };
     if (!res.ok || !data.token || !data.username) {
@@ -88,6 +90,7 @@ export async function loginRequest(
     const session: AuthSession = {
       token: data.token,
       username: data.username,
+      userId: data.userId,
       loggedInAt: now,
       lastActiveAt: now,
     };

@@ -2,6 +2,8 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LayoutGrid, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
+  canAccessFeature,
+  filterNavItems,
   getFeatureFromPath,
   type AppFeature,
   type NavItem,
@@ -23,9 +25,13 @@ export function SidebarNav({
   collapsed = false,
   onNavigate,
 }: SidebarNavProps) {
+  const hasModuleAccess = useAuthStore((s) => s.hasModuleAccess);
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const visible = filterNavItems(items, { hasModuleAccess, hasPermission });
+
   return (
     <nav className="flex flex-col gap-1 p-2">
-      {items.map((item) => {
+      {visible.map((item) => {
         const Icon = item.icon;
         return (
           <NavLink
@@ -158,8 +164,15 @@ export function DesktopSidebar() {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const location = useLocation();
   const feature = getFeatureFromPath(location.pathname);
+  const hasModuleAccess = useAuthStore((s) => s.hasModuleAccess);
+  const hasAnyPermission = useAuthStore((s) => s.hasAnyPermission);
 
   if (!feature) return null;
+  if (
+    !canAccessFeature(feature, { hasModuleAccess, hasAnyPermission })
+  ) {
+    return null;
+  }
 
   return (
     <aside

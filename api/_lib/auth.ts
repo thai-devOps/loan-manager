@@ -1,7 +1,27 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { SignJWT, jwtVerify } from "jose";
+import {
+  getEffectivePermissions,
+  hasPermission as checkPermission,
+  hasAnyPermission as checkAnyPermission,
+} from "./access/permissions-resolve.js";
+import type { AppUser } from "./access/types.js";
+import { usersCol } from "./mongo.js";
+
+export { getAdminCredentials } from "./auth-credentials.js";
 
 const SESSION_TTL = "8h";
+
+export interface AuthSession {
+  userId: string;
+  username: string;
+}
+
+export interface AuthContext extends AuthSession {
+  user: AppUser;
+  roleCodes: string[];
+  permissions: string[];
+}
 
 function getJwtSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET;
@@ -11,20 +31,13 @@ function getJwtSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-export function getAdminCredentials(): {
+export async function signToken(input: {
+  userId: string;
   username: string;
-  password: string;
-} | null {
-  const username = (process.env.ADMIN_USERNAME ?? "").trim();
-  const password = (process.env.ADMIN_PASSWORD ?? "").trim();
-  if (!username || !password) return null;
-  return { username, password };
-}
-
-export async function signToken(username: string): Promise<string> {
-  return new SignJWT({ username })
+}): Promise<string> {
+  return new SignJWT({ username: input.username })
     .setProtectedHeader({ alg: "HS256" })
-    .setSubject(username)
+    .setSubject(input.userId)
     .setIssuedAt()
     .setExpirationTime(SESSION_TTL)
     .sign(getJwtSecret());
@@ -32,17 +45,29 @@ export async function signToken(username: string): Promise<string> {
 
 export async function verifyToken(
   token: string,
-): Promise<{ username: string } | null> {
+): Promise<AuthSession | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
+    const userId =
+      typeof payload.sub === "string" && payload.sub.length > 0
+        ? payload.sub
+        : null;
     const username =
       typeof payload.username === "string"
         ? payload.username
-        : typeof payload.sub === "string"
-          ? payload.sub
-          : null;
-    if (!username) return null;
-    return { username };
+        : null;
+    // Reject legacy tokens that only had username as sub (no userId)
+    if (!userId || !username || userId === username) {
+      // Allow if sub looks like uuid (contains hyphens) even when equal check...
+      // Legacy signToken set sub=username. New tokens set sub=userId (uuid).
+      if (!userId || !username) return null;
+      const looksLikeUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          userId,
+        );
+      if (!looksLikeUuid) return null;
+    }
+    return { userId, username };
   } catch {
     return null;
   }
@@ -51,7 +76,7 @@ export async function verifyToken(
 export async function requireAuth(
   req: VercelRequest,
   res: VercelResponse,
-): Promise<{ username: string } | null> {
+): Promise<AuthContext | null> {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     res.status(401).json({ error: "Unauthorized" });
@@ -63,5 +88,48 @@ export async function requireAuth(
     res.status(401).json({ error: "Unauthorized" });
     return null;
   }
-  return session;
+
+  const col = await usersCol();
+  const user = await col.findOne({ id: session.userId });
+  if (!user || user.status !== "ACTIVE") {
+    res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+
+  const { roleCodes, permissions } = await getEffectivePermissions(user);
+  return {
+    userId: user.id,
+    username: user.username,
+    user,
+    roleCodes,
+    permissions,
+  };
+}
+
+export async function requirePermission(
+  req: VercelRequest,
+  res: VercelResponse,
+  permission: string | string[],
+): Promise<AuthContext | null> {
+  const ctx = await requireAuth(req, res);
+  if (!ctx) return null;
+  if (!checkPermission(ctx.permissions, ctx.roleCodes, permission)) {
+    res.status(403).json({ error: "Forbidden" });
+    return null;
+  }
+  return ctx;
+}
+
+export async function requireAnyPermission(
+  req: VercelRequest,
+  res: VercelResponse,
+  permissions: string[],
+): Promise<AuthContext | null> {
+  const ctx = await requireAuth(req, res);
+  if (!ctx) return null;
+  if (!checkAnyPermission(ctx.permissions, ctx.roleCodes, permissions)) {
+    res.status(403).json({ error: "Forbidden" });
+    return null;
+  }
+  return ctx;
 }

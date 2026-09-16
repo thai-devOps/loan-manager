@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
-import { requireAuth } from "../../_lib/auth.js";
+import { PERMISSIONS } from "../../_lib/access/catalog.js";
+import { requirePermission } from "../../_lib/auth.js";
 import {
   applyInterestPaymentToSchedules,
   getRemainingPrincipal,
@@ -27,7 +28,7 @@ type PaymentBody = {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
-    if (!(await requireAuth(req, res))) return;
+    if (!(await requirePermission(req, res, req.method === "GET" ? PERMISSIONS.LOAN_PAYMENT_VIEW : PERMISSIONS.LOAN_PAYMENT_CREATE))) return;
     if (req.method !== "POST") {
       methodNotAllowed(res, ["POST"]);
       return;

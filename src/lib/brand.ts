@@ -8,4 +8,4 @@ export const APP_MARK = "Mo";
 export const APP_LOGO_SRC = "/logo.png";
 
 export const APP_TAGLINE =
-  "Không gian quản lý tài chính cá nhân — cho vay, thu chi, tài sản";
+  "Không gian làm việc thống nhất — cho vay, thu chi, tài sản, vận hành và phân quyền";

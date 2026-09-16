@@ -51,6 +51,52 @@ const routes: Route[] = [
     load: () => import("../api/auth/login.ts"),
   },
   {
+    method: "GET",
+    pattern: /^\/api\/auth\/me\/?$/,
+    load: () => import("../api/auth/me.ts"),
+  },
+  {
+    pattern: /^\/api\/users\/?$/,
+    load: () => import("../api/users/index.ts"),
+  },
+  {
+    pattern: /^\/api\/users\/([^/]+)\/roles\/?$/,
+    load: () => import("../api/users/[id]/roles.ts"),
+    params: (m) => ({ id: m[1] }),
+  },
+  {
+    pattern: /^\/api\/users\/([^/]+)\/reset-password\/?$/,
+    load: () => import("../api/users/[id]/reset-password.ts"),
+    params: (m) => ({ id: m[1] }),
+  },
+  {
+    pattern: /^\/api\/users\/([^/]+)\/?$/,
+    load: () => import("../api/users/[id].ts"),
+    params: (m) => ({ id: m[1] }),
+  },
+  {
+    pattern: /^\/api\/roles\/?$/,
+    load: () => import("../api/roles/index.ts"),
+  },
+  {
+    pattern: /^\/api\/roles\/([^/]+)\/permissions\/?$/,
+    load: () => import("../api/roles/[id]/permissions.ts"),
+    params: (m) => ({ id: m[1] }),
+  },
+  {
+    pattern: /^\/api\/roles\/([^/]+)\/?$/,
+    load: () => import("../api/roles/[id].ts"),
+    params: (m) => ({ id: m[1] }),
+  },
+  {
+    pattern: /^\/api\/permissions\/?$/,
+    load: () => import("../api/permissions/index.ts"),
+  },
+  {
+    pattern: /^\/api\/audit-logs\/?$/,
+    load: () => import("../api/audit-logs/index.ts"),
+  },
+  {
     pattern: /^\/api\/borrowers\/?$/,
     load: () => import("../api/borrowers/index.ts"),
   },
@@ -97,6 +143,41 @@ const routes: Route[] = [
     pattern: /^\/api\/admin\/([^/]+)\/?$/,
     load: () => import("../api/admin/[action].ts"),
     params: (m) => ({ action: m[1] }),
+  },
+  {
+    pattern: /^\/api\/ride\/dashboard\/?$/,
+    load: () => import("../api/ride/dashboard.ts"),
+  },
+  {
+    pattern: /^\/api\/ride\/bookings\/lookup\/?$/,
+    load: () => import("../api/ride/bookings/lookup.ts"),
+  },
+  {
+    pattern: /^\/api\/ride\/bookings\/?$/,
+    load: () => import("../api/ride/bookings/index.ts"),
+  },
+  {
+    pattern: /^\/api\/ride\/bookings\/([^/]+)\/?$/,
+    load: () => import("../api/ride/bookings/[id].ts"),
+    params: (m) => ({ id: m[1] }),
+  },
+  {
+    pattern: /^\/api\/ride\/vehicles\/?$/,
+    load: () => import("../api/ride/vehicles/index.ts"),
+  },
+  {
+    pattern: /^\/api\/ride\/vehicles\/([^/]+)\/?$/,
+    load: () => import("../api/ride/vehicles/[id].ts"),
+    params: (m) => ({ id: m[1] }),
+  },
+  {
+    pattern: /^\/api\/ride\/drivers\/?$/,
+    load: () => import("../api/ride/drivers/index.ts"),
+  },
+  {
+    pattern: /^\/api\/ride\/drivers\/([^/]+)\/?$/,
+    load: () => import("../api/ride/drivers/[id].ts"),
+    params: (m) => ({ id: m[1] }),
   },
 ];
 
