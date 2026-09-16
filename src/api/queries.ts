@@ -1,75 +1,113 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  fetchAssetAllocation,
-  fetchAssetSettings,
-  fetchAssetSnapshots,
-  fetchAssetSummary,
-  fetchBorrower,
-  fetchBorrowers,
-  fetchFinanceTransactions,
-  fetchGoldPlan,
-  fetchGoldPurchases,
-  fetchLoanDetail,
-  fetchLoans,
-  fetchManualAssets,
-  fetchSchedules,
-  fetchStats,
-  fetchTransactions,
-  syncSchedules,
-} from "@/api/endpoints";
+import { fetchAssetSnapshots, syncSchedules } from "@/api/endpoints";
 import { queryKeys } from "@/api/query-keys";
+import { assetRepository } from "@/db/repositories/assetRepository";
+import { borrowerRepository } from "@/db/repositories/borrowerRepository";
+import { financeRepository } from "@/db/repositories/financeRepository";
+import { loanRepository } from "@/db/repositories/loanRepository";
+import { isDbOpen } from "@/db/database";
+import { useSyncStore } from "@/stores/sync.store";
+import { resolveScheduleStatus } from "@/lib/calculations";
+
+function useLocalDbReady(): boolean {
+  return useSyncStore((s) => s.dbReady);
+}
 
 export function useBorrowersQuery() {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.borrowers.all,
-    queryFn: fetchBorrowers,
+    queryFn: () => borrowerRepository.list(),
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useBorrowerQuery(id: string) {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.borrowers.detail(id),
-    queryFn: () => fetchBorrower(id),
-    enabled: Boolean(id),
+    queryFn: async () => {
+      const row = await borrowerRepository.get(id);
+      if (!row) throw new Error("Không tìm thấy người vay");
+      return row;
+    },
+    enabled: Boolean(id) && dbReady && isDbOpen(),
   });
 }
 
 export function useLoansQuery(status?: string) {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.loans.all(status),
-    queryFn: () => fetchLoans(status),
+    queryFn: () => loanRepository.list(status),
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useLoanDetailQuery(id: string) {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.loans.detail(id),
-    queryFn: () => fetchLoanDetail(id),
-    enabled: Boolean(id),
+    queryFn: async () => {
+      const detail = await loanRepository.getDetail(id);
+      if (!detail) throw new Error("Không tìm thấy khoản vay");
+      return detail;
+    },
+    enabled: Boolean(id) && dbReady && isDbOpen(),
   });
 }
 
 export function useTransactionsQuery() {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.transactions.all,
-    queryFn: () => fetchTransactions(),
+    queryFn: () => loanRepository.listTransactions(),
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useSchedulesQuery(status?: string) {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.schedules.all(status),
     queryFn: async () => {
-      await syncSchedules().catch(() => undefined);
-      return fetchSchedules(status);
+      // Best-effort server schedule horizon extension when online
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        await syncSchedules().catch(() => undefined);
+      }
+      let rows = await loanRepository.listSchedules();
+      rows = rows.map((s) => ({
+        ...s,
+        status: resolveScheduleStatus(s),
+      }));
+      if (status && status !== "ALL") {
+        rows = rows.filter((s) => s.status === status);
+      }
+      return rows;
     },
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useStatsQuery() {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.stats.all,
-    queryFn: fetchStats,
+    queryFn: async () => {
+      const [borrowers, loans, transactions, schedules] = await Promise.all([
+        borrowerRepository.list(),
+        loanRepository.list(),
+        loanRepository.listTransactions(),
+        loanRepository.listSchedules(),
+      ]);
+      return {
+        borrowers: borrowers.length,
+        loans: loans.length,
+        transactions: transactions.length,
+        schedules: schedules.length,
+      };
+    },
+    enabled: dbReady && isDbOpen(),
   });
 }
 
@@ -78,6 +116,7 @@ export function useFinanceTransactionsQuery(params?: {
   from?: string;
   to?: string;
 }) {
+  const dbReady = useLocalDbReady();
   const key = params?.month
     ? queryKeys.finance.month(params.month)
     : params?.from && params?.to
@@ -85,55 +124,71 @@ export function useFinanceTransactionsQuery(params?: {
       : queryKeys.finance.all;
   return useQuery({
     queryKey: key,
-    queryFn: () => fetchFinanceTransactions(params),
+    queryFn: () => financeRepository.list(params),
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useAssetSummaryQuery() {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.assets.summary,
-    queryFn: fetchAssetSummary,
+    queryFn: () => assetRepository.getSummary(),
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useAssetAllocationQuery() {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.assets.allocation,
-    queryFn: fetchAssetAllocation,
+    queryFn: () => assetRepository.getAllocation(),
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useManualAssetsQuery() {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.assets.list,
-    queryFn: fetchManualAssets,
+    queryFn: () => assetRepository.listManual(),
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useGoldPurchasesQuery() {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.assets.goldPurchases,
-    queryFn: fetchGoldPurchases,
+    queryFn: () => assetRepository.listGoldPurchases(),
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useGoldPlanQuery() {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.assets.goldPlan,
-    queryFn: fetchGoldPlan,
+    queryFn: () => assetRepository.getGoldPlan(),
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useAssetSettingsQuery() {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.assets.settings,
-    queryFn: fetchAssetSettings,
+    queryFn: () => assetRepository.getSettings(),
+    enabled: dbReady && isDbOpen(),
   });
 }
 
 export function useAssetSnapshotsQuery(months = 12) {
+  const dbReady = useLocalDbReady();
   return useQuery({
     queryKey: queryKeys.assets.snapshots(months),
+    // Snapshots remain server-derived for now (not stored in Dexie)
     queryFn: () => fetchAssetSnapshots(months),
+    enabled: dbReady,
   });
 }

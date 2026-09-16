@@ -19,5 +19,5 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["vite.config.ts", "plugins/**/*.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "plugins/**/*.ts"]
 }

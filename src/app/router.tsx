@@ -15,6 +15,9 @@ import { SchedulesPage } from "@/features/payments/schedules-page";
 import { TransactionsPage } from "@/features/transactions/transactions-page";
 import { ReportsPage } from "@/features/reports/reports-page";
 import { SettingsPage } from "@/features/settings/settings-page";
+import { SyncMonitorPage } from "@/features/sync/sync-monitor-page";
+import { ProfileLayout } from "@/features/profile/profile-layout";
+import { ProfilePage } from "@/features/profile/profile-page";
 import { FinanceLayout } from "@/features/finance/finance-layout";
 import { FinanceOverviewPage } from "@/features/finance/finance-overview-page";
 import { FinanceIncomePage } from "@/features/finance/finance-income-page";
@@ -54,7 +57,15 @@ export const router = createBrowserRouter([
                   { path: "payments", element: <PaymentsPage /> },
                   { path: "schedules", element: <SchedulesPage /> },
                   { path: "transactions", element: <TransactionsPage /> },
+                ],
+              },
+              {
+                path: "profile",
+                element: <ProfileLayout />,
+                children: [
+                  { index: true, element: <ProfilePage /> },
                   { path: "settings", element: <SettingsPage /> },
+                  { path: "sync", element: <SyncMonitorPage /> },
                 ],
               },
               {
@@ -79,6 +90,8 @@ export const router = createBrowserRouter([
                 ],
               },
               { path: "reports", element: <ReportsPage /> },
+              { path: "settings/sync", element: <Navigate to="/profile/sync" replace /> },
+              { path: "settings", element: <Navigate to="/profile/settings" replace /> },
             ],
           },
         ],

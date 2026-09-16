@@ -1,26 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  cancelLoan as apiCancelLoan,
-  createBorrower as apiCreateBorrower,
-  createFinanceTransaction,
-  createGoldPurchase,
-  createLoan as apiCreateLoan,
-  createManualAsset,
-  deleteFinanceTransaction,
-  deleteGoldPurchase,
-  deleteManualAsset,
   importBackup,
-  recordPayment,
   resetDatabase,
   seedDemo,
-  updateAssetSettings,
-  updateBorrower as apiUpdateBorrower,
-  updateFinanceTransaction,
-  updateGoldPurchase,
-  updateManualAsset,
-  upsertGoldPlan,
 } from "@/api/endpoints";
 import { queryKeys } from "@/api/query-keys";
+import { assetRepository } from "@/db/repositories/assetRepository";
+import { borrowerRepository } from "@/db/repositories/borrowerRepository";
+import { financeRepository } from "@/db/repositories/financeRepository";
+import { loanRepository } from "@/db/repositories/loanRepository";
+import { requestSync } from "@/sync/syncManager";
 import type { BorrowerFormValues } from "@/schemas/borrower.schema";
 import type { LoanFormValues } from "@/schemas/loan.schema";
 import type { FinanceTransaction } from "@/types/finance";
@@ -40,13 +29,16 @@ function useInvalidateAllData() {
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all }),
       queryClient.invalidateQueries({ queryKey: ["schedules"] }),
       queryClient.invalidateQueries({ queryKey: queryKeys.stats.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all }),
     ]);
 }
 
 export function useCreateBorrowerMutation() {
   const invalidate = useInvalidateAllData();
   return useMutation({
-    mutationFn: (values: BorrowerFormValues) => apiCreateBorrower(values),
+    mutationFn: (values: BorrowerFormValues) =>
+      borrowerRepository.create(values),
     onSuccess: () => invalidate(),
   });
 }
@@ -60,7 +52,7 @@ export function useUpdateBorrowerMutation() {
     }: {
       id: string;
       values: BorrowerFormValues;
-    }) => apiUpdateBorrower(id, values),
+    }) => borrowerRepository.update(id, values),
     onSuccess: (_data, variables) =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.borrowers.all }),
@@ -75,7 +67,7 @@ export function useUpdateBorrowerMutation() {
 export function useCreateLoanMutation() {
   const invalidate = useInvalidateAllData();
   return useMutation({
-    mutationFn: (values: LoanFormValues) => apiCreateLoan(values),
+    mutationFn: (values: LoanFormValues) => loanRepository.create(values),
     onSuccess: () => invalidate(),
   });
 }
@@ -84,7 +76,7 @@ export function useCancelLoanMutation() {
   const queryClient = useQueryClient();
   const invalidate = useInvalidateAllData();
   return useMutation({
-    mutationFn: (loanId: string) => apiCancelLoan(loanId),
+    mutationFn: (loanId: string) => loanRepository.cancel(loanId),
     onSuccess: (_data, loanId) => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.loans.detail(loanId),
@@ -106,10 +98,7 @@ export function useRecordPaymentMutation() {
       principalAmount?: number;
       transactionDate: string;
       note?: string;
-    }) => {
-      const { loanId, ...body } = params;
-      return recordPayment(loanId, body);
-    },
+    }) => loanRepository.recordPayment(params),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.loans.detail(variables.loanId),
@@ -123,7 +112,10 @@ export function useSeedDemoMutation() {
   const invalidate = useInvalidateAllData();
   return useMutation({
     mutationFn: (force?: boolean) => seedDemo(force ?? false),
-    onSuccess: () => invalidate(),
+    onSuccess: async () => {
+      requestSync();
+      await invalidate();
+    },
   });
 }
 
@@ -132,12 +124,14 @@ export function useResetDatabaseMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => resetDatabase(),
-    onSuccess: () =>
-      Promise.all([
+    onSuccess: async () => {
+      requestSync();
+      await Promise.all([
         invalidate(),
         queryClient.invalidateQueries({ queryKey: queryKeys.finance.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all }),
-      ]),
+      ]);
+    },
   });
 }
 
@@ -145,7 +139,10 @@ export function useImportBackupMutation() {
   const invalidate = useInvalidateAllData();
   return useMutation({
     mutationFn: (payload: unknown) => importBackup(payload),
-    onSuccess: () => invalidate(),
+    onSuccess: async () => {
+      requestSync();
+      await invalidate();
+    },
   });
 }
 
@@ -160,7 +157,7 @@ export function useCreateFinanceTransactionMutation() {
   return useMutation({
     mutationFn: (
       body: Omit<FinanceTransaction, "id" | "createdAt" | "updatedAt">,
-    ) => createFinanceTransaction(body),
+    ) => financeRepository.create(body),
     onSuccess: () => invalidate(),
   });
 }
@@ -174,7 +171,7 @@ export function useUpdateFinanceTransactionMutation() {
     }: {
       id: string;
       values: Omit<FinanceTransaction, "id" | "createdAt" | "updatedAt">;
-    }) => updateFinanceTransaction(id, values),
+    }) => financeRepository.update(id, values),
     onSuccess: () => invalidate(),
   });
 }
@@ -182,7 +179,7 @@ export function useUpdateFinanceTransactionMutation() {
 export function useDeleteFinanceTransactionMutation() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: (id: string) => deleteFinanceTransaction(id),
+    mutationFn: (id: string) => financeRepository.remove(id),
     onSuccess: () => invalidate(),
   });
 }
@@ -197,7 +194,7 @@ export function useCreateManualAssetMutation() {
   const invalidate = useInvalidateAssets();
   return useMutation({
     mutationFn: (body: Omit<ManualAsset, "id" | "createdAt" | "updatedAt">) =>
-      createManualAsset(body),
+      assetRepository.createManual(body),
     onSuccess: () => invalidate(),
   });
 }
@@ -211,7 +208,7 @@ export function useUpdateManualAssetMutation() {
     }: {
       id: string;
       values: Omit<ManualAsset, "id" | "createdAt" | "updatedAt">;
-    }) => updateManualAsset(id, values),
+    }) => assetRepository.updateManual(id, values),
     onSuccess: () => invalidate(),
   });
 }
@@ -219,7 +216,7 @@ export function useUpdateManualAssetMutation() {
 export function useDeleteManualAssetMutation() {
   const invalidate = useInvalidateAssets();
   return useMutation({
-    mutationFn: (id: string) => deleteManualAsset(id),
+    mutationFn: (id: string) => assetRepository.removeManual(id),
     onSuccess: () => invalidate(),
   });
 }
@@ -228,7 +225,7 @@ export function useCreateGoldPurchaseMutation() {
   const invalidate = useInvalidateAssets();
   return useMutation({
     mutationFn: (body: Omit<GoldPurchase, "id" | "createdAt" | "updatedAt">) =>
-      createGoldPurchase(body),
+      assetRepository.createGoldPurchase(body),
     onSuccess: () => invalidate(),
   });
 }
@@ -242,7 +239,7 @@ export function useUpdateGoldPurchaseMutation() {
     }: {
       id: string;
       values: Omit<GoldPurchase, "id" | "createdAt" | "updatedAt">;
-    }) => updateGoldPurchase(id, values),
+    }) => assetRepository.updateGoldPurchase(id, values),
     onSuccess: () => invalidate(),
   });
 }
@@ -250,7 +247,7 @@ export function useUpdateGoldPurchaseMutation() {
 export function useDeleteGoldPurchaseMutation() {
   const invalidate = useInvalidateAssets();
   return useMutation({
-    mutationFn: (id: string) => deleteGoldPurchase(id),
+    mutationFn: (id: string) => assetRepository.removeGoldPurchase(id),
     onSuccess: () => invalidate(),
   });
 }
@@ -262,7 +259,7 @@ export function useUpsertGoldPlanMutation() {
       body: Omit<GoldPlan, "id" | "createdAt" | "updatedAt"> & {
         budgetEffectiveFrom?: string;
       },
-    ) => upsertGoldPlan(body),
+    ) => assetRepository.upsertGoldPlan(body),
     onSuccess: () => invalidate(),
   });
 }
@@ -275,7 +272,7 @@ export function useUpdateAssetSettingsMutation() {
         AssetSettings["goldReferencePricePerChi"]
       >;
       allocationTargets?: AssetSettings["allocationTargets"] | null;
-    }) => updateAssetSettings(body),
+    }) => assetRepository.updateSettings(body),
     onSuccess: () => invalidate(),
   });
 }

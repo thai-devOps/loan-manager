@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
-import { Download, Upload, Database, Sprout } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Download, Upload, Database, Sprout, RefreshCw } from "lucide-react";
 import { DeleteIcon } from "@/components/icons";
 import { AppHeader } from "@/components/layout/app-header";
-import { LoansModuleChrome } from "@/features/loans/loans-layout";
+import { ProfileModuleChrome } from "@/features/profile/profile-layout";
 import { StatsBlockSkeleton } from "@/components/common/loading-skeletons";
 import { PageShell, StatCard } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
@@ -122,7 +123,7 @@ export function SettingsPage() {
           description="Backup, restore và quản lý database MongoDB"
         />
       }
-      subNav={<LoansModuleChrome />}
+      subNav={<ProfileModuleChrome />}
     >
       {(message || error) && (
         <div
@@ -148,6 +149,24 @@ export function SettingsPage() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Theo dõi đồng bộ</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Xem hàng đợi offline, lỗi sync và conflict giữa dữ liệu cục bộ
+              với máy chủ.
+            </p>
+            <Button asChild variant="secondary">
+              <Link to="/profile/sync">
+                <RefreshCw className="size-4" />
+                Mở trang đồng bộ
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Backup dữ liệu</CardTitle>

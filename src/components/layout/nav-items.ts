@@ -8,7 +8,6 @@ import {
   CalendarClock,
   ArrowLeftRight,
   BarChart3,
-  Settings,
   TrendingUp,
   TrendingDown,
   Landmark,
@@ -62,7 +61,6 @@ export const APP_FEATURES: AppFeature[] = [
       { title: "Thu tiền", href: "/payments", icon: HandCoins },
       { title: "Lịch thu", href: "/schedules", icon: CalendarClock },
       { title: "Giao dịch", href: "/transactions", icon: ArrowLeftRight },
-      { title: "Cài đặt", href: "/settings", icon: Settings },
     ],
   },
   {
@@ -116,6 +114,7 @@ export function getFeatureById(id: AppFeatureId): AppFeature {
 
 export function getFeatureFromPath(pathname: string): AppFeature | null {
   if (pathname === "/apps" || pathname.startsWith("/apps/")) return null;
+  if (pathname === "/profile" || pathname.startsWith("/profile/")) return null;
   if (pathname === "/finance" || pathname.startsWith("/finance/")) {
     return getFeatureById("finance");
   }

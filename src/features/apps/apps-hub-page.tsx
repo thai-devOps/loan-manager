@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, LogOut } from "lucide-react";
+import { ArrowRight, LogOut, UserRound } from "lucide-react";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { AppLogo } from "@/components/common/app-logo";
 import { APP_FEATURES, type AppFeatureId } from "@/components/layout/nav-items";
@@ -79,6 +79,15 @@ export function AppsHubPage() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <ThemeToggle />
+          <Button variant="outline" size="icon" asChild>
+            <Link
+              to="/profile"
+              aria-label="Tài khoản"
+              title={username ? `Tài khoản · ${username}` : "Tài khoản"}
+            >
+              <UserRound className="size-4" />
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" onClick={handleLogout}>
             <LogOut className="size-4" />
             <span className="hidden sm:inline">Đăng xuất</span>

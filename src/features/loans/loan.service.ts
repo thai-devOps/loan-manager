@@ -1,18 +1,13 @@
-import {
-  cancelLoan as apiCancel,
-  createLoan as apiCreate,
-  recordPayment,
-  syncSchedules,
-} from "@/api/endpoints";
+import { loanRepository } from "@/db/repositories/loanRepository";
 import type { LoanFormValues } from "@/schemas/loan.schema";
 import type { Loan } from "@/types/loan";
 
 export async function createLoan(values: LoanFormValues): Promise<Loan> {
-  return apiCreate(values);
+  return loanRepository.create(values);
 }
 
 export async function cancelLoan(loanId: string): Promise<void> {
-  await apiCancel(loanId);
+  await loanRepository.cancel(loanId);
 }
 
 export async function recordPrincipalPayment(params: {
@@ -21,7 +16,8 @@ export async function recordPrincipalPayment(params: {
   transactionDate: string;
   note?: string;
 }): Promise<void> {
-  await recordPayment(params.loanId, {
+  await loanRepository.recordPayment({
+    loanId: params.loanId,
     paymentType: "PRINCIPAL_PAYMENT",
     amount: params.amount,
     transactionDate: params.transactionDate,
@@ -35,7 +31,8 @@ export async function recordInterestPayment(params: {
   transactionDate: string;
   note?: string;
 }): Promise<void> {
-  await recordPayment(params.loanId, {
+  await loanRepository.recordPayment({
+    loanId: params.loanId,
     paymentType: "INTEREST_PAYMENT",
     amount: params.amount,
     transactionDate: params.transactionDate,
@@ -50,7 +47,8 @@ export async function recordCombinedPayment(params: {
   transactionDate: string;
   note?: string;
 }): Promise<void> {
-  await recordPayment(params.loanId, {
+  await loanRepository.recordPayment({
+    loanId: params.loanId,
     paymentType: "BOTH",
     principalAmount: params.principalAmount,
     interestAmount: params.interestAmount,
@@ -59,6 +57,7 @@ export async function recordCombinedPayment(params: {
   });
 }
 
+/** Schedules are maintained locally; SyncManager pulls server copies when online. */
 export async function syncSchedulesForActiveLoans(): Promise<void> {
-  await syncSchedules();
+  // no-op locally — horizon extension happens via POST /api/schedules in useSchedulesQuery
 }

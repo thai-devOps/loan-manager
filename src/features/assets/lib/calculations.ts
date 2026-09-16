@@ -36,6 +36,64 @@ export function calculateAllocationPercentage(
   return Math.round((part / total) * 1000) / 10;
 }
 
+export function calculateTotalAssets(params: {
+  lentCapital: number;
+  availableCash: number;
+  otherAssets: number;
+  goldValue: number;
+}): number {
+  return (
+    params.lentCapital +
+    params.availableCash +
+    params.otherAssets +
+    params.goldValue
+  );
+}
+
+export function buildAllocation(params: {
+  lentCapital: number;
+  availableCash: number;
+  otherAssets: number;
+  goldValue: number;
+  targets?: AssetAllocation["targets"];
+}): AssetAllocation {
+  const total = calculateTotalAssets(params);
+  return {
+    totalAssets: total,
+    lentCapital: params.lentCapital,
+    availableCash: params.availableCash,
+    otherAssets: params.otherAssets,
+    goldValue: params.goldValue,
+    targets: params.targets ?? null,
+    segments: [
+      {
+        key: "lending" as const,
+        label: "Đang cho vay",
+        amount: params.lentCapital,
+        percent: calculateAllocationPercentage(params.lentCapital, total),
+      },
+      {
+        key: "reserve" as const,
+        label: "Tiền khả dụng",
+        amount: params.availableCash,
+        percent: calculateAllocationPercentage(params.availableCash, total),
+      },
+      {
+        key: "other" as const,
+        label: "Tài sản khác",
+        amount: params.otherAssets,
+        percent: calculateAllocationPercentage(params.otherAssets, total),
+      },
+      {
+        key: "gold" as const,
+        label: "Vàng",
+        amount: params.goldValue,
+        percent: calculateAllocationPercentage(params.goldValue, total),
+      },
+    ].filter((s) => s.amount > 0 || total === 0),
+  };
+}
+
 export function calculateGoldGoalProgress(
   accumulated: number,
   target: number,
