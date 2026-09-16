@@ -25,6 +25,7 @@ import { AssetsOverviewPage } from "@/features/assets/assets-overview-page";
 import { AssetsHoldingsPage } from "@/features/assets/assets-holdings-page";
 import { AssetsAllocationPage } from "@/features/assets/assets-allocation-page";
 import { AssetsGoldPage } from "@/features/assets/assets-gold-page";
+import { AssetsGoldPlanPage } from "@/features/assets/assets-gold-plan-page";
 
 export const router = createBrowserRouter([
   {
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
                   { path: "holdings", element: <AssetsHoldingsPage /> },
                   { path: "allocation", element: <AssetsAllocationPage /> },
                   { path: "gold", element: <AssetsGoldPage /> },
+                  { path: "gold-plan", element: <AssetsGoldPlanPage /> },
                 ],
               },
               { path: "reports", element: <ReportsPage /> },

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Link } from "react-router-dom";
 import { Plus, Settings2 } from "lucide-react";
 import { DeleteIcon, EditIcon } from "@/components/icons";
 import { EmptyState, StatCard } from "@/components/common/status-badges";
@@ -27,19 +28,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveFormFooter,
+  ResponsiveFormShell,
+} from "@/components/ui/responsive-form-shell";
 import { MoneyInput } from "@/features/finance/components/money-input";
 import { GoldPurchaseFormDialog } from "@/features/assets/components/gold-purchase-form-dialog";
-import { GoldPlanFormDialog } from "@/features/assets/components/gold-plan-form-dialog";
-import { GoldPlanCard } from "@/features/assets/components/gold-plan-card";
 import {
   useAssetSummaryQuery,
-  useGoldPlanQuery,
   useGoldPurchasesQuery,
 } from "@/api/queries";
 import {
@@ -47,17 +42,12 @@ import {
   useUpdateAssetSettingsMutation,
 } from "@/api/mutations";
 import { formatCurrency } from "@/lib/currency";
-import { formatDate } from "@/lib/date";
+import { formatDateOnly } from "@/lib/date";
 import { currentMonthKey } from "@/features/finance/lib/calculations";
 import {
   calculateAllocationPercentage,
-  calculateGoldGoalProgress,
   monthQuantityPhan,
   monthSpend,
-  normalizeGoldPlan,
-  planAccumulatedPhan,
-  planHasQuantityTarget,
-  listPlanMonths,
 } from "@/features/assets/lib/calculations";
 import { createGoldPriceService } from "@/features/assets/lib/gold-price-service";
 import {
@@ -71,23 +61,34 @@ import type { GoldPurchase } from "@/types/assets";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { z } from "zod";
 
+function recentCalendarMonths(count: number): string[] {
+  const months: string[] = [];
+  const [y0, m0] = currentMonthKey().split("-").map(Number);
+  let y = y0!;
+  let m = m0!;
+  for (let i = 0; i < count; i++) {
+    months.unshift(`${y}-${String(m).padStart(2, "0")}`);
+    m -= 1;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    }
+  }
+  return months;
+}
+
 export function AssetsGoldPage() {
   const summaryQ = useAssetSummaryQuery();
   const purchasesQ = useGoldPurchasesQuery();
-  const planQ = useGoldPlanQuery();
   const deleteM = useDeleteGoldPurchaseMutation();
 
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [editing, setEditing] = useState<GoldPurchase | null>(null);
   const [deleting, setDeleting] = useState<GoldPurchase | null>(null);
-  const [planOpen, setPlanOpen] = useState(false);
   const [pricesOpen, setPricesOpen] = useState(false);
 
   const purchases = purchasesQ.data ?? EMPTY_ARRAY;
   const summary = summaryQ.data;
-  const planRaw = planQ.data ?? summary?.plan ?? null;
-  const plan = planRaw ? normalizeGoldPlan(planRaw) : null;
-  const month = currentMonthKey();
 
   const holdings = useMemo(() => {
     if (!summary) return [];
@@ -137,28 +138,21 @@ export function AssetsGoldPage() {
     summary.goldValue,
     summary.totalAssets,
   );
-  const planProgress =
-    plan && planHasQuantityTarget(plan)
-      ? calculateGoldGoalProgress(
-          planAccumulatedPhan(plan, purchases),
-          plan.targetQuantityInPhan!,
-        )
-      : plan
-        ? calculateGoldGoalProgress(summary.goldCost, plan.targetAmount)
-        : null;
-
-  const recentMonths = plan ? listPlanMonths(plan).slice(-6) : [];
+  const recentMonths = recentCalendarMonths(6);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Tích lũy vàng</h2>
+          <h2 className="text-lg font-semibold">Giao dịch vàng</h2>
           <p className="text-sm text-muted-foreground">
-            Theo dõi lượng vàng đang sở hữu và kế hoạch mua vàng hàng tháng
+            Theo dõi lượng vàng đang sở hữu và các lần mua vàng
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link to="/assets/gold-plan">Kế hoạch vàng</Link>
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -247,14 +241,6 @@ export function AssetsGoldPage() {
         </CardContent>
       </Card>
 
-      <GoldPlanCard
-        plan={plan}
-        purchases={purchases}
-        summary={summary}
-        currentMonth={month}
-        onEdit={() => setPlanOpen(true)}
-      />
-
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Giao dịch vàng</CardTitle>
@@ -330,7 +316,7 @@ export function AssetsGoldPage() {
                             </Button>
                           </div>
                         </TableCell>
-                        <TableCell>{formatDate(p.purchaseDate)}</TableCell>
+                        <TableCell>{formatDateOnly(p.purchaseDate)}</TableCell>
                         <TableCell>{GOLD_TYPE_LABELS[p.type]}</TableCell>
                         <TableCell>
                           {formatGoldQuantity(p.quantityInPhan)}
@@ -356,7 +342,7 @@ export function AssetsGoldPage() {
                           {GOLD_TYPE_LABELS[p.type]}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {formatDate(p.purchaseDate)}
+                          {formatDateOnly(p.purchaseDate)}
                         </p>
                       </div>
                       <p className="font-semibold tabular-nums">
@@ -420,40 +406,30 @@ export function AssetsGoldPage() {
               label="Tỷ trọng vàng trong tổng tài sản"
               value={`${goldShare}%`}
             />
-            <AnalyticRow
-              label="Tiến độ kế hoạch"
-              value={
-                planProgress != null
-                  ? `${planProgress}%`
-                  : "Chưa có kế hoạch"
-              }
-            />
           </div>
 
-          {recentMonths.length > 0 && (
-            <div className="space-y-2 border-t pt-4">
-              <p className="text-sm font-medium">Theo tháng gần đây</p>
-              <div className="space-y-2">
-                {recentMonths.map((m) => {
-                  const [y, mo] = m.split("-");
-                  return (
-                    <div
-                      key={m}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                    >
-                      <span className="font-medium">
-                        {mo}/{y}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {formatCurrency(monthSpend(purchases, m))} ·{" "}
-                        {formatGoldQuantity(monthQuantityPhan(purchases, m))}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+          <div className="space-y-2 border-t pt-4">
+            <p className="text-sm font-medium">Theo tháng gần đây</p>
+            <div className="space-y-2">
+              {recentMonths.map((m) => {
+                const [y, mo] = m.split("-");
+                return (
+                  <div
+                    key={m}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+                  >
+                    <span className="font-medium">
+                      {mo}/{y}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {formatCurrency(monthSpend(purchases, m))} ·{" "}
+                      {formatGoldQuantity(monthQuantityPhan(purchases, m))}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 
@@ -464,13 +440,6 @@ export function AssetsGoldPage() {
           if (!open) setEditing(null);
         }}
         editing={editing}
-      />
-
-      <GoldPlanFormDialog
-        open={planOpen}
-        onOpenChange={setPlanOpen}
-        existing={plan}
-        purchases={purchases}
       />
 
       <GoldPricesDialog
@@ -488,8 +457,8 @@ export function AssetsGoldPage() {
             <AlertDialogTitle>Xóa giao dịch mua?</AlertDialogTitle>
             <AlertDialogDescription>
               Xóa giao dịch mua vàng ngày{" "}
-              {deleting ? formatDate(deleting.purchaseDate) : ""}. Khối lượng
-              và giá vốn sẽ được cập nhật lại.
+              {deleting ? formatDateOnly(deleting.purchaseDate) : ""}. Khối
+              lượng và giá vốn sẽ được cập nhật lại.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -538,25 +507,27 @@ function GoldPricesDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Giá tham chiếu hiện tại</DialogTitle>
-        </DialogHeader>
-        <form
-          className="space-y-4"
-          onSubmit={form.handleSubmit(async (values) => {
-            setError(null);
-            try {
-              await update.mutateAsync({
-                goldReferencePricePerChi: values,
-              });
-              onOpenChange(false);
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Không thể lưu");
-            }
-          })}
-        >
+    <ResponsiveFormShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Giá tham chiếu hiện tại"
+      desktopClassName="max-w-md"
+    >
+      <form
+        className="flex min-h-0 flex-1 flex-col"
+        onSubmit={form.handleSubmit(async (values) => {
+          setError(null);
+          try {
+            await update.mutateAsync({
+              goldReferencePricePerChi: values,
+            });
+            onOpenChange(false);
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "Không thể lưu");
+          }
+        })}
+      >
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
           <p className="text-sm text-muted-foreground">
             Dùng để ước tính giá trị vàng. Không phải giá bán đảm bảo.
           </p>
@@ -576,13 +547,13 @@ function GoldPricesDialog({
             </div>
           ))}
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <DialogFooter>
-            <Button type="submit" disabled={update.isPending}>
-              Lưu giá tham chiếu
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+        <ResponsiveFormFooter>
+          <Button type="submit" disabled={update.isPending}>
+            Lưu giá tham chiếu
+          </Button>
+        </ResponsiveFormFooter>
+      </form>
+    </ResponsiveFormShell>
   );
 }

@@ -15,6 +15,7 @@ import {
   PieChart,
   Coins,
   List,
+  CalendarCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -91,7 +92,12 @@ export const APP_FEATURES: AppFeature[] = [
       { title: "Tổng quan", href: "/assets", icon: LayoutDashboard, end: true },
       { title: "Danh mục tài sản", href: "/assets/holdings", icon: List },
       { title: "Phân bổ vốn", href: "/assets/allocation", icon: PieChart },
-      { title: "Tích lũy vàng", href: "/assets/gold", icon: Coins },
+      { title: "Giao dịch vàng", href: "/assets/gold", icon: Coins },
+      {
+        title: "Kế hoạch vàng",
+        href: "/assets/gold-plan",
+        icon: CalendarCheck,
+      },
     ],
   },
   {

@@ -3,6 +3,8 @@ import type { FinanceTransaction } from "@/types/finance";
 
 export type FinanceOutletContext = {
   month: string;
+  from: string;
+  to: string;
   openCreate: (type?: "income" | "expense") => void;
   openEdit: (tx: FinanceTransaction) => void;
 };

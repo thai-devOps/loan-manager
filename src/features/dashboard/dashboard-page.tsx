@@ -523,7 +523,7 @@ function DashboardAssetsWidgets() {
         <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-base">Kế hoạch vàng</CardTitle>
           <Button asChild variant="ghost" size="sm">
-            <Link to="/assets/gold">Xem kế hoạch →</Link>
+            <Link to="/assets/gold-plan">Xem kế hoạch →</Link>
           </Button>
         </CardHeader>
         <CardContent>

@@ -195,7 +195,7 @@ export function AssetsOverviewPage() {
                 description="Tạo kế hoạch để theo dõi ngân sách và tiến độ hàng tháng."
                 action={
                   <Button asChild size="sm">
-                    <Link to="/assets/gold">Tạo kế hoạch</Link>
+                    <Link to="/assets/gold-plan">Tạo kế hoạch</Link>
                   </Button>
                 }
               />
@@ -230,7 +230,7 @@ export function AssetsOverviewPage() {
                   {formatCurrency(s.plan.monthlyBudget)} / tháng
                 </p>
                 <Button asChild variant="outline" size="sm">
-                  <Link to="/assets/gold">
+                  <Link to="/assets/gold-plan">
                     Xem kế hoạch
                     <ArrowRight className="size-4" />
                   </Link>

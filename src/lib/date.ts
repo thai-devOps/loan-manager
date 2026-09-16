@@ -60,6 +60,14 @@ export function formatDate(iso: string): string {
   return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}:${p.second}`;
 }
 
+/** Format date-only for UI (dd/MM/yyyy) — no time component. */
+export function formatDateOnly(iso: string): string {
+  const date = parseDateValue(iso);
+  if (!date) return iso;
+  const p = getVNParts(date, false);
+  return `${p.day}/${p.month}/${p.year}`;
+}
+
 /** Format an ISO date-time string for UI display in Vietnam time. */
 export function formatDateTime(iso: string): string {
   return formatDate(iso);

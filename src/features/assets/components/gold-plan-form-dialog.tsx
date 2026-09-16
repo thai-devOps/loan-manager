@@ -5,12 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveFormFooter,
+  ResponsiveFormShell,
+} from "@/components/ui/responsive-form-shell";
 import { MoneyInput } from "@/features/finance/components/money-input";
 import { MonthPicker } from "@/components/ui/date-picker";
 import {
@@ -61,23 +58,21 @@ export function GoldPlanFormDialog({
     ({ "9999": 0, "18k": 0, other: 0 } satisfies AssetSettings["goldReferencePricePerChi"]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(92vh,880px)] w-[calc(100%-1.5rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:w-[calc(100%-2rem)]">
-        <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12 sm:px-6">
-          <DialogTitle>
-            {existing ? "Sửa kế hoạch" : "Tạo kế hoạch tích lũy vàng"}
-          </DialogTitle>
-        </DialogHeader>
-        {open && (
-          <GoldPlanFormFields
-            existing={existing}
-            purchases={purchases}
-            prices={prices}
-            onDone={() => onOpenChange(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+    <ResponsiveFormShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title={existing ? "Sửa kế hoạch" : "Tạo kế hoạch tích lũy vàng"}
+      desktopClassName="w-[calc(100%-1.5rem)] max-w-3xl sm:w-[calc(100%-2rem)]"
+    >
+      {open && (
+        <GoldPlanFormFields
+          existing={existing}
+          purchases={purchases}
+          prices={prices}
+          onDone={() => onOpenChange(false)}
+        />
+      )}
+    </ResponsiveFormShell>
   );
 }
 
@@ -108,6 +103,14 @@ function GoldPlanFormFields({
     (normalized?.initialQuantityInPhan ?? 0) > 0 ||
     Boolean(normalized?.includeInitialQuantity);
 
+  const latestBudgetFrom =
+    normalized?.budgetHistory
+      ?.slice()
+      .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]
+      ?.effectiveFrom ??
+    normalized?.startMonth ??
+    currentMonthKey();
+
   const form = useForm<GoldPlanFormValues>({
     resolver: zodResolver(goldPlanSchema),
     defaultValues: {
@@ -120,7 +123,7 @@ function GoldPlanFormFields({
       initialUnit: initialForm.unit,
       includeInitialQuantity: normalized?.includeInitialQuantity ?? true,
       monthlyBudget: normalized?.monthlyBudget ?? 2_000_000,
-      budgetEffectiveFrom: currentMonthKey(),
+      budgetEffectiveFrom: latestBudgetFrom,
       plannedPurchaseDay: normalized?.plannedPurchaseDay ?? 25,
       startMonth: normalized?.startMonth ?? currentMonthKey(),
       endMonth:
@@ -421,6 +424,10 @@ function GoldPlanFormFields({
                         })
                       }
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Tháng ngân sách hiện tại bắt đầu có hiệu lực (trong khoảng
+                      Bắt đầu → Kết thúc).
+                    </p>
                   </div>
                 )}
               </div>
@@ -502,9 +509,9 @@ function GoldPlanFormFields({
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                Ngày nhắc chỉ mang tính kế hoạch, không phải khuyến nghị thời
-                điểm mua. Thời gian hoàn thành phụ thuộc vào giá vàng và số
-                lượng mua thực tế.
+                Bắt đầu / Kết thúc là cửa sổ kế hoạch (tháng tính tiến độ). Ngày
+                nhắc chỉ mang tính kế hoạch. Thời gian hoàn thành phụ thuộc vào
+                giá vàng và số lượng mua thực tế.
               </p>
             </section>
           </div>
@@ -517,11 +524,11 @@ function GoldPlanFormFields({
         )}
       </div>
 
-      <DialogFooter className="shrink-0 border-t px-5 py-3 sm:px-6">
+      <ResponsiveFormFooter>
         <Button type="submit" disabled={upsert.isPending}>
           {upsert.isPending ? "Đang lưu..." : "Lưu kế hoạch"}
         </Button>
-      </DialogFooter>
+      </ResponsiveFormFooter>
     </form>
   );
 }

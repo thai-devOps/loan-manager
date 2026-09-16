@@ -1,7 +1,7 @@
 import { format, parseISO, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import type { FinanceTransaction } from "@/types/finance";
 import type { Transaction } from "@/types/transaction";
-import { getPeriodFromISO } from "@/lib/date";
+import { getPeriodFromISO, isoToDateInput } from "@/lib/date";
 
 export function filterByMonth(
   items: FinanceTransaction[],
@@ -34,6 +34,23 @@ export function calculateLoanCollections(
         period === month &&
         (t.type === "INTEREST_PAYMENT" || t.type === "PRINCIPAL_PAYMENT")
       );
+    })
+    .reduce((sum, t) => sum + t.amount, 0);
+}
+
+/** Collections in an inclusive date range (yyyy-MM-dd), using VN calendar date of tx. */
+export function calculateLoanCollectionsInRange(
+  loanTxs: Transaction[],
+  from: string,
+  to: string,
+): number {
+  return loanTxs
+    .filter((t) => {
+      if (t.type !== "INTEREST_PAYMENT" && t.type !== "PRINCIPAL_PAYMENT") {
+        return false;
+      }
+      const day = isoToDateInput(t.transactionDate);
+      return day >= from && day <= to;
     })
     .reduce((sum, t) => sum + t.amount, 0);
 }

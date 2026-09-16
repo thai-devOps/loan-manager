@@ -105,6 +105,17 @@ export const goldPlanSchema = z
         path: ["endMonth"],
       });
     }
+    if (
+      data.budgetEffectiveFrom &&
+      (data.budgetEffectiveFrom < data.startMonth ||
+        data.budgetEffectiveFrom > data.endMonth)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Tháng áp dụng phải nằm trong thời gian kế hoạch",
+        path: ["budgetEffectiveFrom"],
+      });
+    }
     if (data.hasInitialGold) {
       const qty = data.initialQuantity ?? 0;
       if (qty <= 0) {

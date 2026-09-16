@@ -52,19 +52,21 @@ import {
   calculateCategoryTotals,
   calculateExpenseRatio,
   calculateLivingExpenses,
-  calculateLoanCollections,
+  calculateLoanCollectionsInRange,
   calculateMonthlyComparison,
   calculateRemainingCash,
   calculateSavingsRate,
   calculateTotalIncome,
-  filterByMonth,
   groupCashFlowByMonth,
   monthRangeKeys,
   monthDateBounds,
-  previousMonthKey,
 } from "@/features/finance/lib/calculations";
+import {
+  formatDateRangeLabel,
+  previousEquivalentRange,
+} from "@/features/finance/lib/date-range";
 import { formatCurrency } from "@/lib/currency";
-import { formatDate, formatPeriod } from "@/lib/date";
+import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 function formatPct(value: number | null): string {
@@ -74,7 +76,7 @@ function formatPct(value: number | null): string {
 }
 
 export function FinanceOverviewPage() {
-  const { month } = useFinanceMonth();
+  const { month, from, to, preset } = useFinanceMonth();
   const [chartRange, setChartRange] = useState<"6" | "12" | "year">("6");
 
   const monthCount =
@@ -83,28 +85,43 @@ export function FinanceOverviewPage() {
     () => monthRangeKeys(month, Math.max(monthCount, 1)),
     [month, monthCount],
   );
-  const rangeFrom = `${rangeMonths[0]}-01`;
-  const rangeTo = monthDateBounds(month).to;
+  const chartFrom = `${rangeMonths[0]}-01`;
+  const chartTo = monthDateBounds(month).to;
+  const prevRange = useMemo(
+    () => previousEquivalentRange(from, to),
+    [from, to],
+  );
 
-  const monthFinanceQ = useFinanceTransactionsQuery({ month });
+  const periodFinanceQ = useFinanceTransactionsQuery({ from, to });
+  const prevFinanceQ = useFinanceTransactionsQuery({
+    from: prevRange.from,
+    to: prevRange.to,
+  });
   const rangeFinanceQ = useFinanceTransactionsQuery({
-    from: rangeFrom,
-    to: rangeTo,
+    from: chartFrom,
+    to: chartTo,
   });
   const loanTxQ = useTransactionsQuery();
 
   const isLoading =
-    monthFinanceQ.isLoading || rangeFinanceQ.isLoading || loanTxQ.isLoading;
+    periodFinanceQ.isLoading ||
+    prevFinanceQ.isLoading ||
+    rangeFinanceQ.isLoading ||
+    loanTxQ.isLoading;
   const isError =
-    monthFinanceQ.isError || rangeFinanceQ.isError || loanTxQ.isError;
+    periodFinanceQ.isError ||
+    prevFinanceQ.isError ||
+    rangeFinanceQ.isError ||
+    loanTxQ.isError;
 
-  const monthItems = monthFinanceQ.data ?? EMPTY_ARRAY;
+  const periodItems = periodFinanceQ.data ?? EMPTY_ARRAY;
+  const prevItems = prevFinanceQ.data ?? EMPTY_ARRAY;
   const rangeItems = rangeFinanceQ.data ?? EMPTY_ARRAY;
   const loanTxs = loanTxQ.data ?? EMPTY_ARRAY;
 
-  const income = calculateTotalIncome(monthItems);
-  const expenses = calculateLivingExpenses(monthItems);
-  const loanCollections = calculateLoanCollections(loanTxs, month);
+  const income = calculateTotalIncome(periodItems);
+  const expenses = calculateLivingExpenses(periodItems);
+  const loanCollections = calculateLoanCollectionsInRange(loanTxs, from, to);
   const remaining = calculateRemainingCash({
     income,
     livingExpenses: expenses,
@@ -113,11 +130,13 @@ export function FinanceOverviewPage() {
   const expenseRatio = calculateExpenseRatio(expenses, income);
   const savingsRate = calculateSavingsRate(remaining, income, loanCollections);
 
-  const prevMonth = previousMonthKey(month);
-  const prevItems = filterByMonth(rangeItems, prevMonth);
   const prevIncome = calculateTotalIncome(prevItems);
   const prevExpenses = calculateLivingExpenses(prevItems);
-  const prevLoan = calculateLoanCollections(loanTxs, prevMonth);
+  const prevLoan = calculateLoanCollectionsInRange(
+    loanTxs,
+    prevRange.from,
+    prevRange.to,
+  );
   const prevRemaining = calculateRemainingCash({
     income: prevIncome,
     livingExpenses: prevExpenses,
@@ -135,8 +154,8 @@ export function FinanceOverviewPage() {
     hasPreviousData,
   });
 
-  const expenseCats = calculateCategoryTotals(monthItems, "expense");
-  const incomeCats = calculateCategoryTotals(monthItems, "income");
+  const expenseCats = calculateCategoryTotals(periodItems, "expense");
+  const incomeCats = calculateCategoryTotals(periodItems, "income");
 
   const chartData = useMemo(() => {
     return groupCashFlowByMonth({
@@ -151,11 +170,17 @@ export function FinanceOverviewPage() {
 
   const recent = useMemo(
     () =>
-      [...monthItems]
-        .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+      [...periodItems]
+        .sort(
+          (a, b) =>
+            b.date.localeCompare(a.date) ||
+            b.createdAt.localeCompare(a.createdAt),
+        )
         .slice(0, 5),
-    [monthItems],
+    [periodItems],
   );
+
+  const periodLabel = formatDateRangeLabel(from, to, preset);
 
   if (isError) {
     return (
@@ -166,7 +191,8 @@ export function FinanceOverviewPage() {
           <Button
             variant="outline"
             onClick={() => {
-              void monthFinanceQ.refetch();
+              void periodFinanceQ.refetch();
+              void prevFinanceQ.refetch();
               void rangeFinanceQ.refetch();
               void loanTxQ.refetch();
             }}
@@ -197,7 +223,7 @@ export function FinanceOverviewPage() {
         <StatCard
           title="Tổng thu"
           value={formatCurrency(income)}
-          hint={formatPeriod(month)}
+          hint={periodLabel}
           icon={<ArrowUpRight className="size-4 text-success" />}
         />
         <StatCard
@@ -303,7 +329,7 @@ export function FinanceOverviewPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Phân bổ tháng này</CardTitle>
+            <CardTitle className="text-base">Phân bổ {periodLabel.toLowerCase()}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <Row label="Thu nhập" value={formatCurrency(income)} tone="success" />

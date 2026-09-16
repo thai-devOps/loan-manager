@@ -6,36 +6,63 @@ import { FeatureSubNav } from "@/components/layout/feature-sub-nav";
 import { getFeatureById } from "@/components/layout/nav-items";
 import { PageShell } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
-import { MonthPicker } from "@/components/ui/date-picker";
+import { PeriodFilter } from "@/features/finance/components/period-filter";
 import { TransactionFormDialog } from "@/features/finance/components/transaction-form-dialog";
 import {
   FinanceMonthContext,
   type FinanceMonthContextValue,
 } from "@/features/finance/finance-context";
-import { currentMonthKey } from "@/features/finance/lib/calculations";
-import { todayDateInput } from "@/lib/date";
+import {
+  anchorMonthKey,
+  defaultTransactionDateForRange,
+  resolveDateRangePreset,
+  type DateRangePreset,
+} from "@/features/finance/lib/date-range";
 import type { FinanceTransaction } from "@/types/finance";
 
 export function FinanceLayout() {
   const location = useLocation();
-  const [month, setMonth] = useState(currentMonthKey);
+  const [preset, setPresetState] = useState<DateRangePreset>("this_month");
+  const [range, setRange] = useState(() =>
+    resolveDateRangePreset("this_month"),
+  );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [defaultType, setDefaultType] = useState<"income" | "expense">(
     "expense",
   );
   const [editing, setEditing] = useState<FinanceTransaction | null>(null);
 
+  const setPreset = (next: DateRangePreset) => {
+    setPresetState(next);
+    if (next !== "custom") {
+      setRange(resolveDateRangePreset(next));
+    } else {
+      setRange((prev) => resolveDateRangePreset("custom", prev));
+    }
+  };
+
+  const setCustomRange = (from: string, to: string) => {
+    setPresetState("custom");
+    setRange(resolveDateRangePreset("custom", { from, to }));
+  };
+
+  const month = anchorMonthKey(range.to);
+
   const ctx = useMemo<FinanceMonthContextValue>(
     () => ({
+      preset,
+      from: range.from,
+      to: range.to,
       month,
-      setMonth,
+      setPreset,
+      setCustomRange,
       openCreate: (type = "expense") => {
         setEditing(null);
         setDefaultType(type);
         setDialogOpen(true);
       },
     }),
-    [month],
+    [preset, range.from, range.to, month],
   );
 
   const outletContext = useMemo(
@@ -47,8 +74,10 @@ export function FinanceLayout() {
       },
       openCreate: ctx.openCreate,
       month,
+      from: range.from,
+      to: range.to,
     }),
-    [ctx.openCreate, month],
+    [ctx.openCreate, month, range.from, range.to],
   );
 
   const feature = getFeatureById("finance");
@@ -59,7 +88,7 @@ export function FinanceLayout() {
         header={
           <AppHeader
             title="Tài chính"
-            description="Theo dõi thu chi cá nhân theo tháng"
+            description="Theo dõi thu chi cá nhân theo thời gian"
             actions={
               <Button
                 size="sm"
@@ -75,20 +104,13 @@ export function FinanceLayout() {
         }
         subNav={<FeatureSubNav items={feature.nav} />}
       >
-        <div className="flex items-center justify-end gap-2">
-          <label
-            htmlFor="finance-month"
-            className="text-sm text-muted-foreground"
-          >
-            Tháng
-          </label>
-          <MonthPicker
-            id="finance-month"
-            className="w-[11rem]"
-            value={month}
-            onChange={setMonth}
-          />
-        </div>
+        <PeriodFilter
+          preset={preset}
+          from={range.from}
+          to={range.to}
+          onPresetChange={setPreset}
+          onCustomRangeChange={setCustomRange}
+        />
 
         <Outlet key={location.pathname} context={outletContext} />
 
@@ -100,9 +122,7 @@ export function FinanceLayout() {
           }}
           editing={editing}
           defaultType={defaultType}
-          defaultDate={
-            month === currentMonthKey() ? todayDateInput() : `${month}-01`
-          }
+          defaultDate={defaultTransactionDateForRange(range.from, range.to)}
         />
       </PageShell>
     </FinanceMonthContext.Provider>

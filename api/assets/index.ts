@@ -428,20 +428,63 @@ function validatePlanBody(
       : "active";
 
   const budgetEffectiveFrom = (body.budgetEffectiveFrom ?? "").trim();
-  const effectiveFrom =
-    budgetEffectiveFrom && isValidMonth(budgetEffectiveFrom)
-      ? budgetEffectiveFrom
-      : currentMonthKey();
+  let effectiveFrom: string | null = null;
+  if (budgetEffectiveFrom) {
+    if (!isValidMonth(budgetEffectiveFrom)) {
+      throw new Error("Tháng áp dụng ngân sách không hợp lệ");
+    }
+    if (budgetEffectiveFrom < startMonth || budgetEffectiveFrom > endMonth) {
+      throw new Error(
+        "Tháng áp dụng ngân sách phải nằm trong thời gian kế hoạch",
+      );
+    }
+    effectiveFrom = budgetEffectiveFrom;
+  }
 
   let budgetHistory: GoldPlan["budgetHistory"] = [];
   if (existing) {
-    const prev = normalizeGoldPlan(existing).budgetHistory;
-    budgetHistory = [...prev];
-    if (monthlyBudget !== existing.monthlyBudget) {
+    const prevNormalized = normalizeGoldPlan(existing);
+    budgetHistory = [...prevNormalized.budgetHistory];
+
+    // Keep seed history entry aligned when start month changes
+    if (startMonth !== existing.startMonth) {
+      const oldStart = existing.startMonth;
+      if (budgetHistory.length === 1) {
+        budgetHistory = [
+          { effectiveFrom: startMonth, monthlyBudget: budgetHistory[0]!.monthlyBudget },
+        ];
+      } else {
+        budgetHistory = budgetHistory.map((e) =>
+          e.effectiveFrom === oldStart
+            ? { ...e, effectiveFrom: startMonth }
+            : e,
+        );
+      }
+      // Drop entries that fall before the new plan window
+      budgetHistory = budgetHistory.filter((e) => e.effectiveFrom >= startMonth);
+      if (budgetHistory.length === 0) {
+        budgetHistory = [{ effectiveFrom: startMonth, monthlyBudget }];
+      }
+    }
+
+    // Always upsert when client sends budgetEffectiveFrom (not only on amount change)
+    if (effectiveFrom) {
       const withoutSame = budgetHistory.filter(
         (e) => e.effectiveFrom !== effectiveFrom,
       );
       withoutSame.push({ effectiveFrom, monthlyBudget });
+      withoutSame.sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+      budgetHistory = withoutSame;
+    } else if (monthlyBudget !== existing.monthlyBudget) {
+      const fallbackFrom = currentMonthKey();
+      const applyFrom =
+        fallbackFrom >= startMonth && fallbackFrom <= endMonth
+          ? fallbackFrom
+          : startMonth;
+      const withoutSame = budgetHistory.filter(
+        (e) => e.effectiveFrom !== applyFrom,
+      );
+      withoutSame.push({ effectiveFrom: applyFrom, monthlyBudget });
       withoutSame.sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
       budgetHistory = withoutSame;
     }

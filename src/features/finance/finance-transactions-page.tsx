@@ -51,9 +51,9 @@ import { cn } from "@/lib/utils";
 import type { FinanceTransaction } from "@/types/finance";
 
 export function FinanceTransactionsPage() {
-  const { month } = useFinanceMonth();
+  const { from, to } = useFinanceMonth();
   const { openEdit } = useFinanceOutlet();
-  const q = useFinanceTransactionsQuery({ month });
+  const q = useFinanceTransactionsQuery({ from, to });
   const deleteMutation = useDeleteFinanceTransactionMutation();
 
   const [search, setSearch] = useState("");

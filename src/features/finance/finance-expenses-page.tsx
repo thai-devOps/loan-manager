@@ -12,13 +12,13 @@ import {
   calculateCategoryTotals,
   calculateLivingExpenses,
 } from "@/features/finance/lib/calculations";
+import { formatDateRangeLabel } from "@/features/finance/lib/date-range";
 import { formatCurrency } from "@/lib/currency";
-import { formatPeriod } from "@/lib/date";
 
 export function FinanceExpensesPage() {
-  const { month } = useFinanceMonth();
+  const { from, to, preset } = useFinanceMonth();
   const { openCreate } = useFinanceOutlet();
-  const q = useFinanceTransactionsQuery({ month });
+  const q = useFinanceTransactionsQuery({ from, to });
   const items = (q.data ?? EMPTY_ARRAY).filter((t) => t.type === "expense");
   const total = calculateLivingExpenses(items);
   const cats = calculateCategoryTotals(items, "expense");
@@ -44,7 +44,7 @@ export function FinanceExpensesPage() {
         <StatCard
           title="Tổng chi tiêu"
           value={formatCurrency(total)}
-          hint={formatPeriod(month)}
+          hint={formatDateRangeLabel(from, to, preset)}
         />
         <Button className="gap-1.5" onClick={() => openCreate("expense")}>
           <Plus className="size-4" />
