@@ -74,12 +74,15 @@ export const tripService = {
 
 export const publicVehicleService = {
   async getVehicles(): Promise<Vehicle[]> {
-    return publicFetch<Vehicle[]>("/api/ride/vehicles?active=1");
+    const list = await publicFetch<Vehicle[]>("/api/ride/vehicles?active=1");
+    return list.filter((v) => v.active && v.status === "AVAILABLE");
   },
 
   async getVehicleById(id: string): Promise<Vehicle | null> {
     try {
-      return await publicFetch<Vehicle>(`/api/ride/vehicles/${id}`);
+      const v = await publicFetch<Vehicle>(`/api/ride/vehicles/${id}`);
+      if (!v.active || v.status !== "AVAILABLE") return null;
+      return v;
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) return null;
       throw e;
@@ -105,7 +108,7 @@ export const publicVehicleService = {
 
     return list
       .filter((v) => {
-        if (!v.active) return false;
+        if (!v.active || v.status !== "AVAILABLE") return false;
         if (v.seats < params.passengers) return false;
         if (!tag || tag === "custom") return true;
         if (v.suitableFor.includes(tag as Vehicle["suitableFor"][number]))

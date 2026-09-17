@@ -56,6 +56,10 @@ export async function apiFetch<T>(
     throw new ApiError("Unauthorized", 401);
   }
 
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
   const data = (await res.json().catch(() => ({}))) as {
     error?: string;
   } & T;

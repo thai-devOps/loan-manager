@@ -69,6 +69,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    methodNotAllowed(res, ["GET", "PATCH"]);
+    if (req.method === "DELETE") {
+      if (!(await requirePermission(req, res, PERMISSIONS.FLEET_VEHICLE_DELETE))) return;
+      const result = await col.deleteOne({ id });
+      if (result.deletedCount === 0) {
+        res.status(404).json({ error: "Không tìm thấy xe" });
+        return;
+      }
+      res.status(204).end();
+      return;
+    }
+
+    methodNotAllowed(res, ["GET", "PATCH", "DELETE"]);
   });
 }

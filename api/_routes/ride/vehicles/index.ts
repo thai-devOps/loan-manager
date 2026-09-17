@@ -31,7 +31,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Public list for customer site + auth admin
       await ensureSeed();
       const activeOnly = req.query.active === "1" || req.query.active === "true";
-      const filter = activeOnly ? { active: true } : {};
+      const filter = activeOnly
+        ? { active: true, status: "AVAILABLE" as const }
+        : {};
       const rows = await col.find(filter).sort({ seats: 1, name: 1 }).toArray();
       res.status(200).json(rows.map((r) => stripDoc(r)));
       return;

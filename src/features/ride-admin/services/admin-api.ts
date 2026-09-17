@@ -122,6 +122,9 @@ export const vehicleAdminService = {
   update(id: string, data: Partial<Vehicle>): Promise<Vehicle> {
     return apiFetch(`/api/ride/vehicles/${id}`, { method: "PATCH", body: data });
   },
+  delete(id: string): Promise<void> {
+    return apiFetch(`/api/ride/vehicles/${id}`, { method: "DELETE" });
+  },
 };
 
 export const driverAdminService = {

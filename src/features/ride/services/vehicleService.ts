@@ -16,7 +16,9 @@ export const vehicleService = {
     } catch {
       /* fall through */
     }
-    return MOCK_VEHICLES.filter((v) => v.active);
+    return MOCK_VEHICLES.filter(
+      (v) => v.active && (v.status ?? "AVAILABLE") === "AVAILABLE",
+    );
   },
 
   async getVehicleById(id: string): Promise<Vehicle | null> {
@@ -26,7 +28,11 @@ export const vehicleService = {
     } catch {
       /* fall through */
     }
-    return MOCK_VEHICLES.find((v) => v.id === id && v.active) ?? null;
+    const mock =
+      MOCK_VEHICLES.find((v) => v.id === id && v.active) ?? null;
+    if (!mock) return null;
+    if ((mock.status ?? "AVAILABLE") !== "AVAILABLE") return null;
+    return mock;
   },
 
   async getSuitableVehicles(params: {
@@ -41,6 +47,7 @@ export const vehicleService = {
     }
     return MOCK_VEHICLES.filter((v) => {
       if (!v.active) return false;
+      if ((v.status ?? "AVAILABLE") !== "AVAILABLE") return false;
       if (v.seats < params.passengers) return false;
       return true;
     }).sort((a, b) => a.seats - b.seats);

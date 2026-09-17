@@ -43,6 +43,7 @@ import { RideAdminDashboardPage } from "@/features/ride-admin/pages/dashboard-pa
 import { RideAdminBookingsPage } from "@/features/ride-admin/pages/bookings-page";
 import { RideAdminBookingDetailPage } from "@/features/ride-admin/pages/booking-detail-page";
 import { RideAdminVehiclesPage } from "@/features/ride-admin/pages/vehicles-page";
+import { RideAdminVehicleCreatePage } from "@/features/ride-admin/pages/vehicle-create-page";
 import { RideAdminVehicleDetailPage } from "@/features/ride-admin/pages/vehicle-detail-page";
 import { RideAdminDriversPage } from "@/features/ride-admin/pages/drivers-page";
 import { RideAdminDriverDetailPage } from "@/features/ride-admin/pages/driver-detail-page";
@@ -448,6 +449,16 @@ export const router = createBrowserRouter([
                         permission={PERMISSIONS.FLEET_VEHICLE_VIEW}
                       >
                         <RideAdminVehiclesPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "vehicles/new",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_VEHICLE_CREATE}
+                      >
+                        <RideAdminVehicleCreatePage />
                       </PermissionRoute>
                     ),
                   },
