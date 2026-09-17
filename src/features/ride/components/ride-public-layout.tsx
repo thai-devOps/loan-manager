@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Menu, Phone, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ThemeToggle } from "@/components/common/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -95,6 +96,7 @@ export function RidePublicLayout() {
           </div>
 
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Button asChild size="sm" className="hidden sm:inline-flex bg-teal-800 hover:bg-teal-700">
               <Link to="/ride/booking">Đặt chuyến</Link>
             </Button>
@@ -125,7 +127,7 @@ export function RidePublicLayout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-border bg-muted/40">
+      <footer className="border-t border-border bg-muted/40 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-3">
           <div>
             <p className="font-semibold">{rideBrand.name}</p>
@@ -216,7 +218,7 @@ export function RidePublicLayout() {
       </footer>
 
       {/* Mobile sticky CTA */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur md:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
         <div className="mx-auto flex max-w-lg items-center gap-2">
           {hasHotline() && tel ? (
             <Button variant="outline" size="lg" className="shrink-0 px-3" asChild>
