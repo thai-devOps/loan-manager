@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookingStatusBadge } from "@/features/ride-admin/components/booking-status-badge";
+import { rideAdminQueryKeys } from "@/features/ride-admin/query-keys";
 import {
   bookingAdminService,
   driverAdminService,
@@ -22,10 +24,7 @@ import {
 } from "@/features/ride/lib/labels";
 import type {
   BookingStatus,
-  Driver,
   ServiceType,
-  TripBooking,
-  Vehicle,
 } from "@/features/ride/types/ride";
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
@@ -35,10 +34,6 @@ const SERVICES = Object.keys(SERVICE_TYPE_LABELS) as ServiceType[];
 
 export function RideAdminBookingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [rows, setRows] = useState<TripBooking[] | null>(null);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState(searchParams.get("q") ?? "");
 
   const status = searchParams.get("status") ?? "";
@@ -46,6 +41,41 @@ export function RideAdminBookingsPage() {
   const serviceType = searchParams.get("serviceType") ?? "";
   const vehicleId = searchParams.get("vehicleId") ?? "";
   const driverId = searchParams.get("driverId") ?? "";
+  const qParam = searchParams.get("q") ?? "";
+
+  const filters = {
+    status: status || undefined,
+    q: qParam || undefined,
+    date: date || undefined,
+    serviceType: serviceType || undefined,
+    vehicleId: vehicleId || undefined,
+    driverId: driverId || undefined,
+  };
+
+  const bookingsQ = useQuery({
+    queryKey: rideAdminQueryKeys.bookings(filters),
+    queryFn: () => bookingAdminService.list(filters),
+  });
+
+  const vehiclesQ = useQuery({
+    queryKey: rideAdminQueryKeys.vehicles(),
+    queryFn: () => vehicleAdminService.list(),
+  });
+
+  const driversQ = useQuery({
+    queryKey: rideAdminQueryKeys.drivers(),
+    queryFn: () => driverAdminService.list(),
+  });
+
+  const rows = bookingsQ.data ?? null;
+  const vehicles = vehiclesQ.data ?? [];
+  const drivers = driversQ.data ?? [];
+  const error =
+    bookingsQ.error instanceof ApiError
+      ? bookingsQ.error.message
+      : bookingsQ.isError
+        ? "Không tải booking"
+        : null;
 
   function patchParams(patch: Record<string, string>) {
     const next = new URLSearchParams(searchParams);
@@ -55,40 +85,6 @@ export function RideAdminBookingsPage() {
     }
     setSearchParams(next);
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setError(null);
-      try {
-        const [list, veh, drv] = await Promise.all([
-          bookingAdminService.list({
-            status: status || undefined,
-            q: searchParams.get("q") || undefined,
-            date: date || undefined,
-            serviceType: serviceType || undefined,
-            vehicleId: vehicleId || undefined,
-            driverId: driverId || undefined,
-          }),
-          vehicleAdminService.list(),
-          driverAdminService.list(),
-        ]);
-        if (!cancelled) {
-          setRows(list);
-          setVehicles(veh);
-          setDrivers(drv);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof ApiError ? e.message : "Không tải booking");
-          setRows([]);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [status, date, serviceType, vehicleId, driverId, searchParams]);
 
   function vehicleName(id: string) {
     return vehicles.find((v) => v.id === id)?.name ?? "—";
@@ -198,17 +194,16 @@ export function RideAdminBookingsPage() {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      {/* Mobile cards */}
       <div className="space-y-3 lg:hidden">
-        {rows === null
+        {bookingsQ.isLoading
           ? Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-28 rounded-xl" />
             ))
-          : rows.length === 0
+          : rows && rows.length === 0
             ? (
               <p className="text-sm text-muted-foreground">Không có booking.</p>
             )
-            : rows.map((b) => (
+            : (rows ?? []).map((b) => (
                 <Link
                   key={b.id}
                   to={`/admin/bookings/${b.id}`}
@@ -231,7 +226,6 @@ export function RideAdminBookingsPage() {
               ))}
       </div>
 
-      {/* Desktop table */}
       <div className="hidden overflow-x-auto rounded-2xl border border-border lg:block">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
@@ -249,13 +243,13 @@ export function RideAdminBookingsPage() {
             </tr>
           </thead>
           <tbody>
-            {rows === null ? (
+            {bookingsQ.isLoading ? (
               <tr>
                 <td colSpan={10} className="px-3 py-6">
                   <Skeleton className="h-8 w-full" />
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : !rows || rows.length === 0 ? (
               <tr>
                 <td
                   colSpan={10}

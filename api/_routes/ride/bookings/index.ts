@@ -192,6 +192,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
 
       await col.insertOne(booking);
+
+      try {
+        const { publishRealtimeEvent } = await import(
+          "../../../_lib/realtime/ably.js"
+        );
+        const { RIDE_ADMIN_CHANNEL } = await import(
+          "../../../../shared/ride/realtime.js"
+        );
+        await publishRealtimeEvent({
+          channel: RIDE_ADMIN_CHANNEL,
+          event: "booking.created",
+          data: {
+            bookingId: booking.id,
+            bookingCode: booking.bookingCode,
+            createdAt: booking.createdAt,
+          },
+        });
+      } catch (error) {
+        console.error("[Realtime] Failed to publish booking.created", error);
+      }
+
       res.status(201).json(stripDoc(booking));
       return;
     }

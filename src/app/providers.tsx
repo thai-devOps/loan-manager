@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "sonner";
 import { queryClient } from "@/lib/query-client";
 import { applyTheme } from "@/lib/theme";
 import { useAuthStore } from "@/stores/auth.store";
@@ -27,6 +28,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
   }, [theme]);
 
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      {children}
+      <Toaster richColors closeButton position="top-right" duration={8000} />
+    </QueryClientProvider>
   );
 }

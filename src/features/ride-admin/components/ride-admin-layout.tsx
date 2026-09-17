@@ -11,6 +11,10 @@ import {
 } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { RIDE_ADMIN_NAV } from "@/features/ride-admin/nav";
+import {
+  RideAdminRealtimeProvider,
+  RideAdminRealtimeStatus,
+} from "@/features/ride-admin/realtime/ride-admin-realtime-provider";
 import { PERMISSIONS } from "@/config/permissions";
 import { useAuthStore } from "@/stores/auth.store";
 import { cn } from "@/lib/utils";
@@ -75,71 +79,76 @@ export function RideAdminLayout() {
   }
 
   return (
-    <div className="flex min-h-dvh bg-background">
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-card md:flex">
-        <div className="border-b border-border px-4 py-4">
-          <Link to="/admin/dashboard" className="block">
-            <p className="text-sm font-semibold tracking-tight">Vận hành xe</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Xe riêng + tài xế
-            </p>
-          </Link>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <SidebarNav />
-        </div>
-        <div className="border-t border-border p-3 space-y-2">
-          <Button variant="outline" size="sm" className="w-full" asChild>
-            <Link to="/apps">
-              <LayoutGrid className="size-4" />
-              Apps hub
+    <RideAdminRealtimeProvider>
+      <div className="flex min-h-dvh bg-background">
+        <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-card md:flex">
+          <div className="border-b border-border px-4 py-4">
+            <Link to="/admin/dashboard" className="block">
+              <p className="text-sm font-semibold tracking-tight">Vận hành xe</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Xe riêng + tài xế
+              </p>
             </Link>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={handleLogout}
-          >
-            <LogOut className="size-4" />
-            Đăng xuất
-          </Button>
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border bg-background/95 px-4 backdrop-blur">
-          <div className="flex items-center gap-2 md:hidden">
-            <Sheet open={open} onOpenChange={setOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Menu">
-                  <Menu className="size-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[min(100%,18rem)] p-0">
-                <SheetHeader className="border-b border-border px-4 py-4 text-left">
-                  <SheetTitle>Vận hành xe</SheetTitle>
-                </SheetHeader>
-                <SidebarNav onNavigate={() => setOpen(false)} />
-              </SheetContent>
-            </Sheet>
-            <span className="text-sm font-semibold">Admin</span>
           </div>
-          <p className="hidden truncate text-sm text-muted-foreground md:block">
-            {username ? `Đăng nhập: ${username}` : "Quản trị vận hành"}
-          </p>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Button variant="outline" size="sm" onClick={handleLogout}>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <SidebarNav />
+          </div>
+          <div className="border-t border-border p-3 space-y-2">
+            <Button variant="outline" size="sm" className="w-full" asChild>
+              <Link to="/apps">
+                <LayoutGrid className="size-4" />
+                Apps hub
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={handleLogout}
+            >
               <LogOut className="size-4" />
-              <span className="hidden sm:inline">Đăng xuất</span>
+              Đăng xuất
             </Button>
           </div>
-        </header>
-        <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6">
-          <Outlet />
-        </main>
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border bg-background/95 px-4 backdrop-blur">
+            <div className="flex items-center gap-2 md:hidden">
+              <Sheet open={open} onOpenChange={setOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="Menu">
+                    <Menu className="size-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[min(100%,18rem)] p-0">
+                  <SheetHeader className="border-b border-border px-4 py-4 text-left">
+                    <SheetTitle>Vận hành xe</SheetTitle>
+                  </SheetHeader>
+                  <SidebarNav onNavigate={() => setOpen(false)} />
+                </SheetContent>
+              </Sheet>
+              <span className="text-sm font-semibold">Admin</span>
+            </div>
+            <div className="hidden min-w-0 flex-1 items-center gap-3 md:flex">
+              <p className="truncate text-sm text-muted-foreground">
+                {username ? `Đăng nhập: ${username}` : "Quản trị vận hành"}
+              </p>
+              <RideAdminRealtimeStatus />
+            </div>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="size-4" />
+                <span className="hidden sm:inline">Đăng xuất</span>
+              </Button>
+            </div>
+          </header>
+          <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6">
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </RideAdminRealtimeProvider>
   );
 }

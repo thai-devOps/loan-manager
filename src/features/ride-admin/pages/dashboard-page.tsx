@@ -1,55 +1,60 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookingStatusBadge } from "@/features/ride-admin/components/booking-status-badge";
 import { StatCard } from "@/features/ride-admin/components/stat-card";
+import { rideAdminQueryKeys } from "@/features/ride-admin/query-keys";
 import {
   bookingAdminService,
   dashboardService,
   vehicleAdminService,
 } from "@/features/ride-admin/services/admin-api";
-import type { RideDashboardData, Vehicle } from "@/features/ride/types/ride";
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
 
 export function RideAdminDashboardPage() {
   const [range, setRange] = useState<"today" | "7d" | "month">("today");
-  const [data, setData] = useState<RideDashboardData | null>(null);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  async function load(r = range) {
-    setError(null);
-    try {
-      const [dash, veh] = await Promise.all([
-        dashboardService.get(r),
-        vehicleAdminService.list(),
+  const dashQ = useQuery({
+    queryKey: rideAdminQueryKeys.dashboard(range),
+    queryFn: () => dashboardService.get(range),
+  });
+
+  const vehiclesQ = useQuery({
+    queryKey: rideAdminQueryKeys.vehicles(),
+    queryFn: () => vehicleAdminService.list(),
+  });
+
+  const confirmMut = useMutation({
+    mutationFn: (id: string) =>
+      bookingAdminService.action(id, { action: "confirm" }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: rideAdminQueryKeys.dashboardRoot(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: rideAdminQueryKeys.bookingsRoot(),
+        }),
       ]);
-      setData(dash);
-      setVehicles(veh);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Không tải được dashboard");
-    }
-  }
+    },
+  });
 
-  useEffect(() => {
-    void load(range);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range]);
-
-  async function confirmBooking(id: string) {
-    setBusyId(id);
-    try {
-      await bookingAdminService.action(id, { action: "confirm" });
-      await load();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Xác nhận thất bại");
-    } finally {
-      setBusyId(null);
-    }
-  }
+  const data = dashQ.data ?? null;
+  const vehicles = vehiclesQ.data ?? [];
+  const error =
+    dashQ.error instanceof ApiError
+      ? dashQ.error.message
+      : dashQ.isError
+        ? "Không tải được dashboard"
+        : confirmMut.error instanceof ApiError
+          ? confirmMut.error.message
+          : confirmMut.isError
+            ? "Xác nhận thất bại"
+            : null;
 
   function vehicleName(id: string) {
     return vehicles.find((v) => v.id === id)?.name ?? id;
@@ -60,7 +65,7 @@ export function RideAdminDashboardPage() {
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="text-sm text-destructive">{error}</p>
-        <Button onClick={() => void load()}>Thử lại</Button>
+        <Button onClick={() => void dashQ.refetch()}>Thử lại</Button>
       </div>
     );
   }
@@ -158,8 +163,8 @@ export function RideAdminDashboardPage() {
                     <Button
                       size="sm"
                       className="bg-teal-800 hover:bg-teal-700"
-                      disabled={busyId === b.id}
-                      onClick={() => void confirmBooking(b.id)}
+                      disabled={confirmMut.isPending}
+                      onClick={() => confirmMut.mutate(b.id)}
                     >
                       Xác nhận
                     </Button>

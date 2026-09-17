@@ -138,6 +138,11 @@ export const API_ROUTES: ApiRoute[] = [
     load: () => import("../_routes/ride/bookings/index.js"),
   },
   {
+    method: "GET",
+    pattern: /^\/api\/realtime\/ably-token\/?$/,
+    load: () => import("../_routes/realtime/ably-token.js"),
+  },
+  {
     pattern: /^\/api\/ride\/bookings\/([^/]+)\/?$/,
     load: () => import("../_routes/ride/bookings/[id].js"),
     params: (m) => ({ id: m[1]! }),
