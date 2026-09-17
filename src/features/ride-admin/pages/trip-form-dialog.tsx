@@ -25,6 +25,7 @@ import {
   rideTripFormSchema,
   type RideTripFormValues,
 } from "@/schemas/ride-trip.schema";
+import { MoneyInput } from "@/features/finance/components/money-input";
 import { ApiError } from "@/api/client";
 
 const TYPES = Object.keys(TRIP_TYPE_LABELS) as TripType[];
@@ -399,45 +400,33 @@ export function TripFormDialog({
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="tripPrice">Giá chuyến</Label>
-                  <Input
+                  <MoneyInput
                     id="tripPrice"
-                    type="number"
-                    min={0}
                     value={form.watch("tripPrice") ?? 0}
-                    onChange={(e) =>
-                      form.setValue("tripPrice", Number(e.target.value) || 0, {
-                        shouldValidate: true,
-                      })
+                    onChange={(v) =>
+                      form.setValue("tripPrice", v, { shouldValidate: true })
                     }
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="expenseTotal">Chi phí</Label>
-                  <Input
+                  <MoneyInput
                     id="expenseTotal"
-                    type="number"
-                    min={0}
                     value={form.watch("expenseTotal") ?? 0}
-                    onChange={(e) =>
-                      form.setValue("expenseTotal", Number(e.target.value) || 0, {
-                        shouldValidate: true,
-                      })
+                    onChange={(v) =>
+                      form.setValue("expenseTotal", v, { shouldValidate: true })
                     }
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="revenueAmount">Doanh thu</Label>
-                  <Input
+                  <MoneyInput
                     id="revenueAmount"
-                    type="number"
-                    min={0}
                     value={form.watch("revenueAmount") ?? 0}
-                    onChange={(e) =>
-                      form.setValue(
-                        "revenueAmount",
-                        Number(e.target.value) || 0,
-                        { shouldValidate: true },
-                      )
+                    onChange={(v) =>
+                      form.setValue("revenueAmount", v, {
+                        shouldValidate: true,
+                      })
                     }
                   />
                 </div>

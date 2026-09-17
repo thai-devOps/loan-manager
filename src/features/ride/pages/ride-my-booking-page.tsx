@@ -28,6 +28,7 @@ import {
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
 import { tripService } from "@/features/ride/services/tripService";
 import { vehicleService } from "@/features/ride/services/vehicleService";
+import { formatCurrency } from "@/lib/currency";
 import type { BookingStatus, TripBooking, Vehicle } from "@/features/ride/types/ride";
 import { cn } from "@/lib/utils";
 import {
@@ -277,7 +278,7 @@ function JourneyResult({
         <span className="text-right text-base font-semibold tracking-tight">
           {trip.quotedPrice == null
             ? "Đang xác nhận / Liên hệ báo giá"
-            : `${trip.quotedPrice.toLocaleString("vi-VN")}đ`}
+            : formatCurrency(trip.quotedPrice)}
         </span>
       </div>
 

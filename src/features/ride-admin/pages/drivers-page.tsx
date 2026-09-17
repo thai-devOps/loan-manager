@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { EditIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -135,6 +136,7 @@ export function RideAdminDriversPage() {
                   </div>
                   <div className="mt-4 flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => openEdit(d)}>
+                      <EditIcon size={14} />
                       Sửa
                     </Button>
                     <Button asChild size="sm" variant="ghost">

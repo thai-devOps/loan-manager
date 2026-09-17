@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { Trash2 } from "lucide-react";
+import { EditIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +36,7 @@ import type {
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
 import { PERMISSIONS } from "@/config/permissions";
+import { cn } from "@/lib/utils";
 
 export function RideAdminTripDetailPage() {
   const { id = "" } = useParams();
@@ -118,7 +121,7 @@ export function RideAdminTripDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className={cn("mx-auto max-w-3xl space-y-6", !terminal && "pb-28")}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
@@ -147,6 +150,7 @@ export function RideAdminTripDetailPage() {
                 variant="outline"
                 onClick={() => setEditOpen(true)}
               >
+                <EditIcon size={14} />
                 Sửa
               </Button>
             ) : null}
@@ -393,35 +397,39 @@ export function RideAdminTripDetailPage() {
       </section>
 
       {!terminal ? (
-        <section className="flex flex-wrap gap-2 rounded-2xl border border-border bg-card p-4">
-          {next.map((s) => {
-            const isCancel = s === "CANCELLED";
-            const isComplete = s === "COMPLETED";
-            const permission = isComplete
-              ? PERMISSIONS.FLEET_TRIP_COMPLETE
-              : PERMISSIONS.FLEET_TRIP_UPDATE;
-            return (
-              <Can key={s} permission={permission}>
-                <Button
-                  disabled={busy}
-                  variant={isCancel ? "destructive" : "default"}
-                  className={
-                    isCancel ? undefined : "bg-teal-800 hover:bg-teal-700"
-                  }
-                  onClick={() =>
-                    void run(
-                      isCancel
-                        ? { action: "cancel" }
-                        : { action: "setStatus", status: s },
-                    )
-                  }
-                >
-                  {statusButtonLabel(s)}
-                </Button>
-              </Can>
-            );
-          })}
-        </section>
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:rounded-2xl md:border md:bg-card md:p-4 md:pb-4 md:backdrop-blur-none">
+          <div className="mx-auto flex max-w-3xl flex-wrap gap-2">
+            {next.map((s) => {
+              const isCancel = s === "CANCELLED";
+              const isComplete = s === "COMPLETED";
+              const permission = isComplete
+                ? PERMISSIONS.FLEET_TRIP_COMPLETE
+                : PERMISSIONS.FLEET_TRIP_UPDATE;
+              return (
+                <Can key={s} permission={permission}>
+                  <Button
+                    disabled={busy}
+                    variant={isCancel ? "destructive" : "default"}
+                    className={cn(
+                      "min-h-11 flex-1 sm:flex-none",
+                      !isCancel && "bg-teal-800 hover:bg-teal-700",
+                    )}
+                    onClick={() =>
+                      void run(
+                        isCancel
+                          ? { action: "cancel" }
+                          : { action: "setStatus", status: s },
+                      )
+                    }
+                  >
+                    {isCancel ? <Trash2 className="size-4" /> : null}
+                    {statusButtonLabel(s)}
+                  </Button>
+                </Can>
+              );
+            })}
+          </div>
+        </div>
       ) : null}
 
       <TripFormDialog

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { Trash2 } from "lucide-react";
+import { EditIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Can } from "@/features/auth/can";
@@ -100,6 +102,7 @@ export function RideAdminCustomerDetailPage() {
         <div className="flex flex-wrap gap-2">
           <Can permission={PERMISSIONS.FLEET_CUSTOMER_UPDATE}>
             <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+              <EditIcon size={14} />
               Sửa
             </Button>
           </Can>
@@ -111,6 +114,7 @@ export function RideAdminCustomerDetailPage() {
                 disabled={busy}
                 onClick={() => void runAction("deactivate")}
               >
+                <Trash2 className="size-3.5" />
                 Ngưng hoạt động
               </Button>
             </Can>
