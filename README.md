@@ -52,4 +52,15 @@ Build chạy `tsc` + Vite, rồi generate `sitemap.xml` và prerender HTML tĩnh
 
 ## Deploy
 
-Push lên GitHub; Vercel build static + serverless dưới `/api`. Sau khi set env → Redeploy.
+Push lên GitHub; Vercel build static + serverless dưới `/api`.
+
+**Quan trọng cho SEO `/ride`:**
+
+1. Build Command phải là `npm run build` (đã set trong `vercel.json`) — không chỉ `vite build`, vì cần bước generate sitemap + prerender HTML.
+2. Thêm env Production:
+   - `VITE_SITE_URL=https://domain-cua-ban` (không trailing slash) — canonical/sitemap/OG tuyệt đối
+   - (tuỳ chọn) `VITE_GA_MEASUREMENT_ID=G-...`
+3. Redeploy sau khi set env.
+4. Kiểm tra nhanh: mở `https://domain/ride/locations/an-giang` → View Source phải thấy `<title>`, `<link rel="canonical">`, và thẻ `<h1>` trong HTML (không chỉ `#root` trống). Cũng mở `/robots.txt` và `/sitemap.xml`.
+
+Sau khi set env → Redeploy.
