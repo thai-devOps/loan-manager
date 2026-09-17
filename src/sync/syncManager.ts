@@ -2,7 +2,18 @@ import { ApiError } from "@/api/client";
 import { getDb, isDbOpen } from "@/db/database";
 import { SYNC_META_KEYS } from "@/db/schema";
 import { emitSyncEvent } from "@/sync/syncEvents";
-import { countPendingOps, reclaimSyncingOps } from "@/sync/syncQueue";
+import {
+  countPendingOps,
+  listPendingOps,
+  reclaimSyncingOps,
+} from "@/sync/syncQueue";
+import {
+  isSyncDataModule,
+  moduleForEntity,
+  moduleMetaKey,
+  SYNC_DATA_MODULES,
+  type SyncDataModule,
+} from "@/sync/syncModules";
 import { syncPull } from "@/sync/syncPull";
 import { syncPush } from "@/sync/syncPush";
 import { restReplayTransport } from "@/sync/transports/restReplayTransport";
@@ -14,7 +25,6 @@ const BACKOFF_MS = [1000, 2000, 5000, 10000, 30000] as const;
 
 function isTransientSyncFailure(error: unknown): boolean {
   if (error instanceof ApiError) {
-    // Auth / permission / client errors will not fix themselves by retrying
     if (error.status === 401 || error.status === 403) return false;
     if (error.status >= 400 && error.status < 500 && error.status !== 408) {
       return false;
@@ -42,6 +52,7 @@ let backoffTimer: ReturnType<typeof setTimeout> | null = null;
 let onlineHandler: (() => void) | null = null;
 let offlineHandler: (() => void) | null = null;
 let initialSyncInFlight: Promise<void> | null = null;
+const moduleSyncInFlight = new Map<string, Promise<void>>();
 
 export function setSyncTransport(next: SyncTransport): void {
   transport = next;
@@ -80,14 +91,26 @@ async function isInitialSyncDone(): Promise<boolean> {
   return done?.value === "1";
 }
 
-async function markInitialReadyIfDone(): Promise<boolean> {
-  if (!(await isInitialSyncDone())) return false;
+async function markGateReady(): Promise<void> {
   useSyncStore.getState().setStatus({
     initialSyncReady: true,
     initialSyncPhase: "ready",
     initialSyncError: null,
   });
+}
+
+async function markInitialReadyIfDone(): Promise<boolean> {
+  if (!(await isInitialSyncDone())) return false;
+  await markGateReady();
   return true;
+}
+
+async function markDbReadyWithoutFullPull(): Promise<void> {
+  await getDb().syncMetadata.put({
+    key: SYNC_META_KEYS.initialSyncDone,
+    value: "1",
+  });
+  await markGateReady();
 }
 
 function markInitialSyncError(message: string): void {
@@ -116,18 +139,89 @@ function scheduleBackoffRetry(): void {
   }, delay);
 }
 
+async function readHasModuleAccess(module: string): Promise<boolean> {
+  const { useAuthStore } = await import("@/stores/auth.store");
+  return useAuthStore.getState().hasModuleAccess(module);
+}
+
+async function filterAccessible(
+  modules: SyncDataModule[],
+): Promise<SyncDataModule[]> {
+  const out: SyncDataModule[] = [];
+  for (const mod of modules) {
+    if (await readHasModuleAccess(mod)) out.push(mod);
+  }
+  return out;
+}
+
+async function readActivatedModules(): Promise<SyncDataModule[]> {
+  if (!isDbOpen()) return [];
+  const row = await getDb().syncMetadata.get(SYNC_META_KEYS.activatedModules);
+  if (!row?.value) return [];
+  try {
+    const parsed = JSON.parse(row.value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (m): m is SyncDataModule => typeof m === "string" && isSyncDataModule(m),
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function writeActivatedModules(modules: SyncDataModule[]): Promise<void> {
+  const unique = [...new Set(modules)];
+  await getDb().syncMetadata.put({
+    key: SYNC_META_KEYS.activatedModules,
+    value: JSON.stringify(unique),
+  });
+}
+
+async function activateModules(modules: SyncDataModule[]): Promise<SyncDataModule[]> {
+  const current = await readActivatedModules();
+  const next = [...new Set([...current, ...modules])];
+  await writeActivatedModules(next);
+  return next;
+}
+
+async function modulesFromPendingQueue(): Promise<SyncDataModule[]> {
+  const pending = await listPendingOps();
+  const mods = new Set<SyncDataModule>();
+  for (const item of pending) {
+    const mod = moduleForEntity(item.entity);
+    if (mod) mods.add(mod);
+  }
+  return [...mods];
+}
+
+async function resolvePullModules(
+  scope: "activated" | "allAccessible" | SyncDataModule[],
+): Promise<SyncDataModule[]> {
+  if (Array.isArray(scope)) {
+    return filterAccessible(scope);
+  }
+  if (scope === "allAccessible") {
+    return filterAccessible([...SYNC_DATA_MODULES]);
+  }
+  const activated = await readActivatedModules();
+  const fromQueue = await modulesFromPendingQueue();
+  return filterAccessible([...new Set([...activated, ...fromQueue])]);
+}
+
 export function requestSync(): void {
   if (typeof window === "undefined") return;
   if (typeof navigator !== "undefined" && !navigator.onLine) {
     void refreshStatus({ isSyncing: false });
     return;
   }
-  void runSync();
+  void runSync({ pullScope: "activated" });
 }
 
 export async function runSync(options?: {
   pullOnly?: boolean;
   pushOnly?: boolean;
+  /** Which modules to pull. Default: activated + pending-queue modules. */
+  pullScope?: "activated" | "allAccessible" | SyncDataModule[];
 }): Promise<void> {
   if (!isDbOpen()) return;
   if (syncing) return;
@@ -155,7 +249,6 @@ export async function runSync(options?: {
         useSyncStore.getState().setStatus({ hasSyncError: true });
         scheduleBackoffRetry();
       } else if (deferred > 0) {
-        // Network deferrals — keep pending, retry with backoff, no hard error flag
         useSyncStore.getState().setStatus({ hasSyncError: false });
         scheduleBackoffRetry();
       } else {
@@ -163,16 +256,29 @@ export async function runSync(options?: {
       }
     }
 
-    // Never pull when push still has unresolved ops (avoids wiping local pending writes)
-    const shouldPull = !options?.pushOnly && pushClean;
+    const pullScope = options?.pullScope ?? "activated";
+    const modules = options?.pushOnly
+      ? []
+      : await resolvePullModules(pullScope);
+    const shouldPull = !options?.pushOnly && pushClean && modules.length > 0;
+
     if (shouldPull) {
-      await syncPull(transport);
+      await syncPull(transport, {
+        modules,
+        markModules: modules,
+      });
       emitSyncEvent("synced");
-      // Don't await — refetch active queries in background so UI stays responsive
       void queryClient.invalidateQueries({ refetchType: "active" });
       await refreshStatus({ isSyncing: false, hasSyncError: false });
       await markInitialReadyIfDone();
     } else {
+      if (!options?.pullOnly && pushClean) {
+        await getDb().syncMetadata.put({
+          key: SYNC_META_KEYS.initialSyncDone,
+          value: "1",
+        });
+        await markGateReady();
+      }
       void queryClient.invalidateQueries({ refetchType: "active" });
       await refreshStatus({
         isSyncing: false,
@@ -185,8 +291,6 @@ export async function runSync(options?: {
     emitSyncEvent("error", { message });
     await reclaimSyncingOps();
     await refreshStatus({ isSyncing: false, hasSyncError: true });
-    // Only auto-retry transient failures — 403/4xx used to spam "Đồng bộ ngay"
-    // forever while the offline queue stayed empty.
     if (isTransientSyncFailure(error)) {
       scheduleBackoffRetry();
     } else {
@@ -197,6 +301,53 @@ export async function runSync(options?: {
     syncing = false;
     await refreshStatus({ isSyncing: false });
   }
+}
+
+/**
+ * Lazy-pull IndexedDB data for one or more modules the first time the user opens them.
+ */
+export async function ensureModuleSynced(
+  modules: SyncDataModule | SyncDataModule[],
+): Promise<void> {
+  if (!isDbOpen()) return;
+  const list = (Array.isArray(modules) ? modules : [modules]).filter(
+    isSyncDataModule,
+  );
+  if (list.length === 0) return;
+
+  const accessible = await filterAccessible(list);
+  if (accessible.length === 0) return;
+
+  const key = accessible.slice().sort().join(",");
+  const existing = moduleSyncInFlight.get(key);
+  if (existing) return existing;
+
+  const work = (async () => {
+    await activateModules(accessible);
+
+    const needsPull: SyncDataModule[] = [];
+    for (const mod of accessible) {
+      const done = await getDb().syncMetadata.get(moduleMetaKey(mod));
+      if (done?.value !== "1") needsPull.push(mod);
+    }
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return;
+    }
+
+    if (needsPull.length > 0) {
+      await runSync({ pullScope: needsPull });
+      return;
+    }
+
+    // Already synced once — background refresh for activated modules only
+    requestSync();
+  })().finally(() => {
+    moduleSyncInFlight.delete(key);
+  });
+
+  moduleSyncInFlight.set(key, work);
+  return work;
 }
 
 async function runEnsureInitialSync(): Promise<void> {
@@ -213,19 +364,13 @@ async function runEnsureInitialSync(): Promise<void> {
     initialSyncError: null,
   });
 
+  // Returning users: open gate immediately; do NOT full-pull every module.
   if (await isInitialSyncDone()) {
-    useSyncStore.getState().setStatus({
-      initialSyncReady: true,
-      initialSyncPhase: "ready",
-      initialSyncError: null,
-    });
-    requestSync();
-    return;
-  }
-
-  if (typeof navigator !== "undefined" && !navigator.onLine) {
-    markInitialSyncError("Không có kết nối mạng");
-    await refreshStatus({ isSyncing: false });
+    await markGateReady();
+    const pending = await countPendingOps();
+    if (pending > 0) {
+      requestSync();
+    }
     return;
   }
 
@@ -235,24 +380,20 @@ async function runEnsureInitialSync(): Promise<void> {
     initialSyncError: null,
   });
 
-  try {
-    await runSync();
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Đồng bộ thất bại";
-    markInitialSyncError(message);
-    return;
+  // First visit: push any pending ops if online, then open gate without fan-out pull.
+  if (typeof navigator !== "undefined" && navigator.onLine) {
+    try {
+      await runSync({ pushOnly: true });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Đồng bộ thất bại";
+      markInitialSyncError(message);
+      return;
+    }
   }
 
-  if (await markInitialReadyIfDone()) return;
-
-  const offline =
-    typeof navigator !== "undefined" && !navigator.onLine;
-  markInitialSyncError(
-    offline
-      ? "Không có kết nối mạng"
-      : "Không đồng bộ được dữ liệu. Vui lòng thử lại.",
-  );
+  await markDbReadyWithoutFullPull();
+  await refreshStatus({ isSyncing: false });
 }
 
 export async function ensureInitialSync(): Promise<void> {
@@ -309,4 +450,5 @@ export function stopSyncManager(): void {
   offlineHandler = null;
   clearBackoff();
   initialSyncInFlight = null;
+  moduleSyncInFlight.clear();
 }

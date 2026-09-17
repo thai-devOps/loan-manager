@@ -27,7 +27,13 @@ import {
 } from "@/api/endpoints";
 import { ApiError } from "@/api/client";
 import type { SyncQueueItem } from "@/db/schema";
+import {
+  entitiesForModules,
+  isSyncDataModule,
+  type SyncDataModule,
+} from "@/sync/syncModules";
 import type {
+  PullAllOptions,
   PullEntityResult,
   PushResult,
   SyncTransport,
@@ -98,21 +104,52 @@ function asFormLoan(payload: Record<string, unknown>): LoanFormValues {
 }
 
 export const restReplayTransport: SyncTransport = {
-  async pullAll(): Promise<PullEntityResult[]> {
+  async pullAll(options?: PullAllOptions): Promise<PullEntityResult[]> {
     // Fetch independently so one module's 403 (RBAC) does not abort the whole sync
     // and trigger infinite backoff while the offline queue stays empty.
-    const settled = await Promise.all([
-      pullOptional("borrower", fetchBorrowers, (rows) => rows),
-      pullOptional("loan", fetchLoans, (rows) => rows),
-      pullOptional("loanTransaction", fetchTransactions, (rows) => rows),
-      pullOptional("interestSchedule", fetchSchedules, (rows) => rows),
-      pullOptional("financeTransaction", fetchFinanceTransactions, (rows) => rows),
-      pullOptional("manualAsset", fetchManualAssets, (rows) => rows),
-      pullOptional("goldPurchase", fetchGoldPurchases, (rows) => rows),
-      pullOptional("goldPlan", fetchGoldPlan, (plan) => (plan ? [plan] : [])),
-      pullOptional("assetSettings", fetchAssetSettings, (settings) => [settings]),
-    ]);
+    const modules = (options?.modules ?? []).filter(
+      isSyncDataModule,
+    ) as SyncDataModule[];
+    if (modules.length === 0) return [];
 
+    const allowed = new Set(entitiesForModules(modules));
+    const jobs: Array<Promise<PullEntityResult | null>> = [];
+
+    const enqueue = (
+      entity: PullEntityResult["entity"],
+      run: () => Promise<PullEntityResult | null>,
+    ) => {
+      if (!allowed.has(entity)) return;
+      jobs.push(run());
+    };
+
+    enqueue("borrower", () =>
+      pullOptional("borrower", fetchBorrowers, (rows) => rows),
+    );
+    enqueue("loan", () => pullOptional("loan", fetchLoans, (rows) => rows));
+    enqueue("loanTransaction", () =>
+      pullOptional("loanTransaction", fetchTransactions, (rows) => rows),
+    );
+    enqueue("interestSchedule", () =>
+      pullOptional("interestSchedule", fetchSchedules, (rows) => rows),
+    );
+    enqueue("financeTransaction", () =>
+      pullOptional("financeTransaction", fetchFinanceTransactions, (rows) => rows),
+    );
+    enqueue("manualAsset", () =>
+      pullOptional("manualAsset", fetchManualAssets, (rows) => rows),
+    );
+    enqueue("goldPurchase", () =>
+      pullOptional("goldPurchase", fetchGoldPurchases, (rows) => rows),
+    );
+    enqueue("goldPlan", () =>
+      pullOptional("goldPlan", fetchGoldPlan, (plan) => (plan ? [plan] : [])),
+    );
+    enqueue("assetSettings", () =>
+      pullOptional("assetSettings", fetchAssetSettings, (settings) => [settings]),
+    );
+
+    const settled = await Promise.all(jobs);
     return settled.filter((r): r is PullEntityResult => r !== null);
   },
 

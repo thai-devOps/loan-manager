@@ -79,6 +79,8 @@ export interface SyncConflictRow {
 export const SYNC_META_KEYS = {
   lastSyncAt: "lastSyncAt",
   initialSyncDone: "initialSyncDone",
+  /** JSON array of SyncDataModule codes the user has opened (lazy pull). */
+  activatedModules: "activatedModules",
 } as const;
 
 export function sanitizeUsername(username: string): string {

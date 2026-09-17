@@ -2,7 +2,11 @@ import { getDb } from "@/db/database";
 import type { SyncEntity } from "@/db/schema";
 import { SYNC_META_KEYS } from "@/db/schema";
 import { hasPendingForEntity } from "@/sync/syncQueue";
-import type { SyncTransport } from "@/sync/transports/types";
+import {
+  moduleMetaKey,
+  type SyncDataModule,
+} from "@/sync/syncModules";
+import type { PullAllOptions, SyncTransport } from "@/sync/transports/types";
 
 type AnyLocal = { id: string; updatedAt?: string; deletedAt?: string | null };
 
@@ -50,13 +54,18 @@ async function recordConflict(
 }
 
 /**
- * Full-list pull + reconcile.
+ * Scoped list pull + reconcile.
  * - Upserts server rows (clears deletedAt).
  * - Removes local rows missing on server ONLY when there is no pending local op.
  * - If local has pending changes and server updatedAt is newer → conflict, skip overwrite.
  */
-export async function syncPull(transport: SyncTransport): Promise<void> {
-  const bundles = await transport.pullAll();
+export async function syncPull(
+  transport: SyncTransport,
+  options?: PullAllOptions & { markModules?: SyncDataModule[] },
+): Promise<void> {
+  const bundles = await transport.pullAll(
+    options?.modules ? { modules: options.modules } : options,
+  );
   const db = getDb();
 
   for (const bundle of bundles) {
@@ -117,4 +126,12 @@ export async function syncPull(transport: SyncTransport): Promise<void> {
     key: SYNC_META_KEYS.initialSyncDone,
     value: "1",
   });
+
+  const markModules = options?.markModules ?? [];
+  for (const mod of markModules) {
+    await db.syncMetadata.put({
+      key: moduleMetaKey(mod),
+      value: "1",
+    });
+  }
 }

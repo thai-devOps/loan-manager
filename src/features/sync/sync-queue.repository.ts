@@ -24,13 +24,13 @@ export const syncQueueRepository = {
   async retryFailedAndSync(): Promise<number> {
     if (!isDbOpen()) return 0;
     const n = await retryAllFailed();
-    await runSync();
+    await runSync({ pullScope: "allAccessible" });
     return n;
   },
 
   async syncNow(): Promise<void> {
     if (!isDbOpen()) return;
-    await runSync();
+    await runSync({ pullScope: "allAccessible" });
   },
 
   async markConflictSeen(id: string): Promise<void> {

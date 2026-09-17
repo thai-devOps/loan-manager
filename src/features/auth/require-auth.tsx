@@ -22,9 +22,9 @@ export function RequireAuth() {
   }, [hydrate]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || meLoaded) return;
     void loadMe();
-  }, [isAuthenticated, loadMe]);
+  }, [isAuthenticated, meLoaded, loadMe]);
 
   useEffect(() => {
     if (!isAuthenticated || !meLoaded) return;

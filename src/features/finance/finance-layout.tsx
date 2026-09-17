@@ -22,8 +22,10 @@ import type { FinanceTransaction } from "@/types/finance";
 import { Can } from "@/features/auth/can";
 import { PERMISSIONS } from "@/config/permissions";
 import { useAuthStore } from "@/stores/auth.store";
+import { useEnsureModuleSynced } from "@/sync/use-ensure-module-synced";
 
 export function FinanceLayout() {
+  useEnsureModuleSynced("finance");
   const [preset, setPresetState] = useState<DateRangePreset>("this_month");
   const [range, setRange] = useState(() =>
     resolveDateRangePreset("this_month"),

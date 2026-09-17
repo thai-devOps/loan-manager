@@ -124,7 +124,7 @@ function AccessMatrixEditor({
       await qc.invalidateQueries({ queryKey: ["access", "roles"] });
       const auth = useAuthStore.getState();
       if (auth.user?.roleIds.includes(roleId)) {
-        await auth.loadMe();
+        await auth.loadMe({ force: true });
       }
       setError(null);
     },

@@ -97,7 +97,7 @@ function RoleDetailEditor({
       await qc.invalidateQueries({ queryKey: ["access", "roles"] });
       const auth = useAuthStore.getState();
       if (auth.user?.roleIds.includes(id)) {
-        await auth.loadMe();
+        await auth.loadMe({ force: true });
       }
       setError(null);
     },

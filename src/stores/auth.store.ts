@@ -34,7 +34,7 @@ interface AuthState {
   ) => Promise<{ ok: true } | { ok: false; message: string }>;
   logout: () => void;
   touch: () => void;
-  loadMe: () => Promise<void>;
+  loadMe: (opts?: { force?: boolean }) => Promise<void>;
   /** Open IndexedDB for session user and await first-time sync gate. */
   prepareLocalDb: () => Promise<void>;
   hasPermission: (permission: string | string[]) => boolean;
@@ -64,6 +64,9 @@ function clearAccessState(): Pick<
   };
 }
 
+/** Coalesce concurrent / StrictMode duplicate /auth/me calls. */
+let loadMeInFlight: Promise<void> | null = null;
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   ...syncFromStorage(),
   ...clearAccessState(),
@@ -86,6 +89,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: () => {
     // Policy 2A: keep IndexedDB + pending queue; only clear auth + query cache.
+    loadMeInFlight = null;
     stopSyncManager();
     closeUserDatabase();
     useSyncStore.getState().reset();
@@ -104,33 +108,49 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ session: next, isAuthenticated: true });
   },
 
-  loadMe: async () => {
-    const session = get().session ?? getSession();
-    if (!session?.token) {
-      set(clearAccessState());
-      return;
-    }
-    try {
-      const data = await apiFetch<AuthMeResponse>("/api/auth/me");
-      set({
-        user: data.user,
-        roles: data.roles,
-        permissions: data.permissions,
-        meLoaded: true,
-        session: {
+  loadMe: async (opts) => {
+    if (loadMeInFlight) return loadMeInFlight;
+
+    loadMeInFlight = (async () => {
+      const session = get().session ?? getSession();
+      if (!session?.token) {
+        set(clearAccessState());
+        return;
+      }
+      // Already hydrated for this session — skip redundant /auth/me
+      if (
+        !opts?.force &&
+        get().meLoaded &&
+        get().session?.token === session.token
+      ) {
+        return;
+      }
+      try {
+        const data = await apiFetch<AuthMeResponse>("/api/auth/me");
+        set({
+          user: data.user,
+          roles: data.roles,
+          permissions: data.permissions,
+          meLoaded: true,
+          session: {
+            ...session,
+            userId: data.user.id,
+            username: data.user.username,
+          },
+        });
+        saveSession({
           ...session,
           userId: data.user.id,
           username: data.user.username,
-        },
-      });
-      saveSession({
-        ...session,
-        userId: data.user.id,
-        username: data.user.username,
-      });
-    } catch {
-      set(clearAccessState());
-    }
+        });
+      } catch {
+        set(clearAccessState());
+      }
+    })().finally(() => {
+      loadMeInFlight = null;
+    });
+
+    return loadMeInFlight;
   },
 
   prepareLocalDb: async () => {

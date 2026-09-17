@@ -32,8 +32,13 @@ export interface PushResult {
   retryable?: boolean;
 }
 
+export interface PullAllOptions {
+  /** When set, only pull entities belonging to these sync data modules. */
+  modules?: string[];
+}
+
 export interface SyncTransport {
-  pullAll(): Promise<PullEntityResult[]>;
+  pullAll(options?: PullAllOptions): Promise<PullEntityResult[]>;
   pushOne(item: SyncQueueItem): Promise<PushResult>;
 }
 

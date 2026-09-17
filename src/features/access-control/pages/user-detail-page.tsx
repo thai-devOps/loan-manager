@@ -122,7 +122,7 @@ function UserDetailEditor({
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["access", "user", id] });
       await qc.invalidateQueries({ queryKey: ["access", "users"] });
-      if (id === currentUserId) await loadMe();
+      if (id === currentUserId) await loadMe({ force: true });
       setError(null);
     },
     onError: (err) => {

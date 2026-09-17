@@ -21,7 +21,6 @@ import { syncPush } from "@/sync/syncPush";
 import { syncPull } from "@/sync/syncPull";
 import {
   ensureInitialSync,
-  retryInitialSync,
   setSyncTransport,
   stopSyncManager,
 } from "@/sync/syncManager";
@@ -380,17 +379,26 @@ describe("local-first IndexedDB", () => {
     expect(await countPendingOps()).toBe(0);
   });
 
-  it("ensureInitialSync marks ready after successful pull", async () => {
-    setSyncTransport(emptyPullTransport());
+  it("ensureInitialSync marks ready without full module pull", async () => {
+    let pullCalls = 0;
+    setSyncTransport(
+      emptyPullTransport({
+        pullAll: async () => {
+          pullCalls += 1;
+          return [];
+        },
+      }),
+    );
     await ensureInitialSync();
 
     const meta = await getDb().syncMetadata.get(SYNC_META_KEYS.initialSyncDone);
     expect(meta?.value).toBe("1");
     expect(useSyncStore.getState().initialSyncReady).toBe(true);
     expect(useSyncStore.getState().initialSyncPhase).toBe("ready");
+    expect(pullCalls).toBe(0);
   });
 
-  it("ensureInitialSync errors offline without setting meta", async () => {
+  it("ensureInitialSync opens gate offline on first visit", async () => {
     Object.defineProperty(navigator, "onLine", {
       configurable: true,
       get: () => false,
@@ -399,39 +407,48 @@ describe("local-first IndexedDB", () => {
     await ensureInitialSync();
 
     const meta = await getDb().syncMetadata.get(SYNC_META_KEYS.initialSyncDone);
-    expect(meta?.value).not.toBe("1");
-    expect(useSyncStore.getState().initialSyncReady).toBe(false);
-    expect(useSyncStore.getState().initialSyncPhase).toBe("error");
-    expect(useSyncStore.getState().initialSyncError).toMatch(/mạng/i);
+    expect(meta?.value).toBe("1");
+    expect(useSyncStore.getState().initialSyncReady).toBe(true);
+    expect(useSyncStore.getState().initialSyncPhase).toBe("ready");
   });
 
-  it("retryInitialSync recovers after transport failure", async () => {
-    let attempts = 0;
+  it("ensureModuleSynced pulls only the requested module", async () => {
+    const { useAuthStore } = await import("@/stores/auth.store");
+    const { SYSTEM_ROLE_CODES } = await import("@/config/permissions");
+    const { ensureModuleSynced } = await import("@/sync/syncManager");
+
+    useAuthStore.setState({
+      roles: [SYSTEM_ROLE_CODES.SUPER_ADMIN],
+      permissions: [],
+      meLoaded: true,
+    });
+
+    const pulledModules: string[][] = [];
     setSyncTransport(
       emptyPullTransport({
-        pullAll: async () => {
-          attempts += 1;
-          if (attempts === 1) throw new Error("pull failed");
-          return emptyPullTransport().pullAll();
+        pullAll: async (opts) => {
+          pulledModules.push([...(opts?.modules ?? [])]);
+          return [
+            { entity: "borrower", rows: [] },
+            { entity: "loan", rows: [] },
+            { entity: "loanTransaction", rows: [] },
+            { entity: "interestSchedule", rows: [] },
+          ];
         },
       }),
     );
 
     await ensureInitialSync();
-    expect(useSyncStore.getState().initialSyncPhase).toBe("error");
-    expect(
-      (await getDb().syncMetadata.get(SYNC_META_KEYS.initialSyncDone))?.value,
-    ).not.toBe("1");
+    await ensureModuleSynced("loan");
 
-    await retryInitialSync();
-    expect(useSyncStore.getState().initialSyncReady).toBe(true);
-    expect(useSyncStore.getState().initialSyncPhase).toBe("ready");
+    expect(pulledModules.length).toBeGreaterThanOrEqual(1);
+    expect(pulledModules[0]).toEqual(["loan"]);
     expect(
-      (await getDb().syncMetadata.get(SYNC_META_KEYS.initialSyncDone))?.value,
+      (await getDb().syncMetadata.get("moduleSync:loan"))?.value,
     ).toBe("1");
   });
 
-  it("ensureInitialSync skips gate when meta already done", async () => {
+  it("ensureInitialSync skips background pull when meta already done", async () => {
     await getDb().syncMetadata.put({
       key: SYNC_META_KEYS.initialSyncDone,
       value: "1",
@@ -442,7 +459,7 @@ describe("local-first IndexedDB", () => {
       emptyPullTransport({
         pullAll: async () => {
           pullCalls += 1;
-          return emptyPullTransport().pullAll();
+          return [];
         },
       }),
     );
@@ -450,7 +467,6 @@ describe("local-first IndexedDB", () => {
     await ensureInitialSync();
     expect(useSyncStore.getState().initialSyncReady).toBe(true);
     expect(useSyncStore.getState().initialSyncPhase).toBe("ready");
-    // Background requestSync may pull; gate itself must be ready without awaiting it
-    expect(pullCalls).toBeLessThanOrEqual(1);
+    expect(pullCalls).toBe(0);
   });
 });

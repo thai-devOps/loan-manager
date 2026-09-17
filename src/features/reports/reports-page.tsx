@@ -36,8 +36,10 @@ import { getPeriodFromISO } from "@/lib/date";
 import { ForbiddenPage } from "@/features/auth/forbidden-page";
 import { useAuthStore } from "@/stores/auth.store";
 import { PERMISSIONS } from "@/config/permissions";
+import { useEnsureModuleSynced } from "@/sync/use-ensure-module-synced";
 
 export function ReportsPage() {
+  useEnsureModuleSynced("loan");
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canViewLoanReport = hasPermission(PERMISSIONS.REPORT_LOAN_VIEW);
 

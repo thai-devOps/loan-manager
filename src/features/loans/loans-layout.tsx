@@ -4,12 +4,14 @@ import {
   getFeatureById,
   isFeatureDetailPath,
 } from "@/components/layout/nav-items";
+import { useEnsureModuleSynced } from "@/sync/use-ensure-module-synced";
 
 /**
  * Wraps loans-module routes. Sub-nav is rendered by page shells via
  * {@link LoansModuleChrome} so it sits under each page's AppHeader.
  */
 export function LoansLayout() {
+  useEnsureModuleSynced("loan");
   return <Outlet />;
 }
 
