@@ -121,11 +121,38 @@ export function RideAdminLayout() {
                     <Menu className="size-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-[min(100%,18rem)] p-0">
+                <SheetContent side="left" className="flex w-[min(100%,18rem)] flex-col p-0">
                   <SheetHeader className="border-b border-border px-4 py-4 text-left">
                     <SheetTitle>Vận hành xe</SheetTitle>
                   </SheetHeader>
-                  <SidebarNav onNavigate={() => setOpen(false)} />
+                  <div className="min-h-0 flex-1 overflow-y-auto">
+                    <SidebarNav onNavigate={() => setOpen(false)} />
+                  </div>
+                  <div className="space-y-2 border-t border-border p-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      asChild
+                    >
+                      <Link to="/apps" onClick={() => setOpen(false)}>
+                        <LayoutGrid className="size-4" />
+                        Apps hub
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        setOpen(false);
+                        handleLogout();
+                      }}
+                    >
+                      <LogOut className="size-4" />
+                      Đăng xuất
+                    </Button>
+                  </div>
                 </SheetContent>
               </Sheet>
               <span className="text-sm font-semibold">Admin</span>
@@ -138,6 +165,17 @@ export function RideAdminLayout() {
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />
+              <Button
+                variant="outline"
+                size="icon"
+                className="md:hidden"
+                asChild
+                aria-label="Apps hub"
+              >
+                <Link to="/apps">
+                  <LayoutGrid className="size-4" />
+                </Link>
+              </Button>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="size-4" />
                 <span className="hidden sm:inline">Đăng xuất</span>
