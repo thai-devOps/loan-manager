@@ -163,11 +163,19 @@ function UserDetailEditor({
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
 
       <Tabs defaultValue="info">
-        <TabsList>
-          <TabsTrigger value="info">Thông tin</TabsTrigger>
-          <TabsTrigger value="roles">Roles</TabsTrigger>
-          <TabsTrigger value="permissions">Permissions</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
+        <TabsList className="flex h-auto w-full max-w-full justify-start gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsTrigger value="info" className="shrink-0">
+            Thông tin
+          </TabsTrigger>
+          <TabsTrigger value="roles" className="shrink-0">
+            Roles
+          </TabsTrigger>
+          <TabsTrigger value="permissions" className="shrink-0">
+            Permissions
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="shrink-0">
+            Activity
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="info" className="space-y-4 pt-4">

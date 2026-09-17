@@ -38,7 +38,7 @@ const NAV = [
     icon: ScrollText,
     permission: PERMISSIONS.SETTINGS_VIEW,
   },
-];
+] as const;
 
 export function AccessControlLayout() {
   const navigate = useNavigate();
@@ -76,22 +76,11 @@ export function AccessControlLayout() {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 md:px-6">
-        <div className="flex items-start gap-3">
-          <div className="bg-primary/10 text-primary flex size-10 items-center justify-center rounded-xl">
-            <Shield className="size-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">
-              Quản trị truy cập
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              Người dùng, vai trò và phân quyền dùng chung toàn Monely
-            </p>
-          </div>
-        </div>
-
-        <nav className="flex flex-wrap gap-2 border-b pb-3">
+      <nav
+        aria-label="Mục quản trị truy cập"
+        className="sticky top-14 z-20 shrink-0 border-b border-border bg-background/95 backdrop-blur md:hidden"
+      >
+        <div className="flex gap-1 overflow-x-auto px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {items.map((item) => {
             const Icon = item.icon;
             return (
@@ -101,21 +90,66 @@ export function AccessControlLayout() {
                 end={item.href === "/admin/users"}
                 className={({ isActive }) =>
                   cn(
-                    "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors",
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                     isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      ? "bg-teal-700 text-teal-50 dark:bg-teal-600"
+                      : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground",
                   )
                 }
               >
-                <Icon className="size-4" />
+                <Icon className="size-3.5 shrink-0" />
                 {item.title}
               </NavLink>
             );
           })}
-        </nav>
+        </div>
+      </nav>
 
-        <Outlet />
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-6 pb-32 md:px-6 md:pb-6">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+          <div className="flex items-start gap-3">
+            <div className="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-xl">
+              <Shield className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight">
+                Quản trị truy cập
+              </h1>
+              <p className="text-muted-foreground mt-0.5 hidden text-sm sm:block">
+                Người dùng, vai trò và phân quyền dùng chung toàn Monely
+              </p>
+            </div>
+          </div>
+
+          <nav
+            aria-label="Mục quản trị truy cập"
+            className="hidden gap-2 border-b pb-3 md:flex"
+          >
+            {items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.href}
+                  to={item.href}
+                  end={item.href === "/admin/users"}
+                  className={({ isActive }) =>
+                    cn(
+                      "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )
+                  }
+                >
+                  <Icon className="size-4" />
+                  {item.title}
+                </NavLink>
+              );
+            })}
+          </nav>
+
+          <Outlet />
+        </div>
       </div>
     </div>
   );

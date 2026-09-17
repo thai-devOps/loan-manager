@@ -1,6 +1,7 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
+import { ScrollToTop } from "@/components/scroll-to-top";
 import { RequireAuth } from "@/features/auth/require-auth";
 import { LoginPage } from "@/features/auth/login-page";
 import {
@@ -66,7 +67,19 @@ import { AccessMatrixPage } from "@/features/access-control/pages/access-matrix-
 import { AuditLogsPage } from "@/features/access-control/pages/audit-logs-page";
 import { PERMISSIONS } from "@/config/permissions";
 
+function RootLayout() {
+  return (
+    <>
+      <ScrollToTop />
+      <Outlet />
+    </>
+  );
+}
+
 export const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
   {
     path: "/login",
     element: <LoginPage />,
@@ -446,5 +459,7 @@ export const router = createBrowserRouter([
   {
     path: "*",
     element: <Navigate to="/apps" replace />,
+  },
+    ],
   },
 ]);
