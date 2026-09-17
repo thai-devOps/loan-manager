@@ -2,6 +2,8 @@ import type { ServiceType } from "@/features/ride/types/ride";
 
 export type RideServiceDef = {
   slug: string;
+  /** Public SEO path, e.g. /ride/du-lich */
+  seoPath: string;
   serviceType: ServiceType;
   title: string;
   shortTitle: string;
@@ -16,6 +18,7 @@ export type RideServiceDef = {
 export const MOCK_SERVICES: RideServiceDef[] = [
   {
     slug: "du-lich",
+    seoPath: "/ride/du-lich",
     serviceType: "TRAVEL",
     title: "Du lịch",
     shortTitle: "Du lịch",
@@ -34,6 +37,7 @@ export const MOCK_SERVICES: RideServiceDef[] = [
   },
   {
     slug: "kham-benh",
+    seoPath: "/ride/kham-benh",
     serviceType: "MEDICAL",
     title: "Khám bệnh",
     shortTitle: "Khám bệnh",
@@ -52,6 +56,7 @@ export const MOCK_SERVICES: RideServiceDef[] = [
   },
   {
     slug: "hanh-huong",
+    seoPath: "/ride/hanh-huong",
     serviceType: "PILGRIMAGE",
     title: "Hành hương",
     shortTitle: "Hành hương",
@@ -70,6 +75,7 @@ export const MOCK_SERVICES: RideServiceDef[] = [
   },
   {
     slug: "san-bay",
+    seoPath: "/ride/dua-don-san-bay",
     serviceType: "AIRPORT",
     title: "Sân bay",
     shortTitle: "Sân bay",
@@ -88,6 +94,7 @@ export const MOCK_SERVICES: RideServiceDef[] = [
   },
   {
     slug: "cong-tac",
+    seoPath: "/ride/cong-tac",
     serviceType: "BUSINESS",
     title: "Công tác",
     shortTitle: "Công tác",
@@ -106,6 +113,7 @@ export const MOCK_SERVICES: RideServiceDef[] = [
   },
   {
     slug: "theo-yeu-cau",
+    seoPath: "/ride/theo-yeu-cau",
     serviceType: "CUSTOM",
     title: "Theo yêu cầu",
     shortTitle: "Theo yêu cầu",

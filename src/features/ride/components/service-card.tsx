@@ -60,7 +60,7 @@ export function ServiceCard({
 
   return (
     <Link
-      to={`/ride/booking?serviceType=${service.serviceType}`}
+      to={service.seoPath}
       style={style}
       className={cn(
         "group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/70 bg-card p-5 sm:p-6",
@@ -93,7 +93,7 @@ export function ServiceCard({
             accent.chip,
           )}
         >
-          Xe + tài xế
+          Có tài xế
         </span>
       </div>
 
@@ -106,7 +106,7 @@ export function ServiceCard({
 
       <div className="relative mt-6 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
         <span className="text-sm font-semibold text-foreground transition-colors duration-300 group-hover:text-teal-800 dark:group-hover:text-teal-300">
-          Đặt chuyến
+          Xem dịch vụ
         </span>
         <span className="inline-flex size-9 items-center justify-center rounded-full bg-muted text-foreground transition-all duration-300 group-hover:bg-teal-800 group-hover:text-teal-50 group-hover:translate-x-0.5">
           <ArrowUpRight className="size-4" aria-hidden />

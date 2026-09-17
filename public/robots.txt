@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /ride
+Allow: /ride/
+
+Disallow: /admin/
+Disallow: /api/
+Disallow: /ride/my-booking
+Disallow: /ride/my-booking/
+Disallow: /ride/booking/success
+Disallow: /ride/booking/success/
+Disallow: /apps
+Disallow: /login
+
+Sitemap: /sitemap.xml

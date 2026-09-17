@@ -35,7 +35,7 @@ export function RideCarsPage() {
         Các dòng xe phục vụ
       </h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        Xe riêng + tài xế. Không có dịch vụ tự lái.
+        Xe riêng có tài xế. Không có dịch vụ tự lái.
       </p>
 
       {error ? (

@@ -3,9 +3,11 @@
  * Leave contact fields empty until real info is confirmed — UI hides empty CTAs.
  */
 export const rideBrand = {
-  name: "Dịch vụ xe có tài xế",
-  shortName: "Xe có tài xế",
-  tagline: "Xe riêng có tài xế — uy tín, đúng giờ, tận tâm",
+  name: "SiTha Trip",
+  shortName: "SiTha Trip",
+  /** One-line subtitle under the logo / header */
+  subtitle: "Dịch vụ du lịch SiTha",
+  tagline: "Dịch vụ du lịch SiTha — uy tín, đúng giờ, tận tâm",
   /** Display labels for hotlines */
   hotlines: ["035 5511034", "039 7706494"] as string[],
   zaloUrl: "",

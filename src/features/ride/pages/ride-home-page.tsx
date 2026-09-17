@@ -117,8 +117,8 @@ function SectionEyebrow({ children }: { children: ReactNode }) {
 
 export function RideHomePage() {
   useRidePageMeta(
-    "Trang chủ",
-    "Xe riêng có tài xế tại An Giang — du lịch, khám bệnh, hành hương, sân bay và chuyến liên tỉnh.",
+    "Đặt Xe Có Tài Xế An Giang | Xe Riêng Đón Tận Nơi",
+    "Đặt xe riêng có tài xế tại An Giang. Đón trả tận nơi tại Long Xuyên, Châu Đốc, Tri Tôn — du lịch, khám bệnh, sân bay và chuyến liên tỉnh.",
   );
 
   const [vehicles, setVehicles] = useState<Vehicle[] | null>(null);
@@ -160,7 +160,7 @@ export function RideHomePage() {
                 <Link to="/ride/booking">Đặt chuyến ngay</Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="min-h-11">
-                <Link to="/ride/services">Xem dịch vụ</Link>
+                <Link to="/ride/dich-vu">Xem dịch vụ</Link>
               </Button>
             </div>
             <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
@@ -209,7 +209,7 @@ export function RideHomePage() {
               variant="outline"
               className="rounded-full transition-colors hover:border-teal-800/40 hover:bg-teal-50 hover:text-teal-900 dark:hover:bg-teal-950"
             >
-              <Link to="/ride/services">
+              <Link to="/ride/dich-vu">
                 Xem tất cả dịch vụ
                 <ChevronRight className="size-4" />
               </Link>
@@ -391,22 +391,51 @@ export function RideHomePage() {
                 {group.places && group.places.length > 0 ? (
                   <>
                     <div className="mt-5 flex flex-wrap gap-2">
-                      {group.places.map((place) => (
-                        <span
-                          key={place}
-                          className="rounded-full border border-border bg-muted/50 px-3 py-1 text-sm font-medium"
-                        >
-                          {place}
-                        </span>
-                      ))}
+                      {group.places.map((place) =>
+                        place.href ? (
+                          <Link
+                            key={place.name}
+                            to={place.href}
+                            className="rounded-full border border-border bg-muted/50 px-3 py-1 text-sm font-medium hover:border-teal-700/40 hover:bg-teal-50 hover:text-teal-900 dark:hover:bg-teal-950"
+                          >
+                            {place.name}
+                          </Link>
+                        ) : (
+                          <span
+                            key={place.name}
+                            className="rounded-full border border-border bg-muted/50 px-3 py-1 text-sm font-medium"
+                          >
+                            {place.name}
+                          </span>
+                        ),
+                      )}
                     </div>
                     <p className="mt-4 text-sm text-muted-foreground">
                       {group.description}
                     </p>
+                    {group.href ? (
+                      <Link
+                        to={group.href}
+                        className="mt-3 inline-block text-sm font-medium text-teal-800 hover:underline"
+                      >
+                        Xem khu vực {group.title} →
+                      </Link>
+                    ) : null}
                   </>
                 ) : (
                   <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
                     {group.description}
+                    {group.href ? (
+                      <>
+                        {" "}
+                        <Link
+                          to={group.href}
+                          className="font-medium text-teal-800 hover:underline"
+                        >
+                          Xem chi tiết →
+                        </Link>
+                      </>
+                    ) : null}
                   </p>
                 )}
               </div>
@@ -416,6 +445,11 @@ export function RideHomePage() {
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild className="bg-teal-800 hover:bg-teal-700">
               <Link to="/ride/booking">Đặt chuyến trong khu vực</Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-full">
+              <Link to="/ride/routes/an-giang-can-tho">
+                Tuyến An Giang — Cần Thơ
+              </Link>
             </Button>
             <Button asChild variant="outline" className="rounded-full">
               <Link to="/ride/contact">Hỏi lộ trình liên tỉnh</Link>

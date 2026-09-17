@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Check, Users } from "lucide-react";
+import { rideBrand } from "@/features/ride/config/ride-brand";
 import type { Vehicle } from "@/features/ride/types/ride";
 import { SUITABLE_FOR_LABELS } from "@/features/ride/lib/labels";
 import { cn } from "@/lib/utils";
@@ -59,7 +60,7 @@ export function VehicleCard({
             {vehicle.name}
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Xe riêng + tài xế
+            {rideBrand.subtitle}
           </p>
         </div>
 

@@ -1,4 +1,13 @@
 {
+  "redirects": [
+    { "source": "/ride/services", "destination": "/ride/dich-vu", "permanent": true },
+    { "source": "/ride/services/du-lich", "destination": "/ride/du-lich", "permanent": true },
+    { "source": "/ride/services/kham-benh", "destination": "/ride/kham-benh", "permanent": true },
+    { "source": "/ride/services/hanh-huong", "destination": "/ride/hanh-huong", "permanent": true },
+    { "source": "/ride/services/san-bay", "destination": "/ride/dua-don-san-bay", "permanent": true },
+    { "source": "/ride/services/cong-tac", "destination": "/ride/cong-tac", "permanent": true },
+    { "source": "/ride/services/theo-yeu-cau", "destination": "/ride/theo-yeu-cau", "permanent": true }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -7,6 +16,26 @@
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(robots.txt|sitemap.xml)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
     }
   ]
 }

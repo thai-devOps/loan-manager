@@ -27,6 +27,9 @@ import {
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
 import { tripService } from "@/features/ride/services/tripService";
 import { vehicleService } from "@/features/ride/services/vehicleService";
+import {
+  trackRideEvent,
+} from "@/features/ride/lib/ride-analytics";
 import type {
   Place,
   ServiceType,
@@ -54,10 +57,13 @@ function parseTripType(raw: string | null): TripType {
 }
 
 export function RideBookingPage() {
-  useRidePageMeta(
-    "Đặt chuyến",
-    "Gửi yêu cầu đặt chuyến xe riêng có tài xế.",
-  );
+  useRidePageMeta("Đặt chuyến", "Gửi yêu cầu đặt chuyến xe riêng có tài xế.", {
+    noindex: true,
+  });
+
+  useEffect(() => {
+    trackRideEvent("booking_started");
+  }, []);
 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -177,6 +183,9 @@ export function RideBookingPage() {
       } catch {
         /* ignore */
       }
+      trackRideEvent("booking_submitted", {
+        booking_code: trip.bookingCode,
+      });
       void navigate(
         `/ride/booking/success?code=${encodeURIComponent(trip.bookingCode)}`,
         { state: { trip } },

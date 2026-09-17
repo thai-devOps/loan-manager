@@ -1,23 +1,23 @@
-import { useEffect } from "react";
-import { rideBrand } from "@/features/ride/config/ride-brand";
+import { useLocation } from "react-router-dom";
+import { useSEO } from "@/features/ride/lib/use-seo";
 
-export function useRidePageMeta(title: string, description?: string) {
-  useEffect(() => {
-    const full = `${title} · ${rideBrand.name}`;
-    document.title = full;
+/**
+ * Convenience wrapper — prefer useSEO with explicit path for landings.
+ */
+export function useRidePageMeta(
+  title: string,
+  description?: string,
+  options?: { noindex?: boolean },
+) {
+  const { pathname } = useLocation();
+  const desc =
+    description ??
+    "Xe riêng có tài xế tại An Giang — đón tận nơi, báo giá theo lộ trình.";
 
-    let meta = document.querySelector('meta[name="description"]');
-    if (!meta) {
-      meta = document.createElement("meta");
-      meta.setAttribute("name", "description");
-      document.head.appendChild(meta);
-    }
-    if (description) {
-      meta.setAttribute("content", description);
-    }
-
-    return () => {
-      document.title = rideBrand.name;
-    };
-  }, [title, description]);
+  useSEO({
+    title,
+    description: desc,
+    path: pathname,
+    robots: options?.noindex ? "noindex,nofollow" : "index,follow",
+  });
 }

@@ -1,6 +1,6 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Menu, Phone, MessageCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -16,11 +16,16 @@ import {
   getHotlines,
   rideBrand,
 } from "@/features/ride/config/ride-brand";
+import {
+  initRideAnalytics,
+  trackRidePageView,
+} from "@/features/ride/lib/ride-analytics";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { to: "/ride", label: "Trang chủ", end: true },
-  { to: "/ride/services", label: "Dịch vụ" },
+  { to: "/ride/dich-vu", label: "Dịch vụ" },
+  { to: "/ride/locations/an-giang", label: "Khu vực" },
   { to: "/ride/cars", label: "Xe phục vụ" },
   { to: "/ride/pricing", label: "Bảng giá" },
   { to: "/ride/my-booking", label: "Tra cứu" },
@@ -62,6 +67,15 @@ export function RidePublicLayout() {
   const [open, setOpen] = useState(false);
   const tel = hotlineTelHref();
   const hotlines = getHotlines();
+  const location = useLocation();
+
+  useEffect(() => {
+    initRideAnalytics();
+  }, []);
+
+  useEffect(() => {
+    trackRidePageView(location.pathname + location.search);
+  }, [location.pathname, location.search]);
 
   return (
     <div className="ride-site flex min-h-dvh flex-col bg-background text-foreground">
@@ -72,7 +86,7 @@ export function RidePublicLayout() {
               {rideBrand.name}
             </span>
             <span className="hidden text-xs text-muted-foreground sm:block">
-              Xe riêng + tài xế
+              {rideBrand.subtitle}
             </span>
           </Link>
 
@@ -123,8 +137,23 @@ export function RidePublicLayout() {
             <p className="text-sm font-semibold">Điều hướng</p>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link className="hover:text-foreground" to="/ride/services">
+                <Link className="hover:text-foreground" to="/ride/dich-vu">
                   Dịch vụ
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-foreground" to="/ride/locations/an-giang">
+                  Khu vực An Giang
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-foreground" to="/ride/routes/an-giang-can-tho">
+                  Tuyến An Giang — Cần Thơ
+                </Link>
+              </li>
+              <li>
+                <Link className="hover:text-foreground" to="/ride/xe-co-tai-xe">
+                  Giới thiệu {rideBrand.name}
                 </Link>
               </li>
               <li>

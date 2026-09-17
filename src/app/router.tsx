@@ -1,7 +1,9 @@
-import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import { lazy, Suspense, type ReactNode } from "react";
+import { createBrowserRouter, Navigate, Outlet, useParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { ScrollToTop } from "@/components/scroll-to-top";
+import { Skeleton } from "@/components/ui/skeleton";
 import { RequireAuth } from "@/features/auth/require-auth";
 import { LoginPage } from "@/features/auth/login-page";
 import {
@@ -35,16 +37,7 @@ import { AssetsAllocationPage } from "@/features/assets/assets-allocation-page";
 import { AssetsGoldPage } from "@/features/assets/assets-gold-page";
 import { AssetsGoldPlanPage } from "@/features/assets/assets-gold-plan-page";
 import { RidePublicLayout } from "@/features/ride/components/ride-public-layout";
-import { RideHomePage } from "@/features/ride/pages/ride-home-page";
-import { RideServicesPage } from "@/features/ride/pages/ride-services-page";
-import { RideServiceLandingPage } from "@/features/ride/pages/ride-service-landing-page";
-import { RideCarsPage } from "@/features/ride/pages/ride-cars-page";
-import { RideCarDetailPage } from "@/features/ride/pages/ride-car-detail-page";
-import { RideBookingPage } from "@/features/ride/pages/ride-booking-page";
-import { RideBookingSuccessPage } from "@/features/ride/pages/ride-booking-success-page";
-import { RideMyBookingPage } from "@/features/ride/pages/ride-my-booking-page";
-import { RidePricingPage } from "@/features/ride/pages/ride-pricing-page";
-import { RideContactPage } from "@/features/ride/pages/ride-contact-page";
+import { LEGACY_SERVICE_REDIRECTS } from "@/features/ride/seo/registry";
 import { RideAdminLayout } from "@/features/ride-admin/components/ride-admin-layout";
 import { RideAdminDashboardPage } from "@/features/ride-admin/pages/dashboard-page";
 import { RideAdminBookingsPage } from "@/features/ride-admin/pages/bookings-page";
@@ -67,6 +60,94 @@ import { AccessMatrixPage } from "@/features/access-control/pages/access-matrix-
 import { AuditLogsPage } from "@/features/access-control/pages/audit-logs-page";
 import { PERMISSIONS } from "@/config/permissions";
 
+const RideHomePage = lazy(() =>
+  import("@/features/ride/pages/ride-home-page").then((m) => ({
+    default: m.RideHomePage,
+  })),
+);
+const RideServicesIndexPage = lazy(() =>
+  import("@/features/ride/pages/ride-services-index-page").then((m) => ({
+    default: m.RideServicesIndexPage,
+  })),
+);
+const RideStaticServicePage = lazy(() =>
+  import("@/features/ride/pages/ride-static-service-page").then((m) => ({
+    default: m.RideStaticServicePage,
+  })),
+);
+const RideLocationSeoPage = lazy(() =>
+  import("@/features/ride/pages/ride-seo-route-pages").then((m) => ({
+    default: m.RideLocationSeoPage,
+  })),
+);
+const RideRouteSeoPage = lazy(() =>
+  import("@/features/ride/pages/ride-seo-route-pages").then((m) => ({
+    default: m.RideRouteSeoPage,
+  })),
+);
+const RideNotFoundPage = lazy(() =>
+  import("@/features/ride/pages/ride-seo-route-pages").then((m) => ({
+    default: m.RideNotFoundPage,
+  })),
+);
+const RideCarsPage = lazy(() =>
+  import("@/features/ride/pages/ride-cars-page").then((m) => ({
+    default: m.RideCarsPage,
+  })),
+);
+const RideCarDetailPage = lazy(() =>
+  import("@/features/ride/pages/ride-car-detail-page").then((m) => ({
+    default: m.RideCarDetailPage,
+  })),
+);
+const RideBookingPage = lazy(() =>
+  import("@/features/ride/pages/ride-booking-page").then((m) => ({
+    default: m.RideBookingPage,
+  })),
+);
+const RideBookingSuccessPage = lazy(() =>
+  import("@/features/ride/pages/ride-booking-success-page").then((m) => ({
+    default: m.RideBookingSuccessPage,
+  })),
+);
+const RideMyBookingPage = lazy(() =>
+  import("@/features/ride/pages/ride-my-booking-page").then((m) => ({
+    default: m.RideMyBookingPage,
+  })),
+);
+const RidePricingPage = lazy(() =>
+  import("@/features/ride/pages/ride-pricing-page").then((m) => ({
+    default: m.RidePricingPage,
+  })),
+);
+const RideContactPage = lazy(() =>
+  import("@/features/ride/pages/ride-contact-page").then((m) => ({
+    default: m.RideContactPage,
+  })),
+);
+
+function RideLazy({ children }: { children: ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-6xl space-y-4 px-4 py-10">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
+
+function LegacyServiceSlugRedirect() {
+  const { slug = "" } = useParams();
+  const from = `/ride/services/${slug}`;
+  const target = LEGACY_SERVICE_REDIRECTS[from] ?? "/ride/dich-vu";
+  return <Navigate to={target} replace />;
+}
+
 function RootLayout() {
   return (
     <>
@@ -88,16 +169,168 @@ export const router = createBrowserRouter([
     path: "/ride",
     element: <RidePublicLayout />,
     children: [
-      { index: true, element: <RideHomePage /> },
-      { path: "services", element: <RideServicesPage /> },
-      { path: "services/:slug", element: <RideServiceLandingPage /> },
-      { path: "cars", element: <RideCarsPage /> },
-      { path: "cars/:id", element: <RideCarDetailPage /> },
-      { path: "booking", element: <RideBookingPage /> },
-      { path: "booking/success", element: <RideBookingSuccessPage /> },
-      { path: "my-booking", element: <RideMyBookingPage /> },
-      { path: "pricing", element: <RidePricingPage /> },
-      { path: "contact", element: <RideContactPage /> },
+      {
+        index: true,
+        element: (
+          <RideLazy>
+            <RideHomePage />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "dich-vu",
+        element: (
+          <RideLazy>
+            <RideServicesIndexPage />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "xe-co-tai-xe",
+        element: (
+          <RideLazy>
+            <RideStaticServicePage slug="xe-co-tai-xe" />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "du-lich",
+        element: (
+          <RideLazy>
+            <RideStaticServicePage slug="du-lich" />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "kham-benh",
+        element: (
+          <RideLazy>
+            <RideStaticServicePage slug="kham-benh" />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "hanh-huong",
+        element: (
+          <RideLazy>
+            <RideStaticServicePage slug="hanh-huong" />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "dua-don-san-bay",
+        element: (
+          <RideLazy>
+            <RideStaticServicePage slug="dua-don-san-bay" />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "cong-tac",
+        element: (
+          <RideLazy>
+            <RideStaticServicePage slug="cong-tac" />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "lien-tinh",
+        element: (
+          <RideLazy>
+            <RideStaticServicePage slug="lien-tinh" />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "theo-yeu-cau",
+        element: (
+          <RideLazy>
+            <RideStaticServicePage slug="theo-yeu-cau" />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "locations/:slug",
+        element: (
+          <RideLazy>
+            <RideLocationSeoPage />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "routes/:slug",
+        element: (
+          <RideLazy>
+            <RideRouteSeoPage />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "cars",
+        element: (
+          <RideLazy>
+            <RideCarsPage />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "cars/:id",
+        element: (
+          <RideLazy>
+            <RideCarDetailPage />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "booking",
+        element: (
+          <RideLazy>
+            <RideBookingPage />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "booking/success",
+        element: (
+          <RideLazy>
+            <RideBookingSuccessPage />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "my-booking",
+        element: (
+          <RideLazy>
+            <RideMyBookingPage />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "pricing",
+        element: (
+          <RideLazy>
+            <RidePricingPage />
+          </RideLazy>
+        ),
+      },
+      {
+        path: "contact",
+        element: (
+          <RideLazy>
+            <RideContactPage />
+          </RideLazy>
+        ),
+      },
+      { path: "services", element: <Navigate to="/ride/dich-vu" replace /> },
+      { path: "services/:slug", element: <LegacyServiceSlugRedirect /> },
+      {
+        path: "*",
+        element: (
+          <RideLazy>
+            <RideNotFoundPage />
+          </RideLazy>
+        ),
+      },
     ],
   },
   {

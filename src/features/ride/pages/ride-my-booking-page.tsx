@@ -291,6 +291,7 @@ export function RideMyBookingPage() {
   useRidePageMeta(
     "Tra cứu chuyến",
     "Tra cứu yêu cầu đặt chuyến bằng mã chuyến và số điện thoại.",
+    { noindex: true },
   );
 
   const [searchParams] = useSearchParams();

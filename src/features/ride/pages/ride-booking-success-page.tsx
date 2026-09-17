@@ -8,13 +8,16 @@ import {
   rideBrand,
 } from "@/features/ride/config/ride-brand";
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
+import { trackRideEvent } from "@/features/ride/lib/ride-analytics";
 import { vehicleService } from "@/features/ride/services/vehicleService";
 import type { TripBooking, Vehicle } from "@/features/ride/types/ride";
 
 type LocationState = { trip?: TripBooking };
 
 export function RideBookingSuccessPage() {
-  useRidePageMeta("Đã gửi yêu cầu", "Yêu cầu đặt chuyến đã được tiếp nhận.");
+  useRidePageMeta("Đã gửi yêu cầu", "Yêu cầu đặt chuyến đã được tiếp nhận.", {
+    noindex: true,
+  });
 
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -23,6 +26,12 @@ export function RideBookingSuccessPage() {
 
   const [trip, setTrip] = useState<TripBooking | null>(stateTrip ?? null);
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+
+  useEffect(() => {
+    trackRideEvent("booking_success", {
+      booking_code: codeParam || undefined,
+    });
+  }, [codeParam]);
 
   useEffect(() => {
     let cancelled = false;
