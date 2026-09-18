@@ -36,6 +36,10 @@ import {
   SERVICE_TYPE_LABELS,
   TRIP_TYPE_LABELS,
 } from "@/features/ride/lib/labels";
+import {
+  formatRideDateTime,
+  formatRideTimestamp,
+} from "@/features/ride-admin/lib/format";
 import type {
   BookingQuoteSnapshot,
   BookingStatus,
@@ -461,7 +465,10 @@ export function RideAdminBookingDetailPage() {
             <div className="flex flex-col gap-2 sm:border-l sm:border-teal-100 sm:pl-5 dark:sm:border-teal-900/50">
               <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs font-medium text-amber-900 ring-1 ring-amber-200/80 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900">
                 <Calendar className="size-3.5 shrink-0" />
-                {booking.pickupDate} · {booking.pickupTime}
+                Đón {formatRideDateTime(booking.pickupDate, booking.pickupTime)}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted/50 px-2.5 py-2 text-xs font-medium text-muted-foreground ring-1 ring-border">
+                Đặt lúc {formatRideTimestamp(booking.createdAt)}
               </span>
               {booking.note ? (
                 <span className="rounded-lg bg-orange-50 px-2.5 py-2 text-xs font-medium leading-relaxed text-orange-900 ring-1 ring-orange-200/80 dark:bg-orange-950/40 dark:text-orange-100 dark:ring-orange-900">

@@ -15,6 +15,10 @@ import type { RideCustomerDetail } from "@/features/ride/types/ride";
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
 import { PERMISSIONS } from "@/config/permissions";
+import {
+  formatRideDateTime,
+  formatRideTimestamp,
+} from "@/features/ride-admin/lib/format";
 
 function isDetail(
   value: unknown,
@@ -152,6 +156,18 @@ export function RideAdminCustomerDetailPage() {
             <dt className="text-muted-foreground">Địa chỉ</dt>
             <dd className="font-medium">{detail.address || "—"}</dd>
           </div>
+          <div>
+            <dt className="text-muted-foreground">Booking gần nhất</dt>
+            <dd className="font-medium">
+              {formatRideTimestamp(detail.lastBookingAt)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Tạo lúc</dt>
+            <dd className="font-medium">
+              {formatRideTimestamp(detail.createdAt)}
+            </dd>
+          </div>
           {detail.note ? (
             <div className="sm:col-span-2">
               <dt className="text-muted-foreground">Ghi chú</dt>
@@ -196,7 +212,7 @@ export function RideAdminCustomerDetailPage() {
             <div>
               <p className="font-mono text-sm font-semibold">{lastTrip.tripCode}</p>
               <p className="text-sm text-muted-foreground">
-                {lastTrip.pickupDate} · {lastTrip.pickupTime} ·{" "}
+                {formatRideDateTime(lastTrip.pickupDate, lastTrip.pickupTime)} ·{" "}
                 {TRIP_TYPE_LABELS[lastTrip.tripType] ?? lastTrip.tripType}
               </p>
             </div>
@@ -227,7 +243,8 @@ export function RideAdminCustomerDetailPage() {
                 <div className="min-w-0">
                   <p className="font-mono text-xs font-semibold">{t.tripCode}</p>
                   <p className="truncate text-sm text-muted-foreground">
-                    {t.pickupDate} · {t.pickup?.address ?? "—"}
+                    {formatRideDateTime(t.pickupDate, t.pickupTime)} ·{" "}
+                    {t.pickup?.address ?? "—"}
                   </p>
                 </div>
                 <TripStatusBadge status={t.status} />
@@ -256,7 +273,8 @@ export function RideAdminCustomerDetailPage() {
                     #{b.bookingCode}
                   </p>
                   <p className="truncate text-sm text-muted-foreground">
-                    {b.pickupDate} · {b.pickup?.address ?? "—"}
+                    {formatRideDateTime(b.pickupDate, b.pickupTime)} ·{" "}
+                    {b.pickup?.address ?? "—"}
                   </p>
                 </div>
                 <BookingStatusBadge status={b.status} />

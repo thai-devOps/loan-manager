@@ -27,6 +27,10 @@ import {
   TRIP_TYPE_LABELS,
   nextTripStatuses,
 } from "@/features/ride/lib/labels";
+import {
+  formatRideDateTime,
+  formatRideTimestamp,
+} from "@/features/ride-admin/lib/format";
 import type {
   Driver,
   RideTrip,
@@ -168,15 +172,14 @@ export function RideAdminTripDetailPage() {
           <div>
             <dt className="text-muted-foreground">Ngày giờ đón</dt>
             <dd className="font-medium">
-              {trip.pickupDate} · {trip.pickupTime}
+              {formatRideDateTime(trip.pickupDate, trip.pickupTime)}
             </dd>
           </div>
           {trip.returnDate ? (
             <div>
               <dt className="text-muted-foreground">Ngày giờ về</dt>
               <dd className="font-medium">
-                {trip.returnDate}
-                {trip.returnTime ? ` · ${trip.returnTime}` : ""}
+                {formatRideDateTime(trip.returnDate, trip.returnTime)}
               </dd>
             </div>
           ) : null}
@@ -187,7 +190,7 @@ export function RideAdminTripDetailPage() {
           <div>
             <dt className="text-muted-foreground">Cập nhật</dt>
             <dd className="font-medium">
-              {new Date(trip.updatedAt).toLocaleString("vi-VN")}
+              {formatRideTimestamp(trip.updatedAt)}
             </dd>
           </div>
         </dl>
@@ -381,7 +384,7 @@ export function RideAdminTripDetailPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <TripStatusBadge status={ev.status} />
                       <span className="text-xs text-muted-foreground">
-                        {new Date(ev.at).toLocaleString("vi-VN")}
+                        {formatRideTimestamp(ev.at)}
                       </span>
                     </div>
                     {ev.note ? (

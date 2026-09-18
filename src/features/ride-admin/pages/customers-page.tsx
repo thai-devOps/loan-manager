@@ -12,6 +12,12 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Can } from "@/features/auth/can";
+import {
+  AdminFilterBar,
+  filterControlClass,
+  filterSearchClass,
+  filterSearchFormClass,
+} from "@/features/ride-admin/components/admin-filter-bar";
 import { CustomerStatusBadge } from "@/features/ride-admin/components/customer-status-badge";
 import { CustomerFormDialog } from "@/features/ride-admin/pages/customer-form-dialog";
 import { customerAdminService } from "@/features/ride-admin/services/admin-api";
@@ -20,6 +26,7 @@ import type { RideCustomer, RideCustomerStatus } from "@/features/ride/types/rid
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
 import { PERMISSIONS } from "@/config/permissions";
+import { formatRideTimestamp } from "@/features/ride-admin/lib/format";
 
 const STATUSES = Object.keys(CUSTOMER_STATUS_LABELS) as RideCustomerStatus[];
 
@@ -66,6 +73,9 @@ export function RideAdminCustomersPage() {
     };
   }, [status, searchParams]);
 
+  const qParam = searchParams.get("q") ?? "";
+  const activeFilterCount = [qParam, status].filter(Boolean).length;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -86,20 +96,21 @@ export function RideAdminCustomersPage() {
         </Can>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-2">
+      <AdminFilterBar activeCount={activeFilterCount}>
         <form
-          className="flex gap-2 sm:col-span-2"
+          className={filterSearchFormClass}
           onSubmit={(e) => {
             e.preventDefault();
             patchParams({ q });
           }}
         >
           <Input
+            className={filterSearchClass}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Mã / tên / SĐT / email"
           />
-          <Button type="submit" className="bg-teal-800 hover:bg-teal-700">
+          <Button type="submit" size="sm" className="h-9 shrink-0 bg-teal-800 hover:bg-teal-700">
             Tìm
           </Button>
         </form>
@@ -107,7 +118,7 @@ export function RideAdminCustomersPage() {
           value={status || "all"}
           onValueChange={(v) => patchParams({ status: v })}
         >
-          <SelectTrigger>
+          <SelectTrigger className={filterControlClass}>
             <SelectValue placeholder="Trạng thái" />
           </SelectTrigger>
           <SelectContent>
@@ -119,7 +130,7 @@ export function RideAdminCustomersPage() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </AdminFilterBar>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
@@ -197,10 +208,8 @@ export function RideAdminCustomersPage() {
                   <td className="px-3 py-3 whitespace-nowrap">
                     {formatCurrency(c.totalSpend || 0)}
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">
-                    {c.lastBookingAt
-                      ? new Date(c.lastBookingAt).toLocaleDateString("vi-VN")
-                      : "—"}
+                  <td className="px-3 py-3 text-muted-foreground whitespace-nowrap">
+                    {formatRideTimestamp(c.lastBookingAt)}
                   </td>
                   <td className="px-3 py-3">
                     <CustomerStatusBadge status={c.status} />

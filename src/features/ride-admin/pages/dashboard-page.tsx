@@ -13,6 +13,10 @@ import {
 } from "@/features/ride-admin/services/admin-api";
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
+import {
+  formatRideDateTime,
+  formatRideTimestamp,
+} from "@/features/ride-admin/lib/format";
 
 export function RideAdminDashboardPage() {
   const [range, setRange] = useState<"today" | "7d" | "month">("today");
@@ -153,8 +157,11 @@ export function RideAdminDashboardPage() {
                         {b.pickup.address} → {b.destination.address}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {b.pickupDate} · {b.pickupTime} · {b.passengers} khách ·{" "}
-                        {vehicleName(b.vehicleId)}
+                        Đón {formatRideDateTime(b.pickupDate, b.pickupTime)} ·{" "}
+                        {b.passengers} khách · {vehicleName(b.vehicleId)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Đặt {formatRideTimestamp(b.createdAt)}
                       </p>
                     </div>
                     <BookingStatusBadge status={b.status} />
@@ -189,7 +196,7 @@ export function RideAdminDashboardPage() {
               data.upcoming.map((b) => (
                 <li key={b.id} className="rounded-xl border border-border/70 p-3">
                   <p className="text-sm font-semibold">
-                    {b.pickupTime} · {b.pickupDate}
+                    {formatRideDateTime(b.pickupDate, b.pickupTime)}
                   </p>
                   <p className="mt-1 text-sm">
                     {b.pickup.address} → {b.destination.address}

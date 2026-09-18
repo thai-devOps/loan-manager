@@ -12,6 +12,12 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Can } from "@/features/auth/can";
+import {
+  AdminFilterBar,
+  filterControlClass,
+  filterSearchClass,
+  filterSearchFormClass,
+} from "@/features/ride-admin/components/admin-filter-bar";
 import { TripStatusBadge } from "@/features/ride-admin/components/trip-status-badge";
 import { TripFormDialog } from "@/features/ride-admin/pages/trip-form-dialog";
 import {
@@ -33,6 +39,10 @@ import type {
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
 import { PERMISSIONS } from "@/config/permissions";
+import { cn } from "@/lib/utils";
+import {
+  formatRideDateTime,
+} from "@/features/ride-admin/lib/format";
 
 const STATUSES = Object.keys(TRIP_STATUS_LABELS) as TripStatus[];
 const TYPES = Object.keys(TRIP_TYPE_LABELS) as TripType[];
@@ -109,6 +119,16 @@ export function RideAdminTripsPage() {
     return drivers.find((d) => d.id === id)?.name ?? "—";
   }
 
+  const qParam = searchParams.get("q") ?? "";
+  const activeFilterCount = [
+    qParam,
+    date,
+    status,
+    tripType,
+    vehicleId,
+    driverId,
+  ].filter(Boolean).length;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -129,25 +149,27 @@ export function RideAdminTripsPage() {
         </Can>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-2 lg:grid-cols-3">
+      <AdminFilterBar activeCount={activeFilterCount}>
         <form
-          className="flex gap-2 sm:col-span-2 lg:col-span-3"
+          className={filterSearchFormClass}
           onSubmit={(e) => {
             e.preventDefault();
             patchParams({ q });
           }}
         >
           <Input
+            className={filterSearchClass}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Mã chuyến / booking / khách / điểm đến"
           />
-          <Button type="submit" className="bg-teal-800 hover:bg-teal-700">
+          <Button type="submit" size="sm" className="h-9 shrink-0 bg-teal-800 hover:bg-teal-700">
             Tìm
           </Button>
         </form>
         <Input
           type="date"
+          className={cn(filterControlClass, "w-[10.5rem]")}
           value={date}
           onChange={(e) => patchParams({ date: e.target.value })}
         />
@@ -155,7 +177,7 @@ export function RideAdminTripsPage() {
           value={status || "all"}
           onValueChange={(v) => patchParams({ status: v })}
         >
-          <SelectTrigger>
+          <SelectTrigger className={filterControlClass}>
             <SelectValue placeholder="Trạng thái" />
           </SelectTrigger>
           <SelectContent>
@@ -171,7 +193,7 @@ export function RideAdminTripsPage() {
           value={tripType || "all"}
           onValueChange={(v) => patchParams({ tripType: v })}
         >
-          <SelectTrigger>
+          <SelectTrigger className={filterControlClass}>
             <SelectValue placeholder="Loại chuyến" />
           </SelectTrigger>
           <SelectContent>
@@ -187,7 +209,7 @@ export function RideAdminTripsPage() {
           value={vehicleId || "all"}
           onValueChange={(v) => patchParams({ vehicleId: v })}
         >
-          <SelectTrigger>
+          <SelectTrigger className={filterControlClass}>
             <SelectValue placeholder="Xe" />
           </SelectTrigger>
           <SelectContent>
@@ -203,7 +225,7 @@ export function RideAdminTripsPage() {
           value={driverId || "all"}
           onValueChange={(v) => patchParams({ driverId: v })}
         >
-          <SelectTrigger>
+          <SelectTrigger className={filterControlClass}>
             <SelectValue placeholder="Tài xế" />
           </SelectTrigger>
           <SelectContent>
@@ -215,7 +237,7 @@ export function RideAdminTripsPage() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </AdminFilterBar>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
@@ -250,7 +272,8 @@ export function RideAdminTripsPage() {
                       `${t.pickup?.address ?? "—"} → ${t.destination?.address ?? "—"}`}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {t.pickupDate} {t.pickupTime} · {vehicleName(t.vehicleId)} ·{" "}
+                    {formatRideDateTime(t.pickupDate, t.pickupTime)} ·{" "}
+                    {vehicleName(t.vehicleId)} ·{" "}
                     {TRIP_TYPE_LABELS[t.tripType] ?? t.tripType ?? "—"}
                   </p>
                 </Link>
@@ -264,7 +287,7 @@ export function RideAdminTripsPage() {
               <th className="px-3 py-3 font-medium">Mã</th>
               <th className="px-3 py-3 font-medium">Khách</th>
               <th className="px-3 py-3 font-medium">Hành trình</th>
-              <th className="px-3 py-3 font-medium">Ngày giờ</th>
+              <th className="px-3 py-3 font-medium">Ngày đón</th>
               <th className="px-3 py-3 font-medium">Loại</th>
               <th className="px-3 py-3 font-medium">Xe</th>
               <th className="px-3 py-3 font-medium">Tài xế</th>
@@ -313,9 +336,7 @@ export function RideAdminTripsPage() {
                     </div>
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap">
-                    {t.pickupDate}
-                    <br />
-                    {t.pickupTime}
+                    {formatRideDateTime(t.pickupDate, t.pickupTime)}
                   </td>
                   <td className="px-3 py-3">
                     {TRIP_TYPE_LABELS[t.tripType] ?? t.tripType ?? "—"}
