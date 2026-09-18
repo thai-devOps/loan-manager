@@ -6,8 +6,9 @@ export const rideBrand = {
   name: "SiTha Trip",
   shortName: "SiTha Trip",
   /** One-line subtitle under the logo / header */
-  subtitle: "Dịch vụ du lịch SiTha",
-  tagline: "Dịch vụ du lịch SiTha — uy tín, đúng giờ, tận tâm",
+  subtitle: "Xe có tài xế An Giang",
+  tagline:
+    "Đặt xe riêng có tài xế tại An Giang — đón tận nơi, uy tín, đúng giờ",
   /** Display labels for hotlines */
   hotlines: ["035 5511034", "039 7706494"] as string[],
   zaloUrl: "",

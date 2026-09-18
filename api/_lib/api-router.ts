@@ -121,6 +121,18 @@ export const API_ROUTES: ApiRoute[] = [
     load: () => import("../_routes/ride/dashboard.js"),
   },
   {
+    pattern: /^\/api\/ride\/schedule\/?$/,
+    load: () => import("../_routes/ride/schedule.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/reminders\/?$/,
+    load: () => import("../_routes/ride/reminders.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/availability\/?$/,
+    load: () => import("../_routes/ride/availability.js"),
+  },
+  {
     pattern: /^\/api\/ride\/geo\/search\/?$/,
     load: () => import("../_routes/ride/geo/search.js"),
   },
@@ -128,6 +140,20 @@ export const API_ROUTES: ApiRoute[] = [
     pattern: /^\/api\/ride\/quote\/?$/,
     method: "POST",
     load: () => import("../_routes/ride/quote.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/pricing\/calculate\/?$/,
+    method: "POST",
+    load: () => import("../_routes/ride/pricing/calculate.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/pricing-rules\/?$/,
+    load: () => import("../_routes/ride/pricing-rules/index.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/pricing-rules\/([^/]+)\/?$/,
+    load: () => import("../_routes/ride/pricing-rules/[id].js"),
+    params: (m) => ({ id: m[1]! }),
   },
   {
     pattern: /^\/api\/ride\/bookings\/lookup\/?$/,
@@ -168,6 +194,12 @@ export const API_ROUTES: ApiRoute[] = [
   {
     pattern: /^\/api\/ride\/vehicles\/?$/,
     load: () => import("../_routes/ride/vehicles/index.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/vehicles\/([^/]+)\/odometer-history\/?$/,
+    load: () =>
+      import("../_routes/ride/vehicles/[id]/odometer-history.js"),
+    params: (m) => ({ id: m[1]! }),
   },
   {
     pattern: /^\/api\/ride\/vehicles\/([^/]+)\/?$/,

@@ -25,7 +25,7 @@ export const ROLE_SEEDS: RoleSeedDef[] = [
   {
     code: SYSTEM_ROLE_CODES.SUPER_ADMIN,
     name: "Super Admin",
-    description: "Toàn quyền hệ thống Monely",
+    description: "Toàn quyền hệ thống",
     permissionPrefixes: ["*"],
   },
   {
@@ -87,6 +87,7 @@ export const ROLE_SEEDS: RoleSeedDef[] = [
       "fleet.customer.view",
       "fleet.customer.create",
       "fleet.customer.update",
+      "fleet.pricing.view",
       "report.loan.view",
     ],
   },

@@ -21,11 +21,13 @@ import { cn } from "@/lib/utils";
 
 const NAV_PERMISSION: Record<string, string | undefined> = {
   "/admin/dashboard": PERMISSIONS.FLEET_DASHBOARD_VIEW,
+  "/admin/schedule": PERMISSIONS.FLEET_TRIP_VIEW,
   "/admin/bookings": PERMISSIONS.FLEET_BOOKING_VIEW,
   "/admin/vehicles": PERMISSIONS.FLEET_VEHICLE_VIEW,
   "/admin/drivers": PERMISSIONS.FLEET_DRIVER_VIEW,
   "/admin/trips": PERMISSIONS.FLEET_TRIP_VIEW,
   "/admin/customers": PERMISSIONS.FLEET_CUSTOMER_VIEW,
+  "/admin/pricing": PERMISSIONS.FLEET_PRICING_VIEW,
 };
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {

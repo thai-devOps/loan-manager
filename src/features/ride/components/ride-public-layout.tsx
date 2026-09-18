@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { Menu, Phone, MessageCircle } from "lucide-react";
+import { LayoutGrid, Menu, Phone, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   initRideAnalytics,
   trackRidePageView,
 } from "@/features/ride/lib/ride-analytics";
+import { useAuthStore } from "@/stores/auth.store";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -69,6 +70,12 @@ export function RidePublicLayout() {
   const tel = hotlineTelHref();
   const hotlines = getHotlines();
   const location = useLocation();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hydrate = useAuthStore((s) => s.hydrate);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     initRideAnalytics();
@@ -97,9 +104,18 @@ export function RidePublicLayout() {
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button asChild size="sm" variant="outline" className="hidden sm:inline-flex">
-              <Link to="/login">Đăng nhập</Link>
-            </Button>
+            {isAuthenticated ? (
+              <Button asChild size="sm" variant="outline" className="hidden sm:inline-flex">
+                <Link to="/apps">
+                  <LayoutGrid className="size-3.5" />
+                  Tính năng
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild size="sm" variant="outline" className="hidden sm:inline-flex">
+                <Link to="/login">Đăng nhập</Link>
+              </Button>
+            )}
             <Button asChild size="sm" className="hidden sm:inline-flex bg-teal-800 hover:bg-teal-700">
               <Link to="/ride/booking">Đặt chuyến</Link>
             </Button>
@@ -119,9 +135,18 @@ export function RidePublicLayout() {
                   <Button asChild className="bg-teal-800 hover:bg-teal-700" onClick={() => setOpen(false)}>
                     <Link to="/ride/booking">Đặt chuyến ngay</Link>
                   </Button>
-                  <Button asChild variant="outline" onClick={() => setOpen(false)}>
-                    <Link to="/login">Đăng nhập</Link>
-                  </Button>
+                  {isAuthenticated ? (
+                    <Button asChild variant="outline" onClick={() => setOpen(false)}>
+                      <Link to="/apps">
+                        <LayoutGrid className="size-4" />
+                        Chọn tính năng
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button asChild variant="outline" onClick={() => setOpen(false)}>
+                      <Link to="/login">Đăng nhập</Link>
+                    </Button>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>

@@ -61,6 +61,27 @@ export type VehiclePricingConfig = {
   extraKmRate: number;
 };
 
+export type VehicleInsurance = {
+  id: string;
+  type: string;
+  provider?: string;
+  startDate?: string;
+  endDate?: string;
+  note?: string;
+  attachmentUrl?: string | null;
+};
+
+export type VehicleMaintenanceLog = {
+  id: string;
+  date: string;
+  odometer: number;
+  title: string;
+  cost?: number;
+  garage?: string;
+  note?: string;
+  attachmentUrl?: string | null;
+};
+
 export type QuoteBreakdownLine = {
   label: string;
   amount: number;
@@ -86,6 +107,103 @@ export type BookingQuoteSnapshot = {
   quotedAt: string;
 };
 
+export type PricingRuleType =
+  | "ROUTE"
+  | "PER_KM"
+  | "PER_DAY"
+  | "AIRPORT"
+  | "SURCHARGE";
+
+export type PricingRuleStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
+
+export type VehicleCategory = "SEAT_4" | "SEAT_7" | "SEAT_16" | "ANY";
+
+export type PricingServiceMatch = ServiceType | "ANY";
+
+export type PricingRuleConfig = {
+  basePrice?: number;
+  pricePerKm?: number;
+  minimumPrice?: number;
+  pricePerDay?: number;
+  overtimePricePerHour?: number;
+  roundTrip?: boolean;
+  surchargeType?: "fixed" | "percentage";
+  surchargeAmount?: number;
+  surchargePercentage?: number;
+};
+
+export type PricingRuleVersionSnapshot = {
+  version: number;
+  pricingConfig: PricingRuleConfig;
+  archivedAt: string;
+};
+
+export type RidePricingRule = {
+  id: string;
+  name: string;
+  type: PricingRuleType;
+  serviceType: PricingServiceMatch;
+  vehicleCategory: VehicleCategory;
+  origin?: string;
+  destination?: string;
+  originKey?: string;
+  destinationKey?: string;
+  pricingConfig: PricingRuleConfig;
+  priority: number;
+  status: PricingRuleStatus;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  version: number;
+  versionHistory: PricingRuleVersionSnapshot[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BookingPricingSnapshot = {
+  pricingRuleId: string;
+  version: number;
+  calculatedAt: string;
+  basePrice: number;
+  distanceKm: number;
+  distancePrice: number;
+  surcharges: number;
+  total: number;
+  originKey?: string;
+  destinationKey?: string;
+  vehicleCategory?: VehicleCategory;
+  serviceType?: PricingServiceMatch;
+  roundTrip?: boolean;
+};
+
+export type PricingCalculateResult = {
+  matchedRuleId: string;
+  matchedRuleName?: string;
+  version: number;
+  billableKm: number;
+  breakdown: {
+    basePrice: number;
+    distancePrice: number;
+    surcharges: number;
+    total: number;
+  };
+  snapshot?: BookingPricingSnapshot;
+  origin?: string;
+  destination?: string;
+  roundTrip?: boolean;
+  date?: string;
+  vehicleCategory?: VehicleCategory;
+};
+
+export type PricingRulesListResponse = {
+  items: RidePricingRule[];
+  summary: {
+    total: number;
+    active: number;
+    draft: number;
+    expired: number;
+  };
+};
+
 export type Vehicle = {
   id: string;
   name: string;
@@ -102,6 +220,13 @@ export type Vehicle = {
   pricing?: VehiclePricingConfig;
   active: boolean;
   status?: VehicleStatus;
+  currentOdometer?: number | null;
+  nextMaintenanceOdometer?: number | null;
+  lastMaintenanceAt?: string | null;
+  lastMaintenanceOdometer?: number | null;
+  registrationExpiry?: string | null;
+  insurances?: VehicleInsurance[];
+  maintenanceLogs?: VehicleMaintenanceLog[];
   createdAt?: string;
   updatedAt?: string;
 };
@@ -165,6 +290,7 @@ export type TripBooking = {
   note?: string;
   quotedPrice: number | null;
   quoteSnapshot?: BookingQuoteSnapshot | null;
+  pricingSnapshot?: BookingPricingSnapshot | null;
   deposit?: number;
   paidAmount?: number;
   status: BookingStatus;
@@ -195,6 +321,8 @@ export type RideTrip = {
   pickupTime: string;
   returnDate?: string | null;
   returnTime?: string | null;
+  plannedEndAt?: string | null;
+  plannedDurationMinutes?: number | null;
   vehicleId?: string | null;
   driverId?: string | null;
   tripType: TripType;
@@ -203,10 +331,72 @@ export type RideTrip = {
   tripPrice: number;
   expenseTotal: number;
   revenueAmount: number;
+  actualCosts?: TripActualCosts | null;
+  startOdometer?: number | null;
+  endOdometer?: number | null;
   status: TripStatus;
   statusHistory: TripStatusEvent[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type TripActualCostItem = {
+  id: string;
+  category: string;
+  name: string;
+  amount: number;
+  note?: string;
+};
+
+export type TripActualCosts = {
+  fuelLiters?: number | null;
+  fuelPricePerLiter?: number | null;
+  fuelAmount?: number | null;
+  driverFee?: number | null;
+  items: TripActualCostItem[];
+};
+
+export type ScheduleItem = {
+  kind: "trip" | "booking";
+  id: string;
+  code: string;
+  status: string;
+  serviceType?: string | null;
+  customerName: string;
+  pickupAddress: string;
+  destinationAddress: string;
+  startAt: string;
+  endAt: string;
+  startMs: number;
+  endMs: number;
+  vehicleId: string | null;
+  driverId: string | null;
+  tripId?: string | null;
+  bookingId?: string | null;
+  needsVehicle: boolean;
+  needsDriver: boolean;
+};
+
+export type RideScheduleData = {
+  from: string;
+  to: string;
+  vehicles: Vehicle[];
+  drivers: Driver[];
+  items: ScheduleItem[];
+  summary: {
+    total: number;
+    assigned: number;
+    unassigned: number;
+  };
+};
+
+export type FleetReminder = {
+  id: string;
+  severity: "info" | "warning" | "critical";
+  vehicleId: string;
+  vehicleName: string;
+  message: string;
+  kind: "maintenance" | "registration" | "insurance";
 };
 
 export type RideCustomerDetail = RideCustomer & {
@@ -239,7 +429,16 @@ export type PriceQuote = {
   breakdown?: QuoteBreakdownLine[];
   provider?: string;
   snapshot?: BookingQuoteSnapshot | null;
-  errorCode?: "NO_ROUTE" | "TIMEOUT" | "UPSTREAM" | "MISSING_KEY" | "CUSTOM";
+  pricingSnapshot?: BookingPricingSnapshot | null;
+  matchedRuleId?: string;
+  pricingVersion?: number;
+  errorCode?:
+    | "NO_ROUTE"
+    | "TIMEOUT"
+    | "UPSTREAM"
+    | "MISSING_KEY"
+    | "CUSTOM"
+    | "NO_PRICING_RULE_FOUND";
   errorMessage?: string;
 };
 
@@ -272,7 +471,14 @@ export type RideDashboardData = {
     tripCount: number;
     revenue: number;
     expense: number;
+    profit?: number;
   };
+  dispatchToday?: {
+    total: number;
+    assigned: number;
+    unassigned: number;
+  };
+  reminders?: FleetReminder[];
   pending: TripBooking[];
   upcoming: TripBooking[];
   vehicleStats: {

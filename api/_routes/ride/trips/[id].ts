@@ -41,6 +41,21 @@ type ActionBody = {
   tripPrice?: number;
   expenseTotal?: number;
   revenueAmount?: number;
+  startOdometer?: number | null;
+  endOdometer?: number | null;
+  actualCosts?: {
+    fuelLiters?: number | null;
+    fuelPricePerLiter?: number | null;
+    fuelAmount?: number | null;
+    driverFee?: number | null;
+    items?: Array<{
+      id?: string;
+      category?: string;
+      name?: string;
+      amount?: number;
+      note?: string;
+    }>;
+  } | null;
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -122,14 +137,119 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
 
+        const patch: Record<string, unknown> = {
+          status,
+          statusHistory: pushStatusEvent(current.statusHistory, status, {
+            note: body.note,
+          }),
+          updatedAt: now,
+        };
+
+        if (status === "COMPLETED") {
+          const startOdo =
+            body.startOdometer != null
+              ? Number(body.startOdometer)
+              : current.startOdometer != null
+                ? Number(current.startOdometer)
+                : null;
+          const endOdo =
+            body.endOdometer != null ? Number(body.endOdometer) : null;
+          if (endOdo != null) {
+            if (!Number.isFinite(endOdo) || endOdo < 0) {
+              res.status(400).json({ error: "ODO cuối không hợp lệ" });
+              return;
+            }
+            if (startOdo != null && endOdo < startOdo) {
+              res.status(400).json({
+                error: "ODO cuối phải lớn hơn hoặc bằng ODO đầu",
+              });
+              return;
+            }
+            patch.startOdometer = startOdo;
+            patch.endOdometer = endOdo;
+            if (current.vehicleId) {
+              const vehicles = await rideVehiclesCol();
+              const vehicle = await vehicles.findOne({ id: current.vehicleId });
+              if (vehicle) {
+                const currentOdo = Number(vehicle.currentOdometer);
+                const nextOdo =
+                  Number.isFinite(currentOdo)
+                    ? Math.max(currentOdo, endOdo)
+                    : endOdo;
+                await vehicles.updateOne(
+                  { id: current.vehicleId },
+                  {
+                    $set: {
+                      currentOdometer: nextOdo,
+                      updatedAt: now,
+                    },
+                  },
+                );
+              }
+            }
+          }
+        }
+
+        const result = await col.findOneAndUpdate(
+          { id },
+          { $set: patch },
+          { returnDocument: "after" },
+        );
+        res.status(200).json(stripDoc(normalizeTripDoc(result!)));
+        return;
+      }
+
+      if (action === "setActualCosts") {
+        if (!(await requirePermission(req, res, PERMISSIONS.FLEET_TRIP_UPDATE))) return;
+        const raw = body.actualCosts ?? null;
+        if (!raw) {
+          res.status(400).json({ error: "Thiếu dữ liệu chi phí thực tế" });
+          return;
+        }
+        const fuelLiters =
+          raw.fuelLiters != null ? Number(raw.fuelLiters) : null;
+        const fuelPricePerLiter =
+          raw.fuelPricePerLiter != null ? Number(raw.fuelPricePerLiter) : null;
+        let fuelAmount =
+          raw.fuelAmount != null ? Number(raw.fuelAmount) : null;
+        if (
+          fuelAmount == null &&
+          fuelLiters != null &&
+          fuelPricePerLiter != null &&
+          Number.isFinite(fuelLiters) &&
+          Number.isFinite(fuelPricePerLiter)
+        ) {
+          fuelAmount = Math.round(fuelLiters * fuelPricePerLiter);
+        }
+        const driverFee =
+          raw.driverFee != null ? Number(raw.driverFee) : null;
+        const items = (Array.isArray(raw.items) ? raw.items : []).map(
+          (item, idx) => ({
+            id: String(item.id ?? `item-${idx + 1}`),
+            category: String(item.category ?? "other"),
+            name: String(item.name ?? "Chi phí khác").trim(),
+            amount: Math.max(0, Number(item.amount) || 0),
+            note: item.note ? String(item.note) : undefined,
+          }),
+        );
+        const itemsTotal = items.reduce((s, i) => s + i.amount, 0);
+        const expenseTotal =
+          (Number.isFinite(fuelAmount) ? Number(fuelAmount) : 0) +
+          (Number.isFinite(driverFee) ? Number(driverFee) : 0) +
+          itemsTotal;
+        const actualCosts = {
+          fuelLiters,
+          fuelPricePerLiter,
+          fuelAmount,
+          driverFee,
+          items,
+        };
         const result = await col.findOneAndUpdate(
           { id },
           {
             $set: {
-              status,
-              statusHistory: pushStatusEvent(current.statusHistory, status, {
-                note: body.note,
-              }),
+              actualCosts,
+              expenseTotal,
               updatedAt: now,
             },
           },
@@ -167,20 +287,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await hasTripVehicleConflict({
             vehicleId,
             pickupDate: current.pickupDate,
+            pickupTime: current.pickupTime,
+            returnDate: current.returnDate,
+            returnTime: current.returnTime,
+            plannedEndAt: current.plannedEndAt,
+            plannedDurationMinutes: current.plannedDurationMinutes,
             excludeTripId: id,
           })
         ) {
-          res.status(400).json({ error: "Xe đã có chuyến trong ngày này" });
+          res.status(409).json({
+            error: "Xe đã có chuyến trong khoảng thời gian này.",
+          });
           return;
         }
         if (
           await hasTripDriverConflict({
             driverId,
             pickupDate: current.pickupDate,
+            pickupTime: current.pickupTime,
+            returnDate: current.returnDate,
+            returnTime: current.returnTime,
+            plannedEndAt: current.plannedEndAt,
+            plannedDurationMinutes: current.plannedDurationMinutes,
             excludeTripId: id,
           })
         ) {
-          res.status(400).json({ error: "Tài xế đã có chuyến trong ngày này" });
+          res.status(409).json({
+            error: "Tài xế đã có chuyến trong khoảng thời gian này.",
+          });
           return;
         }
 
@@ -195,12 +329,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
 
+        const { tripWindow } = await import("../../../_lib/ride-schedule.js");
+        const win = tripWindow(current);
+        const plannedEndAt = new Date(win.endMs).toISOString();
+        const plannedDurationMinutes = Math.max(
+          30,
+          Math.round((win.endMs - win.startMs) / 60_000),
+        );
+
         const result = await col.findOneAndUpdate(
           { id },
           {
             $set: {
               vehicleId,
               driverId,
+              plannedEndAt,
+              plannedDurationMinutes,
               status: nextStatus,
               statusHistory: history,
               updatedAt: now,

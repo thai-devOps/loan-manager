@@ -64,6 +64,10 @@ export const PERMISSIONS = {
   FLEET_CUSTOMER_CREATE: "fleet.customer.create",
   FLEET_CUSTOMER_UPDATE: "fleet.customer.update",
   FLEET_CUSTOMER_DELETE: "fleet.customer.delete",
+  FLEET_PRICING_VIEW: "fleet.pricing.view",
+  FLEET_PRICING_CREATE: "fleet.pricing.create",
+  FLEET_PRICING_UPDATE: "fleet.pricing.update",
+  FLEET_PRICING_PUBLISH: "fleet.pricing.publish",
 
   // Report
   REPORT_FINANCE_VIEW: "report.finance.view",
@@ -107,6 +111,7 @@ const ACTION_LABELS: Record<string, string> = {
   cancel: "Hủy",
   complete: "Hoàn thành",
   approve: "Duyệt",
+  publish: "Publish",
   report: "Báo cáo",
 };
 
@@ -125,6 +130,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   trip: "Chuyến xe",
   driver: "Tài xế",
   customer: "Khách hàng",
+  pricing: "Bảng giá",
   finance: "Tài chính",
   fleet: "Vận hành xe",
   report: "Báo cáo",

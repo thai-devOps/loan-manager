@@ -4,9 +4,12 @@ import { requirePermission } from "../../_lib/auth.js";
 import { methodNotAllowed, withHandler } from "../../_lib/http.js";
 import {
   rideBookingsCol,
+  rideTripsCol,
   rideVehiclesCol,
   stripDoc,
 } from "../../_lib/mongo.js";
+import { buildSchedule } from "../../_lib/ride-schedule.js";
+import { buildFleetReminders } from "../../_lib/ride-reminders.js";
 
 function startOfTodayIsoDate(): string {
   const d = new Date();
@@ -43,6 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const bookings = await rideBookingsCol();
+    const trips = await rideTripsCol();
     const vehicles = await rideVehiclesCol();
 
     const inRange = await bookings
@@ -58,8 +62,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         b.status,
       ),
     ).length;
-    const revenue = inRange.reduce((sum, b) => sum + (b.quotedPrice ?? 0), 0);
-    const expense = 0; // Phase 2.3
+
+    const tripsInRange = await trips
+      .find({
+        pickupDate: { $gte: from, $lte: to },
+        status: { $ne: "CANCELLED" },
+      })
+      .toArray();
+
+    const revenue = tripsInRange.reduce(
+      (sum, t) => sum + (Number(t.tripPrice) || 0),
+      0,
+    );
+    const expense = tripsInRange.reduce(
+      (sum, t) => sum + (Number(t.expenseTotal) || 0),
+      0,
+    );
+    const profit = revenue - expense;
 
     const pending = await bookings
       .find({ status: "PENDING" })
@@ -86,6 +105,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       maintenance: allVehicles.filter((v) => v.status === "MAINTENANCE").length,
     };
 
+    const scheduleToday = await buildSchedule({ from: today, to: today });
+    const reminders = buildFleetReminders(allVehicles);
+
     res.status(200).json({
       range,
       from,
@@ -95,7 +117,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         tripCount,
         revenue,
         expense,
+        profit,
       },
+      dispatchToday: scheduleToday.summary,
+      reminders,
       pending: pending.map((p) => stripDoc(p)),
       upcoming: upcoming.map((u) => stripDoc(u)),
       vehicleStats,

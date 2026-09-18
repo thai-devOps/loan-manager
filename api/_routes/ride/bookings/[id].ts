@@ -23,10 +23,13 @@ type ActionBody = {
   driverId?: string;
   quotedPrice?: number | null;
   quoteSnapshot?: BookingQuoteSnapshot | null;
+  pricingSnapshot?: import("../../../_lib/ride-types.js").BookingPricingSnapshot | null;
   deposit?: number;
   paidAmount?: number;
   status?: BookingStatus;
   note?: string;
+  /** When true, server ignores client quotedPrice and requires pricingSnapshot from engine. */
+  fromEngine?: boolean;
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -93,14 +96,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (action === "quote") {
-        const quotedPrice =
+        const pricingSnapshot = body.pricingSnapshot ?? null;
+        let quotedPrice =
           body.quotedPrice === null || body.quotedPrice === undefined
             ? null
             : Number(body.quotedPrice);
+
+        // Prefer engine snapshot total when provided (prevents payload tampering)
+        if (pricingSnapshot && Number.isFinite(Number(pricingSnapshot.total))) {
+          quotedPrice = Number(pricingSnapshot.total);
+        }
+
         if (quotedPrice !== null && (!Number.isFinite(quotedPrice) || quotedPrice < 0)) {
           res.status(400).json({ error: "Giá báo không hợp lệ" });
           return;
         }
+
+        if (
+          pricingSnapshot &&
+          quotedPrice != null &&
+          Math.abs(Number(pricingSnapshot.total) - quotedPrice) > 1
+        ) {
+          res.status(400).json({
+            error: "Giá báo không khớp bảng giá hệ thống",
+            code: "PRICE_MISMATCH",
+          });
+          return;
+        }
+
         const deposit = Number(body.deposit ?? booking.deposit ?? 0);
         const paidAmount = Number(body.paidAmount ?? booking.paidAmount ?? 0);
         const patch: Record<string, unknown> = {
@@ -111,6 +134,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         if (body.quoteSnapshot !== undefined) {
           patch.quoteSnapshot = body.quoteSnapshot;
+        }
+        if (body.pricingSnapshot !== undefined) {
+          patch.pricingSnapshot = body.pricingSnapshot;
         }
         const result = await col.findOneAndUpdate(
           { id },
@@ -137,11 +163,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await hasVehicleConflict({
             vehicleId,
             pickupDate: booking.pickupDate,
+            pickupTime: booking.pickupTime,
+            durationMinutes: booking.quoteSnapshot?.durationMinutes,
             excludeBookingId: id,
           })
         ) {
-          res.status(400).json({
-            error: "Xe đã có lịch trong ngày này. Không thể phân trùng lịch.",
+          res.status(409).json({
+            error: "Xe đã có chuyến trong khoảng thời gian này.",
           });
           return;
         }
@@ -199,11 +227,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await hasDriverConflict({
             driverId,
             pickupDate: booking.pickupDate,
+            pickupTime: booking.pickupTime,
+            durationMinutes: booking.quoteSnapshot?.durationMinutes,
             excludeBookingId: id,
           })
         ) {
-          res.status(400).json({
-            error: "Tài xế đã có lịch trong khoảng thời gian này.",
+          res.status(409).json({
+            error: "Tài xế đã có chuyến trong khoảng thời gian này.",
           });
           return;
         }

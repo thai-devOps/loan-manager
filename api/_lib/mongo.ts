@@ -15,6 +15,7 @@ import type {
   RideBooking,
   RideCustomer,
   RideDriver,
+  RidePricingRule,
   RideTrip,
   RideVehicle,
 } from "./ride-types.js";
@@ -95,6 +96,19 @@ async function ensureIndexes(db: Db): Promise<void> {
     db.collection("ride_trips").createIndex({ status: 1 }),
     db.collection("ride_trips").createIndex({ vehicleId: 1, pickupDate: 1 }),
     db.collection("ride_trips").createIndex({ driverId: 1, pickupDate: 1 }),
+    db
+      .collection("ride_pricing_rules")
+      .createIndex({
+        status: 1,
+        serviceType: 1,
+        vehicleCategory: 1,
+        effectiveFrom: 1,
+      }),
+    db
+      .collection("ride_pricing_rules")
+      .createIndex({ originKey: 1, destinationKey: 1, status: 1 }),
+    db.collection("ride_pricing_rules").createIndex({ type: 1, status: 1 }),
+    db.collection("ride_pricing_rules").createIndex({ priority: -1 }),
     db.collection("users").createIndex({ username: 1 }, { unique: true }),
     db.collection("users").createIndex({ email: 1 }, { unique: true }),
     db.collection("users").createIndex({ status: 1 }),
@@ -166,6 +180,12 @@ export async function rideBookingsCol(): Promise<Collection<RideBooking>> {
 
 export async function rideTripsCol(): Promise<Collection<RideTrip>> {
   return (await getDb()).collection<RideTrip>("ride_trips");
+}
+
+export async function ridePricingRulesCol(): Promise<
+  Collection<RidePricingRule>
+> {
+  return (await getDb()).collection<RidePricingRule>("ride_pricing_rules");
 }
 
 export async function usersCol(): Promise<Collection<AppUser>> {

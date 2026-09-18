@@ -27,10 +27,12 @@ import {
 import { BookingStatusBadge } from "@/features/ride-admin/components/booking-status-badge";
 import { Can } from "@/features/auth/can";
 import {
+  availabilityAdminService,
   bookingAdminService,
   driverAdminService,
   tripAdminService,
   vehicleAdminService,
+  type AvailabilityOption,
 } from "@/features/ride-admin/services/admin-api";
 import {
   SERVICE_TYPE_LABELS,
@@ -41,6 +43,7 @@ import {
   formatRideTimestamp,
 } from "@/features/ride-admin/lib/format";
 import type {
+  BookingPricingSnapshot,
   BookingQuoteSnapshot,
   BookingStatus,
   Driver,
@@ -80,6 +83,8 @@ export function RideAdminBookingDetailPage() {
   );
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [availVehicles, setAvailVehicles] = useState<AvailabilityOption[]>([]);
+  const [availDrivers, setAvailDrivers] = useState<AvailabilityOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [quote, setQuote] = useState(0);
@@ -93,6 +98,8 @@ export function RideAdminBookingDetailPage() {
   const [draftSnapshot, setDraftSnapshot] = useState<BookingQuoteSnapshot | null>(
     null,
   );
+  const [draftPricingSnapshot, setDraftPricingSnapshot] =
+    useState<BookingPricingSnapshot | null>(null);
 
   async function load() {
     setError(null);
@@ -110,6 +117,14 @@ export function RideAdminBookingDetailPage() {
       setPaid(b.paidAmount ?? 0);
       setVehicleId(b.vehicleId || "");
       setDriverId(b.driverId || "");
+      try {
+        const avail = await availabilityAdminService.get({ bookingId: b.id });
+        setAvailVehicles(avail.vehicles);
+        setAvailDrivers(avail.drivers);
+      } catch {
+        setAvailVehicles([]);
+        setAvailDrivers([]);
+      }
     } catch (e) {
       setBooking(null);
       setError(e instanceof ApiError ? e.message : "Không tải booking");
@@ -208,6 +223,8 @@ export function RideAdminBookingDetailPage() {
         vehicleId: vehicleId || booking.vehicleId,
         pickup,
         destination,
+        serviceType: booking.serviceType,
+        date: booking.pickupDate,
       });
       setDraftQuote(result);
       if (result.snapshot && result.amount != null) {
@@ -216,6 +233,7 @@ export function RideAdminBookingDetailPage() {
       } else {
         setDraftSnapshot(null);
       }
+      setDraftPricingSnapshot(result.pricingSnapshot ?? null);
       if (result.errorMessage && !result.autoQuote) {
         setError(result.errorMessage);
       }
@@ -568,13 +586,33 @@ export function RideAdminBookingDetailPage() {
                         <SelectValue placeholder="Xe" />
                       </SelectTrigger>
                       <SelectContent>
-                        {vehicles
-                          .filter((v) => v.active)
-                          .map((v) => (
-                            <SelectItem key={v.id} value={v.id}>
-                              {v.name} ({v.seats} chỗ)
-                            </SelectItem>
-                          ))}
+                        {(availVehicles.length > 0
+                          ? availVehicles
+                          : vehicles
+                              .filter((v) => v.active)
+                              .map((v) => ({
+                                id: v.id,
+                                name: v.name,
+                                seats: v.seats,
+                                available: true as boolean,
+                              }))
+                        ).map((v) => (
+                          <SelectItem
+                            key={v.id}
+                            value={v.id}
+                            disabled={
+                              !v.available && v.id !== booking.vehicleId
+                            }
+                          >
+                            {v.name}
+                            {"seats" in v && v.seats != null
+                              ? ` (${v.seats} chỗ)`
+                              : ""}
+                            {!v.available && v.id !== booking.vehicleId
+                              ? " · Trùng lịch"
+                              : ""}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <Button
@@ -598,14 +636,33 @@ export function RideAdminBookingDetailPage() {
                         <SelectValue placeholder="Tài xế" />
                       </SelectTrigger>
                       <SelectContent>
-                        {drivers
-                          .filter((d) => d.active)
-                          .map((d) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              {d.name} ·{" "}
-                              {d.status === "ON_TRIP" ? "Đang chạy" : "Rảnh"}
-                            </SelectItem>
-                          ))}
+                        {(availDrivers.length > 0
+                          ? availDrivers
+                          : drivers
+                              .filter((d) => d.active)
+                              .map((d) => ({
+                                id: d.id,
+                                name: d.name,
+                                status: d.status,
+                                available: true as boolean,
+                              }))
+                        ).map((d) => (
+                          <SelectItem
+                            key={d.id}
+                            value={d.id}
+                            disabled={
+                              !d.available && d.id !== booking.driverId
+                            }
+                          >
+                            {d.name}
+                            {"status" in d && d.status
+                              ? ` · ${d.status === "ON_TRIP" ? "Đang chạy" : "Rảnh"}`
+                              : ""}
+                            {!d.available && d.id !== booking.driverId
+                              ? " · Trùng lịch"
+                              : ""}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <Button
@@ -761,10 +818,15 @@ export function RideAdminBookingDetailPage() {
                         paidAmount: paid,
                         quoteSnapshot:
                           draftSnapshot ?? booking.quoteSnapshot ?? null,
+                        pricingSnapshot:
+                          draftPricingSnapshot ??
+                          booking.pricingSnapshot ??
+                          null,
                       });
                       if (ok) {
                         setDraftQuote(null);
                         setDraftSnapshot(null);
+                        setDraftPricingSnapshot(null);
                       }
                     })();
                   }}

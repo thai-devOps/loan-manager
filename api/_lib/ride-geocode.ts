@@ -230,7 +230,7 @@ async function searchNominatim(
       method: "GET",
       headers: {
         Accept: "application/json",
-        "User-Agent": "MonelyRideGeocoder/1.0",
+        "User-Agent": "SiThaTripRideGeocoder/1.0",
       },
       signal: controller.signal,
     });
@@ -270,7 +270,7 @@ async function searchNominatim(
       method: "GET",
       headers: {
         Accept: "application/json",
-        "User-Agent": "MonelyRideGeocoder/1.0",
+        "User-Agent": "SiThaTripRideGeocoder/1.0",
       },
       signal: controller.signal,
     });

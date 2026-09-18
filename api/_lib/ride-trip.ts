@@ -9,12 +9,6 @@ import type {
 } from "./ride-types.js";
 import { rideBookingsCol, rideTripsCol } from "./mongo.js";
 
-const ACTIVE_TRIP_STATUSES: TripStatus[] = [
-  "CONFIRMED",
-  "ASSIGNED",
-  "IN_PROGRESS",
-];
-
 export function canTransitionTrip(from: TripStatus, to: TripStatus): boolean {
   if (from === to) return true;
   const map: Record<TripStatus, TripStatus[]> = {
@@ -278,33 +272,67 @@ export async function ensureTripFromBooking(
 export async function hasTripVehicleConflict(params: {
   vehicleId: string;
   pickupDate: string;
+  pickupTime?: string;
+  returnDate?: string | null;
+  returnTime?: string | null;
+  plannedEndAt?: string | null;
+  plannedDurationMinutes?: number | null;
+  durationMinutes?: number | null;
   excludeTripId?: string;
 }): Promise<boolean> {
-  if (!params.vehicleId) return false;
-  const col = await rideTripsCol();
-  const filter: Record<string, unknown> = {
+  const { findTripVehicleConflict, tripWindow } = await import(
+    "./ride-schedule.js"
+  );
+  const window = tripWindow(
+    {
+      pickupDate: params.pickupDate,
+      pickupTime: params.pickupTime || "00:00",
+      returnDate: params.returnDate,
+      returnTime: params.returnTime,
+      plannedEndAt: params.plannedEndAt,
+      plannedDurationMinutes: params.plannedDurationMinutes,
+    },
+    params.durationMinutes,
+  );
+  const hit = await findTripVehicleConflict({
     vehicleId: params.vehicleId,
-    pickupDate: params.pickupDate,
-    status: { $in: ACTIVE_TRIP_STATUSES },
-  };
-  if (params.excludeTripId) filter.id = { $ne: params.excludeTripId };
-  return Boolean(await col.findOne(filter, { projection: { id: 1 } }));
+    window,
+    excludeTripId: params.excludeTripId,
+  });
+  return Boolean(hit);
 }
 
 export async function hasTripDriverConflict(params: {
   driverId: string;
   pickupDate: string;
+  pickupTime?: string;
+  returnDate?: string | null;
+  returnTime?: string | null;
+  plannedEndAt?: string | null;
+  plannedDurationMinutes?: number | null;
+  durationMinutes?: number | null;
   excludeTripId?: string;
 }): Promise<boolean> {
-  if (!params.driverId) return false;
-  const col = await rideTripsCol();
-  const filter: Record<string, unknown> = {
+  const { findTripDriverConflict, tripWindow } = await import(
+    "./ride-schedule.js"
+  );
+  const window = tripWindow(
+    {
+      pickupDate: params.pickupDate,
+      pickupTime: params.pickupTime || "00:00",
+      returnDate: params.returnDate,
+      returnTime: params.returnTime,
+      plannedEndAt: params.plannedEndAt,
+      plannedDurationMinutes: params.plannedDurationMinutes,
+    },
+    params.durationMinutes,
+  );
+  const hit = await findTripDriverConflict({
     driverId: params.driverId,
-    pickupDate: params.pickupDate,
-    status: { $in: ACTIVE_TRIP_STATUSES },
-  };
-  if (params.excludeTripId) filter.id = { $ne: params.excludeTripId };
-  return Boolean(await col.findOne(filter, { projection: { id: 1 } }));
+    window,
+    excludeTripId: params.excludeTripId,
+  });
+  return Boolean(hit);
 }
 
 export function isTripTerminal(status: TripStatus): boolean {
@@ -394,6 +422,11 @@ export function normalizeTripDoc(raw: Partial<RideTrip> & { id: string }): RideT
     tripPrice: Number(raw.tripPrice) || 0,
     expenseTotal: Number(raw.expenseTotal) || 0,
     revenueAmount: Number(raw.revenueAmount) || 0,
+    plannedEndAt: raw.plannedEndAt ?? null,
+    plannedDurationMinutes: raw.plannedDurationMinutes ?? null,
+    actualCosts: raw.actualCosts ?? null,
+    startOdometer: raw.startOdometer ?? null,
+    endOdometer: raw.endOdometer ?? null,
     status,
     statusHistory:
       history.length > 0

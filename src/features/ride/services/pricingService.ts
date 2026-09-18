@@ -53,6 +53,8 @@ export type QuoteRequest = {
   tollFee?: number;
   parkingFee?: number;
   waitingFee?: number;
+  serviceType?: string;
+  date?: string;
 };
 
 function normalizePlace(place: Place): Place {
@@ -115,6 +117,8 @@ export const pricingService = {
             tollFee: params.tollFee ?? 0,
             parkingFee: params.parkingFee ?? 0,
             waitingFee: params.waitingFee ?? 0,
+            serviceType: params.serviceType,
+            date: params.date,
           },
         },
       );
@@ -135,7 +139,8 @@ export const pricingService = {
             code === "NO_ROUTE" ||
             code === "TIMEOUT" ||
             code === "UPSTREAM" ||
-            code === "MISSING_KEY"
+            code === "MISSING_KEY" ||
+            code === "NO_PRICING_RULE_FOUND"
               ? code
               : "UPSTREAM",
           errorMessage: mapped,

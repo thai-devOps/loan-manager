@@ -109,7 +109,7 @@ export function RideAdminDashboardPage() {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {data ? (
           <>
             <StatCard label="Booking" value={data.stats.bookingCount} />
@@ -117,20 +117,69 @@ export function RideAdminDashboardPage() {
             <StatCard
               label="Doanh thu"
               value={formatCurrency(data.stats.revenue)}
-              hint="Theo giá đã báo"
+              hint="Theo giá chuyến"
             />
             <StatCard
               label="Chi phí"
               value={formatCurrency(data.stats.expense)}
-              hint="Phase 2.3"
+              hint="Chi phí thực tế"
+            />
+            <StatCard
+              label="Lợi nhuận"
+              value={formatCurrency(data.stats.profit ?? data.stats.revenue - data.stats.expense)}
+              hint="Doanh thu − chi phí"
             />
           </>
         ) : (
-          Array.from({ length: 4 }).map((_, i) => (
+          Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-24 rounded-2xl" />
           ))
         )}
       </div>
+
+      {data?.dispatchToday ? (
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold">Điều phối hôm nay</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {data.dispatchToday.total} chuyến · {data.dispatchToday.assigned}{" "}
+                đã phân xe · {data.dispatchToday.unassigned} chưa phân xe/tài xế
+              </p>
+              {data.dispatchToday.unassigned > 0 ? (
+                <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                  {data.dispatchToday.unassigned} chuyến cần phân xe/tài xế
+                </p>
+              ) : null}
+            </div>
+            <Button asChild className="bg-teal-800 hover:bg-teal-700">
+              <Link to="/admin/schedule">Mở lịch điều phối</Link>
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
+      {data?.reminders && data.reminders.length > 0 ? (
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="font-semibold">Cần chú ý</h2>
+          <ul className="mt-3 space-y-2">
+            {data.reminders.slice(0, 8).map((r) => (
+              <li key={r.id}>
+                <Link
+                  to={`/admin/vehicles/${r.vehicleId}`}
+                  className={`block rounded-xl border px-3 py-2 text-sm hover:bg-muted/50 ${
+                    r.severity === "critical"
+                      ? "border-red-500/40 text-red-800 dark:text-red-200"
+                      : "border-amber-500/40 text-amber-900 dark:text-amber-100"
+                  }`}
+                >
+                  {r.severity === "critical" ? "Khẩn" : "Cảnh báo"}: {r.message}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-4">

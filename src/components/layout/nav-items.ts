@@ -1,5 +1,6 @@
 import {
   CarFront,
+  Globe,
   LayoutDashboard,
   LayoutGrid,
   Users,
@@ -25,6 +26,7 @@ export type AppFeatureId =
   | "finance"
   | "analytics"
   | "assets"
+  | "rideSite"
   | "rideOps"
   | "accessAdmin";
 
@@ -139,6 +141,16 @@ export const APP_FEATURES: AppFeature[] = [
         end: true,
         permission: "report.loan.view",
       },
+    ],
+  },
+  {
+    id: "rideSite",
+    title: "Website đặt chuyến",
+    description: "Trang khách hàng đặt xe riêng có tài xế",
+    href: "/ride",
+    icon: Globe,
+    nav: [
+      { title: "Trang chủ", href: "/ride", icon: Globe, end: true },
     ],
   },
   {

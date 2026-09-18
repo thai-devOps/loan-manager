@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Can } from "@/features/auth/can";
 import { PERMISSIONS } from "@/config/permissions";
@@ -19,6 +21,16 @@ import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
 import { DEFAULT_VEHICLE_PRICING } from "@shared/ride/vehicle-pricing";
 
+type OdoEntry = {
+  tripId: string;
+  tripCode: string;
+  pickupDate: string;
+  pickupTime: string;
+  startOdometer: number | null;
+  endOdometer: number | null;
+  status: string;
+};
+
 export function RideAdminVehicleDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -27,30 +39,66 @@ export function RideAdminVehicleDetailPage() {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [odoHistory, setOdoHistory] = useState<OdoEntry[]>([]);
+  const [ops, setOps] = useState({
+    currentOdometer: "",
+    nextMaintenanceOdometer: "",
+    registrationExpiry: "",
+  });
+  const [maintForm, setMaintForm] = useState({
+    title: "",
+    date: new Date().toISOString().slice(0, 10),
+    odometer: "",
+    cost: "",
+    garage: "",
+    nextMaintenanceOdometer: "",
+  });
+  const [insForm, setInsForm] = useState({
+    type: "Bảo hiểm trách nhiệm dân sự",
+    provider: "",
+    startDate: "",
+    endDate: "",
+    note: "",
+  });
 
-  useEffect(() => {
-    let cancelled = false;
+  async function load() {
     setVehicle(undefined);
     setEditing(false);
     setError(null);
-    void vehicleAdminService
-      .get(id)
-      .then((v) => {
-        if (!cancelled) {
-          setVehicle(v);
-          setForm(vehicleToForm(v));
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setVehicle(null);
-          setForm(null);
-          setError(e instanceof ApiError ? e.message : "Không tìm thấy xe");
-        }
+    try {
+      const [v, hist] = await Promise.all([
+        vehicleAdminService.get(id),
+        vehicleAdminService.odometerHistory(id).catch(() => null),
+      ]);
+      setVehicle(v);
+      setForm(vehicleToForm(v));
+      setOps({
+        currentOdometer:
+          v.currentOdometer != null ? String(v.currentOdometer) : "",
+        nextMaintenanceOdometer:
+          v.nextMaintenanceOdometer != null
+            ? String(v.nextMaintenanceOdometer)
+            : "",
+        registrationExpiry: v.registrationExpiry ?? "",
       });
-    return () => {
-      cancelled = true;
-    };
+      setOdoHistory(hist?.entries ?? []);
+      setMaintForm((f) => ({
+        ...f,
+        odometer:
+          v.currentOdometer != null ? String(v.currentOdometer) : f.odometer,
+      }));
+    } catch (e) {
+      setVehicle(null);
+      setForm(null);
+      setError(e instanceof ApiError ? e.message : "Không tìm thấy xe");
+    }
+  }
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void load();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function save() {
@@ -62,15 +110,121 @@ export function RideAdminVehicleDetailPage() {
     setBusy(true);
     setError(null);
     try {
-      const updated = await vehicleAdminService.update(
-        id,
-        formToVehiclePayload(form),
-      );
+      const updated = await vehicleAdminService.update(id, {
+        ...formToVehiclePayload(form),
+        currentOdometer:
+          ops.currentOdometer !== "" ? Number(ops.currentOdometer) : null,
+        nextMaintenanceOdometer:
+          ops.nextMaintenanceOdometer !== ""
+            ? Number(ops.nextMaintenanceOdometer)
+            : null,
+        registrationExpiry: ops.registrationExpiry || null,
+      });
       setVehicle(updated);
       setForm(vehicleToForm(updated));
       setEditing(false);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Lưu thất bại");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveOps() {
+    if (!vehicle) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await vehicleAdminService.update(id, {
+        ...vehicle,
+        currentOdometer:
+          ops.currentOdometer !== "" ? Number(ops.currentOdometer) : null,
+        nextMaintenanceOdometer:
+          ops.nextMaintenanceOdometer !== ""
+            ? Number(ops.nextMaintenanceOdometer)
+            : null,
+        registrationExpiry: ops.registrationExpiry || null,
+      });
+      setVehicle(updated);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Lưu thất bại");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addMaintenance() {
+    if (!maintForm.title.trim() || maintForm.odometer === "") {
+      setError("Nhập nội dung và ODO bảo dưỡng");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await vehicleAdminService.action(id, {
+        action: "addMaintenance",
+        title: maintForm.title,
+        date: maintForm.date,
+        odometer: Number(maintForm.odometer),
+        cost: maintForm.cost !== "" ? Number(maintForm.cost) : undefined,
+        garage: maintForm.garage || undefined,
+        nextMaintenanceOdometer:
+          maintForm.nextMaintenanceOdometer !== ""
+            ? Number(maintForm.nextMaintenanceOdometer)
+            : undefined,
+      });
+      setVehicle(updated);
+      setOps({
+        currentOdometer:
+          updated.currentOdometer != null
+            ? String(updated.currentOdometer)
+            : "",
+        nextMaintenanceOdometer:
+          updated.nextMaintenanceOdometer != null
+            ? String(updated.nextMaintenanceOdometer)
+            : "",
+        registrationExpiry: updated.registrationExpiry ?? "",
+      });
+      setMaintForm({
+        title: "",
+        date: new Date().toISOString().slice(0, 10),
+        odometer:
+          updated.currentOdometer != null
+            ? String(updated.currentOdometer)
+            : "",
+        cost: "",
+        garage: "",
+        nextMaintenanceOdometer: "",
+      });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Thêm bảo dưỡng thất bại");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addInsurance() {
+    if (!insForm.type.trim()) {
+      setError("Nhập loại bảo hiểm");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await vehicleAdminService.action(id, {
+        action: "addInsurance",
+        ...insForm,
+      });
+      setVehicle(updated);
+      setInsForm({
+        type: "Bảo hiểm trách nhiệm dân sự",
+        provider: "",
+        startDate: "",
+        endDate: "",
+        note: "",
+      });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Thêm bảo hiểm thất bại");
     } finally {
       setBusy(false);
     }
@@ -106,6 +260,8 @@ export function RideAdminVehicleDetailPage() {
   const status = (vehicle.status as VehicleStatus) || "AVAILABLE";
   const pricing = vehicle.pricing ?? DEFAULT_VEHICLE_PRICING;
   const image = vehicle.images[0];
+  const logs = [...(vehicle.maintenanceLogs ?? [])].reverse();
+  const insurances = [...(vehicle.insurances ?? [])].reverse();
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -155,6 +311,44 @@ export function RideAdminVehicleDetailPage() {
       {editing ? (
         <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
           <VehicleFormFields form={form} onChange={setForm} />
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label>ODO hiện tại</Label>
+              <Input
+                type="number"
+                value={ops.currentOdometer}
+                onChange={(e) =>
+                  setOps((o) => ({ ...o, currentOdometer: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>ODO bảo dưỡng kế</Label>
+              <Input
+                type="number"
+                value={ops.nextMaintenanceOdometer}
+                onChange={(e) =>
+                  setOps((o) => ({
+                    ...o,
+                    nextMaintenanceOdometer: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Hạn đăng kiểm</Label>
+              <Input
+                type="date"
+                value={ops.registrationExpiry}
+                onChange={(e) =>
+                  setOps((o) => ({
+                    ...o,
+                    registrationExpiry: e.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
           <div className="mt-6 flex flex-wrap gap-2">
             <Button
               disabled={busy || !form.name.trim()}
@@ -210,6 +404,257 @@ export function RideAdminVehicleDetailPage() {
                 className="sm:col-span-2 break-all"
               />
             </dl>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                Vận hành
+              </h2>
+              <Can permission={PERMISSIONS.FLEET_VEHICLE_UPDATE}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void saveOps()}
+                >
+                  Lưu ODO / ĐK
+                </Button>
+              </Can>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label>ODO hiện tại (km)</Label>
+                <Input
+                  type="number"
+                  value={ops.currentOdometer}
+                  onChange={(e) =>
+                    setOps((o) => ({ ...o, currentOdometer: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>ODO bảo dưỡng kế</Label>
+                <Input
+                  type="number"
+                  value={ops.nextMaintenanceOdometer}
+                  onChange={(e) =>
+                    setOps((o) => ({
+                      ...o,
+                      nextMaintenanceOdometer: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Hạn đăng kiểm</Label>
+                <Input
+                  type="date"
+                  value={ops.registrationExpiry}
+                  onChange={(e) =>
+                    setOps((o) => ({
+                      ...o,
+                      registrationExpiry: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            {vehicle.lastMaintenanceAt ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Bảo dưỡng gần nhất: {vehicle.lastMaintenanceAt}
+                {vehicle.lastMaintenanceOdometer != null
+                  ? ` · ${vehicle.lastMaintenanceOdometer.toLocaleString("vi-VN")} km`
+                  : ""}
+              </p>
+            ) : null}
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+            <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+              Bảo dưỡng
+            </h2>
+            <ul className="mt-3 space-y-2">
+              {logs.length === 0 ? (
+                <li className="text-sm text-muted-foreground">Chưa có lịch sử</li>
+              ) : (
+                logs.map((log) => (
+                  <li
+                    key={log.id}
+                    className="rounded-xl border border-border/70 px-3 py-2 text-sm"
+                  >
+                    <p className="font-medium">
+                      {log.date} · {log.title}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {log.odometer.toLocaleString("vi-VN")} km
+                      {log.cost != null ? ` · ${formatCurrency(log.cost)}` : ""}
+                      {log.garage ? ` · ${log.garage}` : ""}
+                    </p>
+                  </li>
+                ))
+              )}
+            </ul>
+            <Can permission={PERMISSIONS.FLEET_VEHICLE_UPDATE}>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <Input
+                  placeholder="Nội dung"
+                  value={maintForm.title}
+                  onChange={(e) =>
+                    setMaintForm((f) => ({ ...f, title: e.target.value }))
+                  }
+                />
+                <Input
+                  type="date"
+                  value={maintForm.date}
+                  onChange={(e) =>
+                    setMaintForm((f) => ({ ...f, date: e.target.value }))
+                  }
+                />
+                <Input
+                  type="number"
+                  placeholder="ODO"
+                  value={maintForm.odometer}
+                  onChange={(e) =>
+                    setMaintForm((f) => ({ ...f, odometer: e.target.value }))
+                  }
+                />
+                <Input
+                  type="number"
+                  placeholder="Chi phí"
+                  value={maintForm.cost}
+                  onChange={(e) =>
+                    setMaintForm((f) => ({ ...f, cost: e.target.value }))
+                  }
+                />
+                <Input
+                  placeholder="Garage"
+                  value={maintForm.garage}
+                  onChange={(e) =>
+                    setMaintForm((f) => ({ ...f, garage: e.target.value }))
+                  }
+                />
+                <Input
+                  type="number"
+                  placeholder="ODO kỳ sau"
+                  value={maintForm.nextMaintenanceOdometer}
+                  onChange={(e) =>
+                    setMaintForm((f) => ({
+                      ...f,
+                      nextMaintenanceOdometer: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <Button
+                className="mt-3 bg-teal-800 hover:bg-teal-700"
+                size="sm"
+                disabled={busy}
+                onClick={() => void addMaintenance()}
+              >
+                Thêm bảo dưỡng
+              </Button>
+            </Can>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+            <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+              Bảo hiểm
+            </h2>
+            <ul className="mt-3 space-y-2">
+              {insurances.length === 0 ? (
+                <li className="text-sm text-muted-foreground">Chưa có bảo hiểm</li>
+              ) : (
+                insurances.map((ins) => (
+                  <li
+                    key={ins.id}
+                    className="rounded-xl border border-border/70 px-3 py-2 text-sm"
+                  >
+                    <p className="font-medium">{ins.type}</p>
+                    <p className="text-muted-foreground">
+                      {ins.provider ? `${ins.provider} · ` : ""}
+                      {ins.startDate || "?"} → {ins.endDate || "?"}
+                    </p>
+                  </li>
+                ))
+              )}
+            </ul>
+            <Can permission={PERMISSIONS.FLEET_VEHICLE_UPDATE}>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <Input
+                  placeholder="Loại BH"
+                  value={insForm.type}
+                  onChange={(e) =>
+                    setInsForm((f) => ({ ...f, type: e.target.value }))
+                  }
+                />
+                <Input
+                  placeholder="Nhà cung cấp"
+                  value={insForm.provider}
+                  onChange={(e) =>
+                    setInsForm((f) => ({ ...f, provider: e.target.value }))
+                  }
+                />
+                <Input
+                  type="date"
+                  value={insForm.startDate}
+                  onChange={(e) =>
+                    setInsForm((f) => ({ ...f, startDate: e.target.value }))
+                  }
+                />
+                <Input
+                  type="date"
+                  value={insForm.endDate}
+                  onChange={(e) =>
+                    setInsForm((f) => ({ ...f, endDate: e.target.value }))
+                  }
+                />
+              </div>
+              <Button
+                className="mt-3 bg-teal-800 hover:bg-teal-700"
+                size="sm"
+                disabled={busy}
+                onClick={() => void addInsurance()}
+              >
+                Thêm bảo hiểm
+              </Button>
+            </Can>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+            <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+              Lịch sử ODO
+            </h2>
+            <ul className="mt-3 space-y-2">
+              {odoHistory.length === 0 ? (
+                <li className="text-sm text-muted-foreground">
+                  Chưa có dữ liệu từ chuyến hoàn thành
+                </li>
+              ) : (
+                odoHistory.map((e) => (
+                  <li key={e.tripId} className="text-sm">
+                    <Link
+                      to={`/admin/trips/${e.tripId}`}
+                      className="font-mono font-medium underline-offset-2 hover:underline"
+                    >
+                      #{e.tripCode}
+                    </Link>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {e.pickupDate}{" "}
+                      {e.startOdometer != null
+                        ? e.startOdometer.toLocaleString("vi-VN")
+                        : "—"}
+                      {" → "}
+                      {e.endOdometer != null
+                        ? e.endOdometer.toLocaleString("vi-VN")
+                        : "—"}{" "}
+                      km
+                    </span>
+                  </li>
+                ))
+              )}
+            </ul>
           </section>
 
           <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">

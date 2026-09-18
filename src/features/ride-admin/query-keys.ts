@@ -14,4 +14,19 @@ export const rideAdminQueryKeys = {
   dashboardRoot: () => [...rideAdminQueryKeys.all, "dashboard"] as const,
   vehicles: () => [...rideAdminQueryKeys.all, "vehicles"] as const,
   drivers: () => [...rideAdminQueryKeys.all, "drivers"] as const,
+  schedule: (filters: {
+    from?: string;
+    to?: string;
+    vehicleId?: string;
+    driverId?: string;
+    status?: string;
+  }) => [...rideAdminQueryKeys.all, "schedule", filters] as const,
+  scheduleRoot: () => [...rideAdminQueryKeys.all, "schedule"] as const,
+  reminders: () => [...rideAdminQueryKeys.all, "reminders"] as const,
+  trip: (id: string) => [...rideAdminQueryKeys.all, "trip", id] as const,
+  pricingRules: (filters: { type?: string; status?: string; q?: string }) =>
+    [...rideAdminQueryKeys.all, "pricing-rules", filters] as const,
+  pricingRulesRoot: () => [...rideAdminQueryKeys.all, "pricing-rules"] as const,
+  pricingRule: (id: string) =>
+    [...rideAdminQueryKeys.all, "pricing-rule", id] as const,
 };

@@ -58,7 +58,7 @@ export function AccessControlLayout() {
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">Quản trị truy cập</p>
           <p className="text-muted-foreground truncate text-xs">
-            {username ? `Đăng nhập: ${username}` : "Phân quyền Monely"}
+            {username ? `Đăng nhập: ${username}` : "Phân quyền"}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -116,7 +116,7 @@ export function AccessControlLayout() {
                 Quản trị truy cập
               </h1>
               <p className="text-muted-foreground mt-0.5 hidden text-sm sm:block">
-                Người dùng, vai trò và phân quyền dùng chung toàn Monely
+                Người dùng, vai trò và phân quyền hệ thống
               </p>
             </div>
           </div>

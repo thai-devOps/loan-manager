@@ -1,9 +1,14 @@
 import { apiFetch } from "@/api/client";
 import type {
   Driver,
+  FleetReminder,
+  PricingCalculateResult,
+  PricingRulesListResponse,
   RideCustomer,
   RideCustomerDetail,
   RideDashboardData,
+  RidePricingRule,
+  RideScheduleData,
   RideTrip,
   TripBooking,
   Vehicle,
@@ -119,8 +124,26 @@ export const vehicleAdminService = {
   create(data: Partial<Vehicle>): Promise<Vehicle> {
     return apiFetch("/api/ride/vehicles", { method: "POST", body: data });
   },
-  update(id: string, data: Partial<Vehicle>): Promise<Vehicle> {
+  update(id: string, data: Partial<Vehicle> | Record<string, unknown>): Promise<Vehicle> {
     return apiFetch(`/api/ride/vehicles/${id}`, { method: "PATCH", body: data });
+  },
+  action(id: string, body: Record<string, unknown>): Promise<Vehicle> {
+    return apiFetch(`/api/ride/vehicles/${id}`, { method: "PATCH", body });
+  },
+  odometerHistory(id: string): Promise<{
+    vehicleId: string;
+    currentOdometer: number | null;
+    entries: Array<{
+      tripId: string;
+      tripCode: string;
+      pickupDate: string;
+      pickupTime: string;
+      startOdometer: number | null;
+      endOdometer: number | null;
+      status: string;
+    }>;
+  }> {
+    return apiFetch(`/api/ride/vehicles/${id}/odometer-history`);
   },
   delete(id: string): Promise<void> {
     return apiFetch(`/api/ride/vehicles/${id}`, { method: "DELETE" });
@@ -145,5 +168,110 @@ export const driverAdminService = {
 export const dashboardService = {
   get(range: "today" | "7d" | "month" = "today"): Promise<RideDashboardData> {
     return apiFetch(`/api/ride/dashboard?range=${range}`);
+  },
+};
+
+export const scheduleAdminService = {
+  get(params: {
+    date?: string;
+    from?: string;
+    to?: string;
+    vehicleId?: string;
+    driverId?: string;
+    status?: string;
+    serviceType?: string;
+  }): Promise<RideScheduleData> {
+    const qs = new URLSearchParams();
+    if (params.date) qs.set("date", params.date);
+    if (params.from) qs.set("from", params.from);
+    if (params.to) qs.set("to", params.to);
+    if (params.vehicleId) qs.set("vehicleId", params.vehicleId);
+    if (params.driverId) qs.set("driverId", params.driverId);
+    if (params.status) qs.set("status", params.status);
+    if (params.serviceType) qs.set("serviceType", params.serviceType);
+    const query = qs.toString();
+    return apiFetch(`/api/ride/schedule${query ? `?${query}` : ""}`);
+  },
+};
+
+export const remindersAdminService = {
+  list(): Promise<FleetReminder[]> {
+    return apiFetch("/api/ride/reminders");
+  },
+};
+
+export const pricingRuleAdminService = {
+  list(params?: {
+    type?: string;
+    status?: string;
+    q?: string;
+  }): Promise<PricingRulesListResponse> {
+    const qs = new URLSearchParams();
+    if (params?.type) qs.set("type", params.type);
+    if (params?.status) qs.set("status", params.status);
+    if (params?.q) qs.set("q", params.q);
+    const query = qs.toString();
+    return apiFetch(`/api/ride/pricing-rules${query ? `?${query}` : ""}`);
+  },
+  get(id: string): Promise<RidePricingRule> {
+    return apiFetch(`/api/ride/pricing-rules/${id}`);
+  },
+  create(body: Record<string, unknown>): Promise<RidePricingRule> {
+    return apiFetch("/api/ride/pricing-rules", { method: "POST", body });
+  },
+  update(id: string, body: Record<string, unknown>): Promise<RidePricingRule> {
+    return apiFetch(`/api/ride/pricing-rules/${id}`, {
+      method: "PATCH",
+      body,
+    });
+  },
+  action(id: string, action: string): Promise<RidePricingRule> {
+    return apiFetch(`/api/ride/pricing-rules/${id}`, {
+      method: "PATCH",
+      body: { action },
+    });
+  },
+  calculate(body: Record<string, unknown>): Promise<PricingCalculateResult> {
+    return apiFetch("/api/ride/pricing/calculate", { method: "POST", body });
+  },
+};
+
+export type AvailabilityOption = {
+  id: string;
+  name: string;
+  available: boolean;
+  conflictLabel?: string;
+  licensePlate?: string;
+  seats?: number;
+  phone?: string;
+  status?: string;
+};
+
+export const availabilityAdminService = {
+  get(params: {
+    tripId?: string;
+    bookingId?: string;
+    pickupDate?: string;
+    pickupTime?: string;
+    returnDate?: string;
+    returnTime?: string;
+    durationMinutes?: number;
+  }): Promise<{
+    startMs: number;
+    endMs: number;
+    vehicles: AvailabilityOption[];
+    drivers: AvailabilityOption[];
+  }> {
+    const qs = new URLSearchParams();
+    if (params.tripId) qs.set("tripId", params.tripId);
+    if (params.bookingId) qs.set("bookingId", params.bookingId);
+    if (params.pickupDate) qs.set("pickupDate", params.pickupDate);
+    if (params.pickupTime) qs.set("pickupTime", params.pickupTime);
+    if (params.returnDate) qs.set("returnDate", params.returnDate);
+    if (params.returnTime) qs.set("returnTime", params.returnTime);
+    if (params.durationMinutes != null) {
+      qs.set("durationMinutes", String(params.durationMinutes));
+    }
+    return apiFetch(`/api/ride/availability?${qs.toString()}`);
   },
 };

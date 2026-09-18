@@ -245,6 +245,11 @@ const RideAdminTripsPage = lazy(() =>
     default: m.RideAdminTripsPage,
   })),
 );
+const RideAdminSchedulePage = lazy(() =>
+  import("@/features/ride-admin/pages/schedule-page").then((m) => ({
+    default: m.RideAdminSchedulePage,
+  })),
+);
 const RideAdminTripDetailPage = lazy(() =>
   import("@/features/ride-admin/pages/trip-detail-page").then((m) => ({
     default: m.RideAdminTripDetailPage,
@@ -258,6 +263,11 @@ const RideAdminCustomersPage = lazy(() =>
 const RideAdminCustomerDetailPage = lazy(() =>
   import("@/features/ride-admin/pages/customer-detail-page").then((m) => ({
     default: m.RideAdminCustomerDetailPage,
+  })),
+);
+const RideAdminPricingPage = lazy(() =>
+  import("@/features/ride-admin/pages/pricing-page").then((m) => ({
+    default: m.RideAdminPricingPage,
   })),
 );
 const RideAdminComingSoonPage = lazy(() =>
@@ -631,6 +641,16 @@ export const router = createBrowserRouter([
                     ),
                   },
                   {
+                    path: "schedule",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_TRIP_VIEW}
+                      >
+                        <RideAdminSchedulePage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
                     path: "bookings",
                     element: (
                       <PermissionRoute
@@ -743,7 +763,11 @@ export const router = createBrowserRouter([
                   {
                     path: "pricing",
                     element: (
-                      <RideAdminComingSoonPage title="Bảng giá" />
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_PRICING_VIEW}
+                      >
+                        <RideAdminPricingPage />
+                      </PermissionRoute>
                     ),
                   },
                   {

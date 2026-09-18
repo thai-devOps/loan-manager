@@ -11,13 +11,6 @@ import {
 } from "./mongo.js";
 import { ensureTripFromBooking } from "./ride-trip.js";
 
-const ACTIVE_STATUSES: BookingStatus[] = [
-  "CONFIRMED",
-  "DRIVER_ASSIGNED",
-  "DRIVER_ARRIVING",
-  "IN_PROGRESS",
-];
-
 export function normalizePhone(raw: string): string {
   return raw.replace(/\D/g, "");
 }
@@ -53,43 +46,69 @@ export function canTransition(
   return map[from]?.includes(to) ?? false;
 }
 
-/** Same calendar day conflict — MVP window check by date. */
+/** Time-overlap conflict against trips + bookings. */
 export async function hasVehicleConflict(params: {
   vehicleId: string;
   pickupDate: string;
+  pickupTime?: string;
+  durationMinutes?: number | null;
   excludeBookingId?: string;
 }): Promise<boolean> {
-  if (!params.vehicleId) return false;
-  const col = await rideBookingsCol();
-  const filter: Record<string, unknown> = {
+  const {
+    findBookingVehicleConflict,
+    findTripVehicleConflict,
+    parseDateTimeMs,
+    DEFAULT_TRIP_DURATION_MINUTES,
+  } = await import("./ride-schedule.js");
+  const startMs = parseDateTimeMs(
+    params.pickupDate,
+    params.pickupTime || "00:00",
+  );
+  const mins = params.durationMinutes ?? DEFAULT_TRIP_DURATION_MINUTES;
+  const win = { startMs, endMs: startMs + Math.max(30, mins) * 60_000 };
+  const tripHit = await findTripVehicleConflict({
     vehicleId: params.vehicleId,
-    pickupDate: params.pickupDate,
-    status: { $in: ACTIVE_STATUSES },
-  };
-  if (params.excludeBookingId) {
-    filter.id = { $ne: params.excludeBookingId };
-  }
-  const hit = await col.findOne(filter, { projection: { id: 1 } });
-  return Boolean(hit);
+    window: win,
+  });
+  if (tripHit) return true;
+  const bookingHit = await findBookingVehicleConflict({
+    vehicleId: params.vehicleId,
+    window: win,
+    excludeBookingId: params.excludeBookingId,
+  });
+  return Boolean(bookingHit);
 }
 
 export async function hasDriverConflict(params: {
   driverId: string;
   pickupDate: string;
+  pickupTime?: string;
+  durationMinutes?: number | null;
   excludeBookingId?: string;
 }): Promise<boolean> {
-  if (!params.driverId) return false;
-  const col = await rideBookingsCol();
-  const filter: Record<string, unknown> = {
+  const {
+    findBookingDriverConflict,
+    findTripDriverConflict,
+    parseDateTimeMs,
+    DEFAULT_TRIP_DURATION_MINUTES,
+  } = await import("./ride-schedule.js");
+  const startMs = parseDateTimeMs(
+    params.pickupDate,
+    params.pickupTime || "00:00",
+  );
+  const mins = params.durationMinutes ?? DEFAULT_TRIP_DURATION_MINUTES;
+  const win = { startMs, endMs: startMs + Math.max(30, mins) * 60_000 };
+  const tripHit = await findTripDriverConflict({
     driverId: params.driverId,
-    pickupDate: params.pickupDate,
-    status: { $in: ACTIVE_STATUSES },
-  };
-  if (params.excludeBookingId) {
-    filter.id = { $ne: params.excludeBookingId };
-  }
-  const hit = await col.findOne(filter, { projection: { id: 1 } });
-  return Boolean(hit);
+    window: win,
+  });
+  if (tripHit) return true;
+  const bookingHit = await findBookingDriverConflict({
+    driverId: params.driverId,
+    window: win,
+    excludeBookingId: params.excludeBookingId,
+  });
+  return Boolean(bookingHit);
 }
 
 /** Upsert full trip from booking (replaces thin stub). */

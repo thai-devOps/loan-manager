@@ -33,6 +33,11 @@ const FEATURE_ACCENT: Record<
     icon: "bg-slate-800 text-slate-50 group-hover:bg-slate-700 dark:bg-slate-700",
     ring: "group-hover:border-slate-500/40 group-hover:shadow-slate-900/10 dark:group-hover:shadow-slate-400/10",
   },
+  rideSite: {
+    glow: "from-sky-500/20 via-sky-600/5 to-transparent",
+    icon: "bg-sky-800 text-sky-50 group-hover:bg-sky-700",
+    ring: "group-hover:border-sky-600/40 group-hover:shadow-sky-900/10 dark:group-hover:shadow-sky-400/10",
+  },
   rideOps: {
     glow: "from-cyan-500/20 via-cyan-600/5 to-transparent",
     icon: "bg-cyan-800 text-cyan-50 group-hover:bg-cyan-700",

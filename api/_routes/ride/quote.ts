@@ -192,6 +192,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tollFee?: number;
       parkingFee?: number;
       waitingFee?: number;
+      serviceType?: string;
+      date?: string;
     }>(req);
 
     const tripType = (body.tripType ?? "").trim() as TripType;
@@ -268,7 +270,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           body.pickup?.address ?? "",
           body.destination?.address ?? "",
         );
-        return respondQuote(
+        return await respondQuote(
           res,
           tripType,
           pricing,
@@ -287,7 +289,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         body.destination?.address ?? "",
       );
 
-      return respondQuote(
+      return await respondQuote(
         res,
         tripType,
         pricing,
@@ -315,23 +317,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
 }
 
-function respondQuote(
+async function respondQuote(
   res: VercelResponse,
   tripType: TripType,
   pricing: ReturnType<typeof resolveVehiclePricing>,
-  vehicle: Record<string, unknown>,
+  vehicle: { id: string; seats?: number; name?: string; [key: string]: unknown },
   body: {
     tollFee?: number;
     parkingFee?: number;
     waitingFee?: number;
     pickup?: PlaceBody;
     destination?: PlaceBody;
+    serviceType?: string;
+    date?: string;
   },
   origin: RoutePlace,
   destination: RoutePlace,
   route: RouteResult,
 ) {
-  const engine = calculateTripQuote({
+  const opEngine = calculateTripQuote({
     tripType,
     distanceKm: route.distanceKm,
     durationMinutes: route.durationMinutes,
@@ -341,49 +345,96 @@ function respondQuote(
     waitingFee: body.waitingFee,
   });
 
+  const {
+    normalizeLocationKey,
+    runPricingCalculate,
+    seatsToVehicleCategory,
+  } = await import("../../_lib/ride-pricing.js");
+
+  const roundTrip = tripType === "ROUND_TRIP";
+  const customer = await runPricingCalculate({
+    serviceType: (body.serviceType as "TRAVEL") || "TRAVEL",
+    vehicleCategory: seatsToVehicleCategory(Number(vehicle.seats) || 7),
+    originKey: normalizeLocationKey(
+      origin.address ?? body.pickup?.address ?? "",
+    ),
+    destinationKey: normalizeLocationKey(
+      destination.address ?? body.destination?.address ?? "",
+    ),
+    distanceKm: route.distanceKm,
+    roundTrip,
+    date: (body.date || new Date().toISOString()).slice(0, 10),
+  });
+
+  if (!customer.ok) {
+    res.status(400).json({
+      error: customer.message,
+      code: customer.code,
+      display: "Liên hệ báo giá",
+      amount: null,
+      autoQuote: false,
+      operatingCost: opEngine.operatingCost,
+      fuelCost: opEngine.fuelCost,
+      driverCost: opEngine.driverCost,
+      distanceKm: opEngine.distanceKm,
+      durationMinutes: opEngine.durationMinutes,
+    });
+    return;
+  }
+
   const quotedAt = new Date().toISOString();
+  const customerTotal = customer.breakdown.total;
+  const customerBreakdown = [
+    { label: "Giá cơ bản", amount: customer.breakdown.basePrice },
+    {
+      label: roundTrip ? "Theo quãng đường (khứ hồi)" : "Theo quãng đường",
+      amount: customer.breakdown.distancePrice,
+    },
+    { label: "Phụ phí", amount: customer.breakdown.surcharges },
+  ];
+
   const snapshot = {
-    distanceKm: engine.distanceKm,
-    durationMinutes: engine.durationMinutes,
+    distanceKm: opEngine.distanceKm,
+    durationMinutes: opEngine.durationMinutes,
     fuelPricePerLiter: pricing.fuelPricePerLiter,
     fuelConsumptionPer100Km: pricing.fuelConsumptionPer100Km,
-    fuelLiters: engine.fuelLiters,
-    fuelCost: engine.fuelCost,
-    driverFee: engine.driverCost,
-    tollFee: engine.tollFee,
-    parkingFee: engine.parkingFee,
-    waitingFee: engine.waitingFee,
-    additionalFee: engine.additionalFee,
-    operatingCost: engine.operatingCost,
-    subtotal: engine.subtotal,
-    totalPrice: engine.totalPrice ?? 0,
-    breakdown: engine.breakdown,
+    fuelLiters: opEngine.fuelLiters,
+    fuelCost: opEngine.fuelCost,
+    driverFee: opEngine.driverCost,
+    tollFee: opEngine.tollFee,
+    parkingFee: opEngine.parkingFee,
+    waitingFee: opEngine.waitingFee,
+    additionalFee: opEngine.additionalFee,
+    operatingCost: opEngine.operatingCost,
+    subtotal: customerTotal,
+    totalPrice: customerTotal,
+    breakdown: customerBreakdown,
     provider: route.provider,
     quotedAt,
   };
 
   res.status(200).json({
-    display:
-      engine.totalPrice != null
-        ? `${engine.totalPrice.toLocaleString("vi-VN")} đ`
-        : "Liên hệ báo giá",
-    amount: engine.totalPrice,
-    autoQuote: engine.autoQuote,
-    distanceKm: engine.distanceKm,
-    durationMinutes: engine.durationMinutes,
-    fuelLiters: engine.fuelLiters,
-    fuelCost: engine.fuelCost,
-    driverCost: engine.driverCost,
-    tollFee: engine.tollFee,
-    parkingFee: engine.parkingFee,
-    waitingFee: engine.waitingFee,
-    additionalFee: engine.additionalFee,
-    operatingCost: engine.operatingCost,
-    subtotal: engine.subtotal,
-    totalPrice: engine.totalPrice,
-    breakdown: engine.breakdown,
+    display: `${customerTotal.toLocaleString("vi-VN")} đ`,
+    amount: customerTotal,
+    autoQuote: true,
+    distanceKm: opEngine.distanceKm,
+    durationMinutes: opEngine.durationMinutes,
+    fuelLiters: opEngine.fuelLiters,
+    fuelCost: opEngine.fuelCost,
+    driverCost: opEngine.driverCost,
+    tollFee: opEngine.tollFee,
+    parkingFee: opEngine.parkingFee,
+    waitingFee: opEngine.waitingFee,
+    additionalFee: opEngine.additionalFee,
+    operatingCost: opEngine.operatingCost,
+    subtotal: customerTotal,
+    totalPrice: customerTotal,
+    breakdown: customerBreakdown,
     provider: route.provider,
     snapshot,
+    pricingSnapshot: customer.snapshot,
+    matchedRuleId: customer.matchedRuleId,
+    pricingVersion: customer.version,
     resolvedPickup: {
       address: origin.address ?? body.pickup?.address ?? "",
       latitude: origin.latitude,
@@ -394,6 +445,6 @@ function respondQuote(
       latitude: destination.latitude,
       longitude: destination.longitude,
     },
-    vehicle: stripDoc(vehicle),
+    vehicle: stripDoc(vehicle as { _id?: unknown }),
   });
 }
