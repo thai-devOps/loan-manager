@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   Check,
@@ -16,7 +16,6 @@ import {
   UserRoundCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { QuickBookingForm } from "@/features/ride/components/quick-booking-form";
 import { ServiceCard } from "@/features/ride/components/service-card";
 import { VehicleCard } from "@/features/ride/components/vehicle-card";
@@ -26,10 +25,16 @@ import {
   SERVICE_AREA_GROUPS,
   SERVICE_AREA_INTRO,
 } from "@/features/ride/data/service-areas";
+import { MOCK_VEHICLES } from "@/features/ride/data/mock-vehicles";
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
 import { vehicleService } from "@/features/ride/services/vehicleService";
 import type { Vehicle } from "@/features/ride/types/ride";
 import { cn } from "@/lib/utils";
+
+const FEATURED_VEHICLES_FALLBACK = MOCK_VEHICLES.filter((v) => v.active).slice(
+  0,
+  4,
+);
 
 const WHY_US = [
   {
@@ -117,34 +122,18 @@ function SectionEyebrow({ children }: { children: ReactNode }) {
 
 const HERO_IMAGE_SRC = "/hero_image.webp";
 
-/** Soft fade-in for hero photo — no skeleton; keeps layout stable. */
+/** Preloaded LCP image — paint immediately (no opacity-0 gate). */
 function HeroBackgroundImage() {
-  const imgRef = useRef<HTMLImageElement>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const img = imgRef.current;
-    if (img?.complete && img.naturalWidth > 0) {
-      setReady(true);
-    }
-  }, []);
-
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 bg-muted/20">
       <img
-        ref={imgRef}
         src={HERO_IMAGE_SRC}
         alt=""
         width={1720}
         height={914}
-        decoding="async"
+        decoding="sync"
         fetchPriority="high"
-        onLoad={() => setReady(true)}
-        className={cn(
-          "absolute inset-0 size-full object-cover object-[center_40%]",
-          "transition-opacity duration-700 ease-out motion-reduce:transition-none",
-          ready ? "opacity-100" : "opacity-0",
-        )}
+        className="absolute inset-0 size-full object-cover object-[center_40%]"
       />
       <div className="absolute inset-0 bg-linear-to-r from-background from-0% via-background/92 via-42% to-transparent to-72% dark:from-background dark:via-background/95" />
     </div>
@@ -157,12 +146,12 @@ export function RideHomePage() {
     "Đặt xe riêng có tài xế tại An Giang. Đón trả tận nơi tại Long Xuyên, Châu Đốc, Tri Tôn — du lịch, khám bệnh, sân bay và chuyến liên tỉnh.",
   );
 
-  const [vehicles, setVehicles] = useState<Vehicle[] | null>(null);
+  const [vehicles, setVehicles] = useState<Vehicle[]>(FEATURED_VEHICLES_FALLBACK);
 
   useEffect(() => {
     let cancelled = false;
     void vehicleService.getVehicles().then((list) => {
-      if (!cancelled) setVehicles(list.slice(0, 4));
+      if (!cancelled && list.length > 0) setVehicles(list.slice(0, 4));
     });
     return () => {
       cancelled = true;
@@ -278,17 +267,13 @@ export function RideHomePage() {
             </Button>
           </div>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {vehicles === null
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-[22rem] rounded-2xl" />
-                ))
-              : vehicles.map((v, i) => (
-                  <VehicleCard
-                    key={v.id}
-                    vehicle={v}
-                    animationDelayMs={i * 80}
-                  />
-                ))}
+            {vehicles.map((v, i) => (
+              <VehicleCard
+                key={v.id}
+                vehicle={v}
+                animationDelayMs={i * 80}
+              />
+            ))}
           </div>
         </div>
       </section>

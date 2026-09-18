@@ -1,70 +1,270 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, Outlet, useParams } from "react-router-dom";
-import { AppLayout } from "@/components/layout/app-layout";
-import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { ScrollToTop } from "@/components/scroll-to-top";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RequireAuth } from "@/features/auth/require-auth";
-import { LoginPage } from "@/features/auth/login-page";
 import {
   ModuleRoute,
   PermissionRoute,
 } from "@/features/auth/permission-route";
-import { AppsHubPage } from "@/features/apps/apps-hub-page";
-import { DashboardPage } from "@/features/dashboard/dashboard-page";
-import { BorrowersPage } from "@/features/borrowers/borrowers-page";
-import { BorrowerDetailPage } from "@/features/borrowers/borrower-detail-page";
-import { LoansLayout } from "@/features/loans/loans-layout";
-import { LoansPage } from "@/features/loans/loans-page";
-import { LoanDetailPage } from "@/features/loans/loan-detail-page";
-import { PaymentsPage } from "@/features/payments/payments-page";
-import { SchedulesPage } from "@/features/payments/schedules-page";
-import { TransactionsPage } from "@/features/transactions/transactions-page";
-import { ReportsPage } from "@/features/reports/reports-page";
-import { SettingsPage } from "@/features/settings/settings-page";
-import { SyncMonitorPage } from "@/features/sync/sync-monitor-page";
-import { ProfileLayout } from "@/features/profile/profile-layout";
-import { ProfilePage } from "@/features/profile/profile-page";
-import { FinanceLayout } from "@/features/finance/finance-layout";
-import { FinanceOverviewPage } from "@/features/finance/finance-overview-page";
-import { FinanceIncomePage } from "@/features/finance/finance-income-page";
-import { FinanceExpensesPage } from "@/features/finance/finance-expenses-page";
-import { FinanceTransactionsPage } from "@/features/finance/finance-transactions-page";
-import { AssetsLayout } from "@/features/assets/assets-layout";
-import { AssetsOverviewPage } from "@/features/assets/assets-overview-page";
-import { AssetsHoldingsPage } from "@/features/assets/assets-holdings-page";
-import { AssetsAllocationPage } from "@/features/assets/assets-allocation-page";
-import { AssetsGoldPage } from "@/features/assets/assets-gold-page";
-import { AssetsGoldPlanPage } from "@/features/assets/assets-gold-plan-page";
 import { RidePublicLayout } from "@/features/ride/components/ride-public-layout";
-import { LEGACY_SERVICE_REDIRECTS } from "@/features/ride/seo/registry";
-import { RideAdminLayout } from "@/features/ride-admin/components/ride-admin-layout";
-import { RideAdminDashboardPage } from "@/features/ride-admin/pages/dashboard-page";
-import { RideAdminBookingsPage } from "@/features/ride-admin/pages/bookings-page";
-import { RideAdminBookingDetailPage } from "@/features/ride-admin/pages/booking-detail-page";
-import { RideAdminVehiclesPage } from "@/features/ride-admin/pages/vehicles-page";
-import { RideAdminVehicleCreatePage } from "@/features/ride-admin/pages/vehicle-create-page";
-import { RideAdminVehicleDetailPage } from "@/features/ride-admin/pages/vehicle-detail-page";
-import { RideAdminDriversPage } from "@/features/ride-admin/pages/drivers-page";
-import { RideAdminDriverDetailPage } from "@/features/ride-admin/pages/driver-detail-page";
-import { RideAdminTripsPage } from "@/features/ride-admin/pages/trips-page";
-import { RideAdminTripDetailPage } from "@/features/ride-admin/pages/trip-detail-page";
-import { RideAdminCustomersPage } from "@/features/ride-admin/pages/customers-page";
-import { RideAdminCustomerDetailPage } from "@/features/ride-admin/pages/customer-detail-page";
-import { RideAdminComingSoonPage } from "@/features/ride-admin/pages/coming-soon-page";
-import { AccessControlLayout } from "@/features/access-control/components/access-control-layout";
-import { UsersPage } from "@/features/access-control/pages/users-page";
-import { UserDetailPage } from "@/features/access-control/pages/user-detail-page";
-import { RolesPage } from "@/features/access-control/pages/roles-page";
-import { RoleDetailPage } from "@/features/access-control/pages/role-detail-page";
-import { AccessMatrixPage } from "@/features/access-control/pages/access-matrix-page";
-import { AuditLogsPage } from "@/features/access-control/pages/audit-logs-page";
-import { PERMISSIONS } from "@/config/permissions";
 import { RideHomePage } from "@/features/ride/pages/ride-home-page";
+import { LEGACY_SERVICE_REDIRECTS } from "@/features/ride/seo/registry";
+import { PERMISSIONS } from "@/config/permissions";
 
 // Route module exports `router` + lazy page bindings (not only components).
 /* eslint-disable react-refresh/only-export-components */
 
+const RequireAuth = lazy(() =>
+  import("@/features/auth/require-auth").then((m) => ({
+    default: m.RequireAuth,
+  })),
+);
+const LoginPage = lazy(() =>
+  import("@/features/auth/login-page").then((m) => ({ default: m.LoginPage })),
+);
+const AuthenticatedShell = lazy(() =>
+  import("@/components/layout/authenticated-shell").then((m) => ({
+    default: m.AuthenticatedShell,
+  })),
+);
+const AppLayout = lazy(() =>
+  import("@/components/layout/app-layout").then((m) => ({
+    default: m.AppLayout,
+  })),
+);
+const AppsHubPage = lazy(() =>
+  import("@/features/apps/apps-hub-page").then((m) => ({
+    default: m.AppsHubPage,
+  })),
+);
+const DashboardPage = lazy(() =>
+  import("@/features/dashboard/dashboard-page").then((m) => ({
+    default: m.DashboardPage,
+  })),
+);
+const BorrowersPage = lazy(() =>
+  import("@/features/borrowers/borrowers-page").then((m) => ({
+    default: m.BorrowersPage,
+  })),
+);
+const BorrowerDetailPage = lazy(() =>
+  import("@/features/borrowers/borrower-detail-page").then((m) => ({
+    default: m.BorrowerDetailPage,
+  })),
+);
+const LoansLayout = lazy(() =>
+  import("@/features/loans/loans-layout").then((m) => ({
+    default: m.LoansLayout,
+  })),
+);
+const LoansPage = lazy(() =>
+  import("@/features/loans/loans-page").then((m) => ({ default: m.LoansPage })),
+);
+const LoanDetailPage = lazy(() =>
+  import("@/features/loans/loan-detail-page").then((m) => ({
+    default: m.LoanDetailPage,
+  })),
+);
+const PaymentsPage = lazy(() =>
+  import("@/features/payments/payments-page").then((m) => ({
+    default: m.PaymentsPage,
+  })),
+);
+const SchedulesPage = lazy(() =>
+  import("@/features/payments/schedules-page").then((m) => ({
+    default: m.SchedulesPage,
+  })),
+);
+const TransactionsPage = lazy(() =>
+  import("@/features/transactions/transactions-page").then((m) => ({
+    default: m.TransactionsPage,
+  })),
+);
+const ReportsPage = lazy(() =>
+  import("@/features/reports/reports-page").then((m) => ({
+    default: m.ReportsPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("@/features/settings/settings-page").then((m) => ({
+    default: m.SettingsPage,
+  })),
+);
+const SyncMonitorPage = lazy(() =>
+  import("@/features/sync/sync-monitor-page").then((m) => ({
+    default: m.SyncMonitorPage,
+  })),
+);
+const ProfileLayout = lazy(() =>
+  import("@/features/profile/profile-layout").then((m) => ({
+    default: m.ProfileLayout,
+  })),
+);
+const ProfilePage = lazy(() =>
+  import("@/features/profile/profile-page").then((m) => ({
+    default: m.ProfilePage,
+  })),
+);
+const FinanceLayout = lazy(() =>
+  import("@/features/finance/finance-layout").then((m) => ({
+    default: m.FinanceLayout,
+  })),
+);
+const FinanceOverviewPage = lazy(() =>
+  import("@/features/finance/finance-overview-page").then((m) => ({
+    default: m.FinanceOverviewPage,
+  })),
+);
+const FinanceIncomePage = lazy(() =>
+  import("@/features/finance/finance-income-page").then((m) => ({
+    default: m.FinanceIncomePage,
+  })),
+);
+const FinanceExpensesPage = lazy(() =>
+  import("@/features/finance/finance-expenses-page").then((m) => ({
+    default: m.FinanceExpensesPage,
+  })),
+);
+const FinanceTransactionsPage = lazy(() =>
+  import("@/features/finance/finance-transactions-page").then((m) => ({
+    default: m.FinanceTransactionsPage,
+  })),
+);
+const AssetsLayout = lazy(() =>
+  import("@/features/assets/assets-layout").then((m) => ({
+    default: m.AssetsLayout,
+  })),
+);
+const AssetsOverviewPage = lazy(() =>
+  import("@/features/assets/assets-overview-page").then((m) => ({
+    default: m.AssetsOverviewPage,
+  })),
+);
+const AssetsHoldingsPage = lazy(() =>
+  import("@/features/assets/assets-holdings-page").then((m) => ({
+    default: m.AssetsHoldingsPage,
+  })),
+);
+const AssetsAllocationPage = lazy(() =>
+  import("@/features/assets/assets-allocation-page").then((m) => ({
+    default: m.AssetsAllocationPage,
+  })),
+);
+const AssetsGoldPage = lazy(() =>
+  import("@/features/assets/assets-gold-page").then((m) => ({
+    default: m.AssetsGoldPage,
+  })),
+);
+const AssetsGoldPlanPage = lazy(() =>
+  import("@/features/assets/assets-gold-plan-page").then((m) => ({
+    default: m.AssetsGoldPlanPage,
+  })),
+);
+const AccessControlLayout = lazy(() =>
+  import("@/features/access-control/components/access-control-layout").then(
+    (m) => ({ default: m.AccessControlLayout }),
+  ),
+);
+const UsersPage = lazy(() =>
+  import("@/features/access-control/pages/users-page").then((m) => ({
+    default: m.UsersPage,
+  })),
+);
+const UserDetailPage = lazy(() =>
+  import("@/features/access-control/pages/user-detail-page").then((m) => ({
+    default: m.UserDetailPage,
+  })),
+);
+const RolesPage = lazy(() =>
+  import("@/features/access-control/pages/roles-page").then((m) => ({
+    default: m.RolesPage,
+  })),
+);
+const RoleDetailPage = lazy(() =>
+  import("@/features/access-control/pages/role-detail-page").then((m) => ({
+    default: m.RoleDetailPage,
+  })),
+);
+const AccessMatrixPage = lazy(() =>
+  import("@/features/access-control/pages/access-matrix-page").then((m) => ({
+    default: m.AccessMatrixPage,
+  })),
+);
+const AuditLogsPage = lazy(() =>
+  import("@/features/access-control/pages/audit-logs-page").then((m) => ({
+    default: m.AuditLogsPage,
+  })),
+);
+const RideAdminLayout = lazy(() =>
+  import("@/features/ride-admin/components/ride-admin-layout").then((m) => ({
+    default: m.RideAdminLayout,
+  })),
+);
+const RideAdminDashboardPage = lazy(() =>
+  import("@/features/ride-admin/pages/dashboard-page").then((m) => ({
+    default: m.RideAdminDashboardPage,
+  })),
+);
+const RideAdminBookingsPage = lazy(() =>
+  import("@/features/ride-admin/pages/bookings-page").then((m) => ({
+    default: m.RideAdminBookingsPage,
+  })),
+);
+const RideAdminBookingDetailPage = lazy(() =>
+  import("@/features/ride-admin/pages/booking-detail-page").then((m) => ({
+    default: m.RideAdminBookingDetailPage,
+  })),
+);
+const RideAdminVehiclesPage = lazy(() =>
+  import("@/features/ride-admin/pages/vehicles-page").then((m) => ({
+    default: m.RideAdminVehiclesPage,
+  })),
+);
+const RideAdminVehicleCreatePage = lazy(() =>
+  import("@/features/ride-admin/pages/vehicle-create-page").then((m) => ({
+    default: m.RideAdminVehicleCreatePage,
+  })),
+);
+const RideAdminVehicleDetailPage = lazy(() =>
+  import("@/features/ride-admin/pages/vehicle-detail-page").then((m) => ({
+    default: m.RideAdminVehicleDetailPage,
+  })),
+);
+const RideAdminDriversPage = lazy(() =>
+  import("@/features/ride-admin/pages/drivers-page").then((m) => ({
+    default: m.RideAdminDriversPage,
+  })),
+);
+const RideAdminDriverDetailPage = lazy(() =>
+  import("@/features/ride-admin/pages/driver-detail-page").then((m) => ({
+    default: m.RideAdminDriverDetailPage,
+  })),
+);
+const RideAdminTripsPage = lazy(() =>
+  import("@/features/ride-admin/pages/trips-page").then((m) => ({
+    default: m.RideAdminTripsPage,
+  })),
+);
+const RideAdminTripDetailPage = lazy(() =>
+  import("@/features/ride-admin/pages/trip-detail-page").then((m) => ({
+    default: m.RideAdminTripDetailPage,
+  })),
+);
+const RideAdminCustomersPage = lazy(() =>
+  import("@/features/ride-admin/pages/customers-page").then((m) => ({
+    default: m.RideAdminCustomersPage,
+  })),
+);
+const RideAdminCustomerDetailPage = lazy(() =>
+  import("@/features/ride-admin/pages/customer-detail-page").then((m) => ({
+    default: m.RideAdminCustomerDetailPage,
+  })),
+);
+const RideAdminComingSoonPage = lazy(() =>
+  import("@/features/ride-admin/pages/coming-soon-page").then((m) => ({
+    default: m.RideAdminComingSoonPage,
+  })),
+);
 const RideServicesIndexPage = lazy(() =>
   import("@/features/ride/pages/ride-services-index-page").then((m) => ({
     default: m.RideServicesIndexPage,
@@ -126,19 +326,21 @@ const RideContactPage = lazy(() =>
   })),
 );
 
-function RideLazy({ children }: Readonly<{ children: ReactNode }>) {
+function PageFallback() {
   return (
-    <Suspense
-      fallback={
-        <div className="mx-auto max-w-6xl space-y-4 px-4 py-10">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      }
-    >
-      {children}
-    </Suspense>
+    <div className="mx-auto max-w-6xl space-y-4 px-4 py-10">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-40 w-full" />
+    </div>
   );
+}
+
+function RideLazy({ children }: Readonly<{ children: ReactNode }>) {
+  return <Suspense fallback={<PageFallback />}>{children}</Suspense>;
+}
+
+function AppLazy({ children }: Readonly<{ children: ReactNode }>) {
+  return <Suspense fallback={<PageFallback />}>{children}</Suspense>;
 }
 
 function LegacyServiceSlugRedirect() {
@@ -167,7 +369,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/login",
-    element: <LoginPage />,
+    element: (
+      <AppLazy>
+        <LoginPage />
+      </AppLazy>
+    ),
   },
   {
     path: "/ride",
@@ -334,7 +540,11 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    element: <RequireAuth />,
+    element: (
+      <AppLazy>
+        <RequireAuth />
+      </AppLazy>
+    ),
     children: [
       {
         path: "admin",

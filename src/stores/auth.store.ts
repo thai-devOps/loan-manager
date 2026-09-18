@@ -10,15 +10,18 @@ import {
 } from "@/lib/auth";
 import { apiFetch } from "@/api/client";
 import { queryClient } from "@/lib/query-client";
-import { closeUserDatabase, isDbOpen, openUserDatabase } from "@/db/database";
-import {
-  ensureInitialSync,
-  startSyncManager,
-  stopSyncManager,
-} from "@/sync/syncManager";
 import { useSyncStore } from "@/stores/sync.store";
 import type { AuthMeResponse, PublicUser } from "@/config/permissions";
 import { SYSTEM_ROLE_CODES } from "@/config/permissions";
+
+/** Keep Dexie/sync out of the public /ride entry — load only after login. */
+async function loadDb() {
+  return import("@/db/database");
+}
+
+async function loadSyncManager() {
+  return import("@/sync/syncManager");
+}
 
 interface AuthState {
   session: AuthSession | null;
@@ -90,8 +93,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: () => {
     // Policy 2A: keep IndexedDB + pending queue; only clear auth + query cache.
     loadMeInFlight = null;
-    stopSyncManager();
-    closeUserDatabase();
+    void Promise.all([loadSyncManager(), loadDb()]).then(
+      ([{ stopSyncManager }, { closeUserDatabase }]) => {
+        stopSyncManager();
+        closeUserDatabase();
+      },
+    );
     useSyncStore.getState().reset();
     clearAuth();
     queryClient.clear();
@@ -164,6 +171,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
       return;
     }
+
+    const [{ isDbOpen, openUserDatabase }, { ensureInitialSync, startSyncManager }] =
+      await Promise.all([loadDb(), loadSyncManager()]);
 
     // login + RequireAuth both call this; skip re-entry once gate is ready
     if (isDbOpen() && useSyncStore.getState().initialSyncReady) {
