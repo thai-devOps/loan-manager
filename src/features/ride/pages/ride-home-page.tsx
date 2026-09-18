@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   Check,
@@ -115,6 +115,42 @@ function SectionEyebrow({ children }: { children: ReactNode }) {
   );
 }
 
+const HERO_IMAGE_SRC = "/hero_image.webp";
+
+/** Soft fade-in for hero photo — no skeleton; keeps layout stable. */
+function HeroBackgroundImage() {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img?.complete && img.naturalWidth > 0) {
+      setReady(true);
+    }
+  }, []);
+
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 bg-muted/20">
+      <img
+        ref={imgRef}
+        src={HERO_IMAGE_SRC}
+        alt=""
+        width={1720}
+        height={914}
+        decoding="async"
+        fetchPriority="high"
+        onLoad={() => setReady(true)}
+        className={cn(
+          "absolute inset-0 size-full object-cover object-[center_40%]",
+          "transition-opacity duration-700 ease-out motion-reduce:transition-none",
+          ready ? "opacity-100" : "opacity-0",
+        )}
+      />
+      <div className="absolute inset-0 bg-linear-to-r from-background from-0% via-background/92 via-42% to-transparent to-72% dark:from-background dark:via-background/95" />
+    </div>
+  );
+}
+
 export function RideHomePage() {
   useRidePageMeta(
     "Đặt Xe Có Tài Xế An Giang | Xe Riêng Đón Tận Nơi",
@@ -137,14 +173,7 @@ export function RideHomePage() {
     <div>
       {/* Hero + Quick booking */}
       <section className="relative overflow-hidden border-b border-border">
-        <div aria-hidden className="pointer-events-none absolute inset-0">
-          <img
-            src="/hero_section_image.png"
-            alt=""
-            className="absolute inset-0 size-full object-cover object-[center_40%]"
-          />
-          <div className="absolute inset-0 bg-linear-to-r from-background from-0% via-background/92 via-42% to-transparent to-72% dark:from-background dark:via-background/95" />
-        </div>
+        <HeroBackgroundImage />
         <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-16">
           <div>
             <p className="text-xs font-medium tracking-[0.2em] text-teal-800 uppercase dark:text-teal-300">

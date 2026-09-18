@@ -3,6 +3,11 @@
   "outputDirectory": "dist",
   "redirects": [
     {
+      "source": "/",
+      "destination": "/ride",
+      "permanent": false
+    },
+    {
       "source": "/ride/services",
       "destination": "/ride/dich-vu",
       "permanent": true

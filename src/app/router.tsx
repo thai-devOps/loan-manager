@@ -60,12 +60,8 @@ import { RoleDetailPage } from "@/features/access-control/pages/role-detail-page
 import { AccessMatrixPage } from "@/features/access-control/pages/access-matrix-page";
 import { AuditLogsPage } from "@/features/access-control/pages/audit-logs-page";
 import { PERMISSIONS } from "@/config/permissions";
+import { RideHomePage } from "@/features/ride/pages/ride-home-page";
 
-const RideHomePage = lazy(() =>
-  import("@/features/ride/pages/ride-home-page").then((m) => ({
-    default: m.RideHomePage,
-  })),
-);
 const RideServicesIndexPage = lazy(() =>
   import("@/features/ride/pages/ride-services-index-page").then((m) => ({
     default: m.RideServicesIndexPage,
@@ -163,6 +159,10 @@ export const router = createBrowserRouter([
     element: <RootLayout />,
     children: [
   {
+    index: true,
+    element: <Navigate to="/ride" replace />,
+  },
+  {
     path: "/login",
     element: <LoginPage />,
   },
@@ -172,11 +172,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: (
-          <RideLazy>
-            <RideHomePage />
-          </RideLazy>
-        ),
+        element: <RideHomePage />,
       },
       {
         path: "dich-vu",
@@ -335,7 +331,6 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "/",
     element: <RequireAuth />,
     children: [
       {
@@ -702,7 +697,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "*",
-    element: <Navigate to="/apps" replace />,
+    element: <Navigate to="/ride" replace />,
   },
     ],
   },
