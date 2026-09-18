@@ -69,7 +69,7 @@ function inject(html, page) {
 
   out = out.replace("</head>", `${headExtras}</head>`);
 
-  const prerenderBody = `<div id="root"><article class="seo-prerender" style="max-width:48rem;margin:2rem auto;padding:1rem;font-family:system-ui,sans-serif"><h1>${h1}</h1><p>${body}</p><p><a href="/ride/booking">Đặt chuyến</a> · <a href="/ride/dich-vu">Dịch vụ</a></p></article></div>`;
+  const prerenderBody = `<div id="root"><article class="seo-prerender" aria-hidden="true"><h1>${h1}</h1><p>${body}</p><p><a href="/ride/booking">Đặt chuyến</a> · <a href="/ride/dich-vu">Dịch vụ</a></p></article></div>`;
 
   out = out.replace(/<div id="root"><\/div>/, prerenderBody);
 
