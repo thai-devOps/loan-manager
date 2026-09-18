@@ -9,6 +9,7 @@ import {
 } from "@/features/ride/config/ride-brand";
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
 import { trackRideEvent } from "@/features/ride/lib/ride-analytics";
+import { saveLastBookingLookup } from "@/features/ride/lib/last-booking-lookup";
 import { vehicleService } from "@/features/ride/services/vehicleService";
 import type { TripBooking, Vehicle } from "@/features/ride/types/ride";
 
@@ -53,6 +54,10 @@ export function RideBookingSuccessPage() {
       if (cancelled) return;
       setTrip(found);
       if (found) {
+        saveLastBookingLookup({
+          bookingCode: found.bookingCode,
+          phone: found.customer?.phone,
+        });
         const v = await vehicleService.getVehicleById(found.vehicleId);
         if (!cancelled) setVehicle(v);
       }

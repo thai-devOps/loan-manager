@@ -25,6 +25,7 @@ import {
   getBookingClientId,
   newIdempotencyKey,
 } from "@/features/ride/lib/booking-client-id";
+import { saveLastBookingLookup } from "@/features/ride/lib/last-booking-lookup";
 import {
   SERVICE_TYPE_LABELS,
   TRIP_TYPE_LABELS,
@@ -197,6 +198,10 @@ export function RideBookingPage() {
       } catch {
         /* ignore */
       }
+      saveLastBookingLookup({
+        bookingCode: trip.bookingCode,
+        phone: trip.customer?.phone,
+      });
       trackRideEvent("booking_submitted", {
         booking_code: trip.bookingCode,
       });
@@ -237,7 +242,7 @@ export function RideBookingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-3xl px-4 py-10 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:px-6 md:pb-10">
       <h1 className="text-3xl font-semibold tracking-tight">Đặt chuyến</h1>
       <p className="mt-2 text-muted-foreground">
         Gửi yêu cầu đặt chuyến — xe riêng có tài xế. Nhân viên sẽ liên hệ xác
@@ -245,6 +250,7 @@ export function RideBookingPage() {
       </p>
 
       <form
+        id="ride-booking-form"
         onSubmit={form.handleSubmit(onSubmit)}
         className="mt-8 space-y-10"
       >
@@ -492,15 +498,36 @@ export function RideBookingPage() {
           <p className="text-sm text-destructive">{submitError}</p>
         ) : null}
 
+        {/* Desktop / in-flow submit */}
         <Button
           type="submit"
           size="lg"
           disabled={submitting}
-          className="min-h-12 w-full bg-teal-800 text-base hover:bg-teal-700"
+          className="hidden min-h-12 w-full bg-teal-800 text-base hover:bg-teal-700 md:inline-flex"
         >
           {submitting ? "Đang gửi…" : "Gửi yêu cầu đặt chuyến"}
         </Button>
       </form>
+
+      {/* Mobile: sticky submit only — avoids confusion with site "Đặt chuyến" bar */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
+        <div className="mx-auto max-w-3xl">
+          {submitError ? (
+            <p className="mb-2 text-center text-xs text-destructive">
+              {submitError}
+            </p>
+          ) : null}
+          <Button
+            type="submit"
+            form="ride-booking-form"
+            size="lg"
+            disabled={submitting}
+            className="min-h-12 w-full bg-teal-800 text-base hover:bg-teal-700"
+          >
+            {submitting ? "Đang gửi…" : "Gửi yêu cầu đặt chuyến"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

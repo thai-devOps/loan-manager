@@ -21,7 +21,6 @@ import {
   runPricingCalculate,
   seatsToVehicleCategory,
 } from "../../../_lib/ride-pricing.js";
-import { lookupMatrixPrice } from "../../../_lib/ride-price-matrix.js";
 import type {
   Place,
   RideBooking,
@@ -240,61 +239,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const id = randomUUID();
       const bookingCode = await generateBookingCode();
 
-      // Prefer fixed matrix price; fall back to ACTIVE ROUTE/AIRPORT rules (no km).
+      // Attach fixed-route quote when an ACTIVE ROUTE/AIRPORT rule matches
+      // (no distance needed). Per-km rules stay null — admin auto-quotes with routing.
       let quotedPrice: number | null = null;
       let pricingSnapshot: RideBooking["pricingSnapshot"] = null;
       const pricingRuleId =
         typeof body.pricingRuleId === "string" ? body.pricingRuleId.trim() : "";
       try {
-        const matrixHit = await lookupMatrixPrice({
-          origin: pickup.address,
-          destination: destination.address,
-          seats: passengers,
-          tripType,
-        });
-        if (matrixHit) {
-          const calculatedAt = new Date().toISOString();
-          quotedPrice = matrixHit.amount;
-          pricingSnapshot = {
-            pricingRuleId: `matrix:${matrixHit.routeId}`,
-            version: 1,
-            calculatedAt,
-            basePrice: matrixHit.amount,
-            distanceKm: 0,
-            distancePrice: 0,
-            surcharges: 0,
-            total: matrixHit.amount,
-            matrixRouteId: matrixHit.routeId,
-            matrixVehicleTypeId: matrixHit.vehicleTypeId,
-            matrixTripTypeId: matrixHit.tripTypeId,
-          };
-        } else {
-          let originKey = pickup.address;
-          let destinationKey = destination.address;
-          if (pricingRuleId) {
-            const pinned = await getPricingRule(pricingRuleId);
-            if (pinned?.status === "ACTIVE") {
-              originKey = pinned.originKey || pinned.origin || originKey;
-              destinationKey =
-                pinned.destinationKey || pinned.destination || destinationKey;
-            }
+        let originKey = pickup.address;
+        let destinationKey = destination.address;
+        if (pricingRuleId) {
+          const pinned = await getPricingRule(pricingRuleId);
+          if (pinned?.status === "ACTIVE") {
+            originKey = pinned.originKey || pinned.origin || originKey;
+            destinationKey =
+              pinned.destinationKey || pinned.destination || destinationKey;
           }
-          const calc = await runPricingCalculate({
-            serviceType: serviceType as ServiceType,
-            vehicleCategory: seatsToVehicleCategory(passengers),
-            originKey,
-            destinationKey,
-            distanceKm: 0,
-            roundTrip: tripType === "ROUND_TRIP",
-            date: pickupDate,
-          });
-          if (calc.ok && calc.snapshot) {
-            const matched = await getPricingRule(calc.matchedRuleId);
-            const perKm = Number(matched?.pricingConfig?.pricePerKm) || 0;
-            if (perKm <= 0) {
-              quotedPrice = calc.breakdown.total;
-              pricingSnapshot = calc.snapshot;
-            }
+        }
+        const calc = await runPricingCalculate({
+          serviceType: serviceType as ServiceType,
+          vehicleCategory: seatsToVehicleCategory(passengers),
+          originKey,
+          destinationKey,
+          distanceKm: 0,
+          roundTrip: tripType === "ROUND_TRIP",
+          date: pickupDate,
+        });
+        if (calc.ok && calc.snapshot) {
+          const matched = await getPricingRule(calc.matchedRuleId);
+          const perKm = Number(matched?.pricingConfig?.pricePerKm) || 0;
+          if (perKm <= 0) {
+            quotedPrice = calc.breakdown.total;
+            pricingSnapshot = calc.snapshot;
           }
         }
       } catch (err) {

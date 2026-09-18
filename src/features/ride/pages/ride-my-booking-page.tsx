@@ -11,11 +11,23 @@ import { TrackingHero } from "@/features/ride/components/tracking/tracking-hero"
 import { TrackingSearchForm } from "@/features/ride/components/tracking/tracking-search-form";
 import { TrackingResult } from "@/features/ride/components/tracking/tracking-result";
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
+import {
+  readLastBookingLookup,
+  saveLastBookingLookup,
+} from "@/features/ride/lib/last-booking-lookup";
 import { tripService } from "@/features/ride/services/tripService";
 import { vehicleService } from "@/features/ride/services/vehicleService";
 import type { TripBooking, Vehicle } from "@/features/ride/types/ride";
 import { cn } from "@/lib/utils";
 import { hasHotline, hotlineTelHref } from "@/features/ride/config/ride-brand";
+
+function initialLookupValues(codeFromUrl: string): TripLookupFormValues {
+  const saved = readLastBookingLookup();
+  return {
+    bookingCode: (codeFromUrl || saved?.bookingCode || "").toUpperCase(),
+    phone: saved?.phone ?? "",
+  };
+}
 
 export function RideMyBookingPage() {
   useRidePageMeta(
@@ -25,6 +37,7 @@ export function RideMyBookingPage() {
   );
 
   const [searchParams] = useSearchParams();
+  const codeFromUrl = (searchParams.get("code") ?? "").trim();
   const [trip, setTrip] = useState<TripBooking | null>(null);
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -34,11 +47,15 @@ export function RideMyBookingPage() {
 
   const form = useForm<TripLookupFormValues>({
     resolver: zodResolver(tripLookupSchema),
-    defaultValues: {
-      bookingCode: searchParams.get("code") ?? "",
-      phone: "",
-    },
+    defaultValues: initialLookupValues(codeFromUrl),
   });
+
+  useEffect(() => {
+    if (!codeFromUrl) return;
+    form.setValue("bookingCode", codeFromUrl.toUpperCase(), {
+      shouldDirty: false,
+    });
+  }, [codeFromUrl, form]);
 
   useEffect(() => {
     if (!trip) return;
@@ -69,6 +86,10 @@ export function RideMyBookingPage() {
         setNotFound(true);
         return;
       }
+      saveLastBookingLookup({
+        bookingCode: found.bookingCode,
+        phone: values.phone || found.customer?.phone,
+      });
       setTrip(found);
       const v = await vehicleService.getVehicleById(found.vehicleId);
       setVehicle(v);
@@ -78,6 +99,8 @@ export function RideMyBookingPage() {
   }
 
   const tel = hotlineTelHref();
+  const hasPrefill =
+    Boolean(form.getValues("bookingCode")) || Boolean(form.getValues("phone"));
 
   return (
     <div className="pb-10 sm:pb-14">
@@ -88,8 +111,9 @@ export function RideMyBookingPage() {
 
         {!hasSearched && !trip ? (
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Mã chuyến được gửi sau khi bạn đặt thành công (SMS hoặc trang xác
-            nhận).
+            {hasPrefill
+              ? "Đã điền sẵn mã chuyến gần nhất trên thiết bị này. Kiểm tra số điện thoại rồi bấm Tra cứu."
+              : "Mã chuyến được gửi sau khi bạn đặt thành công (SMS hoặc trang xác nhận)."}
           </p>
         ) : null}
 

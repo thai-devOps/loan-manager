@@ -73,6 +73,11 @@ export function RidePublicLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const hydrate = useAuthStore((s) => s.hydrate);
 
+  /** Booking form has its own sticky submit — hide global "Đặt chuyến" CTA. */
+  const hideMobileCta =
+    location.pathname === "/ride/booking" ||
+    location.pathname.startsWith("/ride/booking/");
+
   useEffect(() => {
     hydrate();
   }, [hydrate]);
@@ -154,11 +159,18 @@ export function RidePublicLayout() {
         </div>
       </header>
 
-      <main className="flex-1 pb-24 md:pb-0">
+      <main className={cn("flex-1", hideMobileCta ? "pb-0" : "pb-24 md:pb-0")}>
         <Outlet />
       </main>
 
-      <footer className="border-t border-border bg-muted/40 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0">
+      <footer
+        className={cn(
+          "border-t border-border bg-muted/40",
+          hideMobileCta
+            ? "pb-0"
+            : "pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0",
+        )}
+      >
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-3">
           <div>
             <p className="font-semibold">{rideBrand.name}</p>
@@ -248,28 +260,39 @@ export function RidePublicLayout() {
         </div>
       </footer>
 
-      {/* Mobile sticky CTA */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
-        <div className="mx-auto flex max-w-lg items-center gap-2">
-          {hasHotline() && tel ? (
-            <Button variant="outline" size="lg" className="shrink-0 px-3" asChild>
-              <a href={tel} aria-label="Gọi hotline">
-                <Phone className="size-4" />
-              </a>
+      {/* Mobile sticky CTA — hidden on booking form (own submit bar) */}
+      {!hideMobileCta ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
+          <div className="mx-auto flex max-w-lg items-center gap-2">
+            {hasHotline() && tel ? (
+              <Button variant="outline" size="lg" className="shrink-0 px-3" asChild>
+                <a href={tel} aria-label="Gọi hotline">
+                  <Phone className="size-4" />
+                </a>
+              </Button>
+            ) : null}
+            {hasZalo() ? (
+              <Button variant="outline" size="lg" className="shrink-0 px-3" asChild>
+                <a
+                  href={rideBrand.zaloUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Chat Zalo"
+                >
+                  <MessageCircle className="size-4" />
+                </a>
+              </Button>
+            ) : null}
+            <Button
+              asChild
+              size="lg"
+              className="min-h-11 flex-1 bg-teal-800 text-base hover:bg-teal-700"
+            >
+              <Link to="/ride/booking">Đặt chuyến</Link>
             </Button>
-          ) : null}
-          {hasZalo() ? (
-            <Button variant="outline" size="lg" className="shrink-0 px-3" asChild>
-              <a href={rideBrand.zaloUrl} target="_blank" rel="noreferrer" aria-label="Chat Zalo">
-                <MessageCircle className="size-4" />
-              </a>
-            </Button>
-          ) : null}
-          <Button asChild size="lg" className="min-h-11 flex-1 bg-teal-800 text-base hover:bg-teal-700">
-            <Link to="/ride/booking">Đặt chuyến</Link>
-          </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

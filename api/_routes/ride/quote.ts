@@ -15,7 +15,6 @@ import {
 import { calculateTripQuote } from "../../../shared/ride/quote-engine.js";
 import { resolveVehiclePricing } from "../../../shared/ride/vehicle-pricing.js";
 import type { TripType } from "../../_lib/ride-types.js";
-import { lookupMatrixPrice } from "../../_lib/ride-price-matrix.js";
 import { rideVehiclesCol, stripDoc } from "../../_lib/mongo.js";
 
 const TRIP_TYPES = new Set(["ONE_WAY", "ROUND_TRIP", "DAILY", "CUSTOM"]);
@@ -241,62 +240,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    // Fixed matrix first (no routing needed when origin/destination match a route).
-    try {
-      const matrixHit = await lookupMatrixPrice({
-        origin: body.pickup?.address ?? "",
-        destination: body.destination?.address ?? "",
-        seats: Number(vehicle.seats) || 1,
-        tripType,
-      });
-      if (matrixHit) {
-        const calculatedAt = new Date().toISOString();
-        const pricingSnapshot = {
-          pricingRuleId: `matrix:${matrixHit.routeId}`,
-          version: 1,
-          calculatedAt,
-          basePrice: matrixHit.amount,
-          distanceKm: 0,
-          distancePrice: 0,
-          surcharges: 0,
-          total: matrixHit.amount,
-          matrixRouteId: matrixHit.routeId,
-          matrixVehicleTypeId: matrixHit.vehicleTypeId,
-          matrixTripTypeId: matrixHit.tripTypeId,
-        };
-        res.status(200).json({
-          display: new Intl.NumberFormat("vi-VN", {
-            style: "currency",
-            currency: "VND",
-            maximumFractionDigits: 0,
-          }).format(matrixHit.amount),
-          amount: matrixHit.amount,
-          autoQuote: true,
-          totalPrice: matrixHit.amount,
-          breakdown: {
-            basePrice: matrixHit.amount,
-            distancePrice: 0,
-            surcharges: 0,
-            total: matrixHit.amount,
-          },
-          pricingSnapshot,
-          snapshot: null,
-          vehicle: stripDoc(vehicle),
-          matrix: {
-            routeId: matrixHit.routeId,
-            routeName: matrixHit.routeName,
-            vehicleTypeId: matrixHit.vehicleTypeId,
-            vehicleName: matrixHit.vehicleName,
-            tripTypeId: matrixHit.tripTypeId,
-            tripTypeName: matrixHit.tripTypeName,
-          },
-        });
-        return;
-      }
-    } catch (err) {
-      console.warn("[Quote] Matrix lookup failed", err);
-    }
-
     try {
       const pair = await resolvePlacePair(body.pickup, body.destination);
       if (!pair) {
@@ -392,7 +335,8 @@ async function respondQuote(
   destination: RoutePlace,
   route: RouteResult,
 ) {
-  const opEngine = calculateTripQuote({
+  // Auto-quote from routed distance + vehicle pricing config (base + /km + fuel/driver).
+  const engine = calculateTripQuote({
     tripType,
     distanceKm: route.distanceKm,
     durationMinutes: route.durationMinutes,
@@ -402,96 +346,70 @@ async function respondQuote(
     waitingFee: body.waitingFee,
   });
 
-  const {
-    normalizeLocationKey,
-    runPricingCalculate,
-    seatsToVehicleCategory,
-  } = await import("../../_lib/ride-pricing.js");
-
-  const roundTrip = tripType === "ROUND_TRIP";
-  const customer = await runPricingCalculate({
-    serviceType: (body.serviceType as "TRAVEL") || "TRAVEL",
-    vehicleCategory: seatsToVehicleCategory(Number(vehicle.seats) || 7),
-    originKey: normalizeLocationKey(
-      origin.address ?? body.pickup?.address ?? "",
-    ),
-    destinationKey: normalizeLocationKey(
-      destination.address ?? body.destination?.address ?? "",
-    ),
-    distanceKm: route.distanceKm,
-    roundTrip,
-    date: (body.date || new Date().toISOString()).slice(0, 10),
-  });
-
-  if (!customer.ok) {
-    res.status(400).json({
-      error: customer.message,
-      code: customer.code,
-      display: "Liên hệ báo giá",
-      amount: null,
-      autoQuote: false,
-      operatingCost: opEngine.operatingCost,
-      fuelCost: opEngine.fuelCost,
-      driverCost: opEngine.driverCost,
-      distanceKm: opEngine.distanceKm,
-      durationMinutes: opEngine.durationMinutes,
-    });
-    return;
-  }
-
   const quotedAt = new Date().toISOString();
-  const customerTotal = customer.breakdown.total;
-  const customerBreakdown = [
-    { label: "Giá cơ bản", amount: customer.breakdown.basePrice },
-    {
-      label: roundTrip ? "Theo quãng đường (khứ hồi)" : "Theo quãng đường",
-      amount: customer.breakdown.distancePrice,
-    },
-    { label: "Phụ phí", amount: customer.breakdown.surcharges },
-  ];
-
   const snapshot = {
-    distanceKm: opEngine.distanceKm,
-    durationMinutes: opEngine.durationMinutes,
+    distanceKm: engine.distanceKm,
+    durationMinutes: engine.durationMinutes,
     fuelPricePerLiter: pricing.fuelPricePerLiter,
     fuelConsumptionPer100Km: pricing.fuelConsumptionPer100Km,
-    fuelLiters: opEngine.fuelLiters,
-    fuelCost: opEngine.fuelCost,
-    driverFee: opEngine.driverCost,
-    tollFee: opEngine.tollFee,
-    parkingFee: opEngine.parkingFee,
-    waitingFee: opEngine.waitingFee,
-    additionalFee: opEngine.additionalFee,
-    operatingCost: opEngine.operatingCost,
-    subtotal: customerTotal,
-    totalPrice: customerTotal,
-    breakdown: customerBreakdown,
+    fuelLiters: engine.fuelLiters,
+    fuelCost: engine.fuelCost,
+    driverFee: engine.driverCost,
+    tollFee: engine.tollFee,
+    parkingFee: engine.parkingFee,
+    waitingFee: engine.waitingFee,
+    additionalFee: engine.additionalFee,
+    operatingCost: engine.operatingCost,
+    subtotal: engine.subtotal,
+    totalPrice: engine.totalPrice ?? 0,
+    breakdown: engine.breakdown,
     provider: route.provider,
     quotedAt,
   };
 
+  const pricingSnapshot =
+    engine.totalPrice != null && engine.autoQuote
+      ? {
+          pricingRuleId: `vehicle:${String(vehicle.id)}`,
+          version: 1,
+          calculatedAt: quotedAt,
+          basePrice: pricing.baseFare,
+          distanceKm: engine.billableKm,
+          distancePrice: Math.max(
+            0,
+            engine.fare - (Number(pricing.baseFare) || 0),
+          ),
+          surcharges: engine.operatingCost + engine.additionalFee,
+          total: engine.totalPrice,
+          originKey: origin.address ?? body.pickup?.address ?? "",
+          destinationKey: destination.address ?? body.destination?.address ?? "",
+          roundTrip: tripType === "ROUND_TRIP",
+        }
+      : null;
+
   res.status(200).json({
-    display: `${customerTotal.toLocaleString("vi-VN")} đ`,
-    amount: customerTotal,
-    autoQuote: true,
-    distanceKm: opEngine.distanceKm,
-    durationMinutes: opEngine.durationMinutes,
-    fuelLiters: opEngine.fuelLiters,
-    fuelCost: opEngine.fuelCost,
-    driverCost: opEngine.driverCost,
-    tollFee: opEngine.tollFee,
-    parkingFee: opEngine.parkingFee,
-    waitingFee: opEngine.waitingFee,
-    additionalFee: opEngine.additionalFee,
-    operatingCost: opEngine.operatingCost,
-    subtotal: customerTotal,
-    totalPrice: customerTotal,
-    breakdown: customerBreakdown,
+    display:
+      engine.totalPrice != null
+        ? `${engine.totalPrice.toLocaleString("vi-VN")} đ`
+        : "Liên hệ báo giá",
+    amount: engine.totalPrice,
+    autoQuote: engine.autoQuote,
+    distanceKm: engine.distanceKm,
+    durationMinutes: engine.durationMinutes,
+    fuelLiters: engine.fuelLiters,
+    fuelCost: engine.fuelCost,
+    driverCost: engine.driverCost,
+    tollFee: engine.tollFee,
+    parkingFee: engine.parkingFee,
+    waitingFee: engine.waitingFee,
+    additionalFee: engine.additionalFee,
+    operatingCost: engine.operatingCost,
+    subtotal: engine.subtotal,
+    totalPrice: engine.totalPrice,
+    breakdown: engine.breakdown,
     provider: route.provider,
     snapshot,
-    pricingSnapshot: customer.snapshot,
-    matchedRuleId: customer.matchedRuleId,
-    pricingVersion: customer.version,
+    pricingSnapshot,
     resolvedPickup: {
       address: origin.address ?? body.pickup?.address ?? "",
       latitude: origin.latitude,
