@@ -60,12 +60,11 @@ import { RoleDetailPage } from "@/features/access-control/pages/role-detail-page
 import { AccessMatrixPage } from "@/features/access-control/pages/access-matrix-page";
 import { AuditLogsPage } from "@/features/access-control/pages/audit-logs-page";
 import { PERMISSIONS } from "@/config/permissions";
+import { RideHomePage } from "@/features/ride/pages/ride-home-page";
 
-const RideHomePage = lazy(() =>
-  import("@/features/ride/pages/ride-home-page").then((m) => ({
-    default: m.RideHomePage,
-  })),
-);
+// Route module exports `router` + lazy page bindings (not only components).
+/* eslint-disable react-refresh/only-export-components */
+
 const RideServicesIndexPage = lazy(() =>
   import("@/features/ride/pages/ride-services-index-page").then((m) => ({
     default: m.RideServicesIndexPage,
@@ -127,7 +126,7 @@ const RideContactPage = lazy(() =>
   })),
 );
 
-function RideLazy({ children }: { children: ReactNode }) {
+function RideLazy({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <Suspense
       fallback={
@@ -176,11 +175,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: (
-          <RideLazy>
-            <RideHomePage />
-          </RideLazy>
-        ),
+        element: <RideHomePage />,
       },
       {
         path: "dich-vu",
