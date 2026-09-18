@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Clock3,
   HeartHandshake,
+  Loader2,
   MapPin,
   Route,
   ShieldCheck,
@@ -128,7 +129,6 @@ function SectionEyebrow({ children }: { children: ReactNode }) {
 const HERO_IMAGE_SRC = "/hero_image.webp";
 const HERO_IMAGE_SRC_SM = "/hero_image-sm.webp";
 
-/** Paint immediately for LCP — image is also preloaded + in prerender shell. */
 function HeroBackgroundImage() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 bg-muted/20">
@@ -150,14 +150,12 @@ function HeroBackgroundImage() {
 
 function QuickBookingFallback() {
   return (
-    <div className="rounded-2xl border border-border/80 bg-background/90 p-5 shadow-sm backdrop-blur-sm sm:p-6">
-      <p className="text-sm font-medium text-foreground">Đặt chuyến nhanh</p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Nhập điểm đón và điểm đến để gửi yêu cầu.
-      </p>
-      <Button asChild className="mt-4 w-full min-h-11 bg-teal-800 hover:bg-teal-700">
-        <Link to="/ride/booking">Mở form đặt chuyến</Link>
-      </Button>
+    <div
+      className="flex aspect-[532/528] w-full max-w-[532px] items-center justify-center rounded-2xl border border-border/80 bg-background/90 shadow-sm backdrop-blur-sm"
+      role="status"
+      aria-label="Đang tải form đặt chuyến"
+    >
+      <Loader2 className="size-5 animate-spin text-teal-800 sm:size-6" aria-hidden />
     </div>
   );
 }
@@ -169,16 +167,6 @@ export function RideHomePage() {
   );
 
   const [vehicles, setVehicles] = useState<Vehicle[]>(FEATURED_VEHICLES_FALLBACK);
-
-  useEffect(() => {
-    // Drop static LCP cover after React hero has painted (same cached image).
-    const boot = document.getElementById("ride-lcp-boot");
-    if (!boot) return;
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => boot.remove());
-    });
-    return () => cancelAnimationFrame(id);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
