@@ -69,11 +69,11 @@ export const APP_FEATURES: AppFeature[] = [
     id: "loans",
     title: "Khoản cho vay",
     description: "Người vay, khoản vay, thu tiền và lịch thu",
-    href: "/",
+    href: "/dashboard",
     icon: Wallet,
     accessModule: "loan",
     nav: [
-      { title: "Tổng quan", href: "/", icon: LayoutDashboard, end: true },
+      { title: "Tổng quan", href: "/dashboard", icon: LayoutDashboard, end: true },
       { title: "Người vay", href: "/borrowers", icon: Users },
       { title: "Khoản vay", href: "/loans", icon: Wallet },
       { title: "Thu tiền", href: "/payments", icon: HandCoins },
@@ -221,6 +221,8 @@ export function getFeatureById(id: AppFeatureId): AppFeature {
 export function getFeatureFromPath(pathname: string): AppFeature | null {
   if (pathname === "/apps" || pathname.startsWith("/apps/")) return null;
   if (pathname === "/profile" || pathname.startsWith("/profile/")) return null;
+  if (pathname === "/ride" || pathname.startsWith("/ride/")) return null;
+  if (pathname === "/login" || pathname.startsWith("/login")) return null;
   if (
     pathname.startsWith("/admin/users") ||
     pathname.startsWith("/admin/roles") ||
@@ -239,7 +241,17 @@ export function getFeatureFromPath(pathname: string): AppFeature | null {
   if (pathname === "/reports" || pathname.startsWith("/reports/")) {
     return getFeatureById("analytics");
   }
-  return getFeatureById("loans");
+  if (
+    pathname === "/dashboard" ||
+    pathname.startsWith("/borrowers") ||
+    pathname.startsWith("/loans") ||
+    pathname.startsWith("/payments") ||
+    pathname.startsWith("/schedules") ||
+    pathname.startsWith("/transactions")
+  ) {
+    return getFeatureById("loans");
+  }
+  return null;
 }
 
 /** Bottom tab order: Cho vay · Tài chính · Ứng dụng (FAB) · Tài sản · Phân tích */
@@ -247,7 +259,7 @@ export const MOBILE_BOTTOM_TABS: MobileBottomTab[] = [
   {
     id: "loans",
     title: "Cho vay",
-    href: "/",
+    href: "/dashboard",
     icon: Wallet,
     accessModule: "loan",
     isActive: (pathname) => getFeatureFromPath(pathname)?.id === "loans",

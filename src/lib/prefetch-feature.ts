@@ -14,7 +14,7 @@ export function prefetchFeatureRoute(href: string): void {
 
   const path = href.split("?")[0] ?? href;
 
-  if (path === "/" || path.startsWith("/borrowers") || path.startsWith("/loans") || path.startsWith("/payments") || path.startsWith("/schedules") || path.startsWith("/transactions")) {
+  if (path === "/dashboard" || path.startsWith("/borrowers") || path.startsWith("/loans") || path.startsWith("/payments") || path.startsWith("/schedules") || path.startsWith("/transactions")) {
     void queryClient.prefetchQuery({
       queryKey: queryKeys.borrowers.all,
       queryFn: () => borrowerRepository.list(),

@@ -787,7 +787,7 @@ export const router = createBrowserRouter([
                   {
                     element: <LoansLayout />,
                     children: [
-                      { index: true, element: <DashboardPage /> },
+                      { path: "dashboard", element: <DashboardPage /> },
                       { path: "borrowers", element: <BorrowersPage /> },
                       {
                         path: "borrowers/:id",
