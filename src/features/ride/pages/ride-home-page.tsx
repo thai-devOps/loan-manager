@@ -137,21 +137,25 @@ export function RideHomePage() {
     <div>
       {/* Hero + Quick booking */}
       <section className="relative overflow-hidden border-b border-border">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,oklch(0.92_0.03_180),transparent_55%),radial-gradient(ellipse_at_bottom_left,oklch(0.94_0.02_80),transparent_50%)] dark:bg-[radial-gradient(ellipse_at_top_right,oklch(0.28_0.04_180),transparent_55%)]"
-        />
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <img
+            src="/hero_section_image.png"
+            alt=""
+            className="absolute inset-0 size-full object-cover object-[center_40%]"
+          />
+          <div className="absolute inset-0 bg-linear-to-r from-background from-0% via-background/92 via-42% to-transparent to-72% dark:from-background dark:via-background/95" />
+        </div>
         <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-16">
           <div>
             <p className="text-xs font-medium tracking-[0.2em] text-teal-800 uppercase dark:text-teal-300">
               {rideBrand.shortName}
             </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-balance text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
               Đưa bạn đến nơi,
               <br />
               an tâm suốt hành trình.
             </h1>
-            <p className="mt-4 max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg">
+            <p className="mt-4 max-w-lg text-base leading-relaxed text-foreground/90 sm:text-lg">
               Xe riêng có tài xế cho du lịch, khám bệnh, hành hương, sân bay và
               các chuyến đi theo yêu cầu.
             </p>
@@ -159,11 +163,16 @@ export function RideHomePage() {
               <Button asChild size="lg" className="min-h-11 bg-teal-800 hover:bg-teal-700">
                 <Link to="/ride/booking">Đặt chuyến ngay</Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="min-h-11">
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="min-h-11 border-border bg-background hover:bg-background"
+              >
                 <Link to="/ride/dich-vu">Xem dịch vụ</Link>
               </Button>
             </div>
-            <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+            <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-foreground/85">
               {["Uy tín", "An toàn", "Đúng giờ", "Tận tâm", "Giá rõ ràng"].map(
                 (item) => (
                   <li key={item} className="inline-flex items-center gap-1.5">
