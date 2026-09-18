@@ -2,15 +2,15 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { INDEXABLE_PATHS } from "./seo-paths.mjs";
+import { joinSiteUrl, resolveSiteUrl } from "./site-url.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 
-const siteUrl = (process.env.VITE_SITE_URL || "").replace(/\/+$/, "");
+const siteUrl = resolveSiteUrl(process.env);
 
 function loc(path) {
-  const p = path.endsWith("/") && path !== "/" ? path.slice(0, -1) : path;
-  return siteUrl ? `${siteUrl}${p}` : p;
+  return joinSiteUrl(siteUrl, path);
 }
 
 function escapeXml(s) {
@@ -35,28 +35,25 @@ ${urls}
 </urlset>
 `;
 
-writeFileSync(join(root, "public", "sitemap.xml"), xml, "utf8");
-try {
-  mkdirSync(join(root, "dist"), { recursive: true });
-  writeFileSync(join(root, "dist", "sitemap.xml"), xml, "utf8");
-} catch {
-  /* ignore */
-}
+// Vercel serves dist/ — always write absolute (or path) locs there after vite build.
+mkdirSync(join(root, "dist"), { recursive: true });
+writeFileSync(join(root, "dist", "sitemap.xml"), xml, "utf8");
 
+const robotsTemplate = readFileSync(join(root, "public", "robots.txt"), "utf8");
+let robots = robotsTemplate;
 if (siteUrl) {
-  const robotsPath = join(root, "public", "robots.txt");
-  let robots = readFileSync(robotsPath, "utf8");
-  robots = robots.replace(
-    /Sitemap:\s*.*/i,
-    `Sitemap: ${siteUrl}/sitemap.xml`,
-  );
-  writeFileSync(robotsPath, robots, "utf8");
-  try {
-    writeFileSync(join(root, "dist", "robots.txt"), robots, "utf8");
-  } catch {
-    /* ignore */
+  const sitemapLine = `Sitemap: ${siteUrl}/sitemap.xml`;
+  if (/^Sitemap:\s*/im.test(robots)) {
+    robots = robots.replace(/^Sitemap:\s*.*$/im, sitemapLine);
+  } else {
+    robots = `${robots.trimEnd()}\n\n${sitemapLine}\n`;
   }
+} else {
+  console.warn(
+    "[seo] VITE_SITE_URL (or Vercel URL) is unset — sitemap <loc> and robots Sitemap stay relative. Set VITE_SITE_URL=https://your-domain.com for production.",
+  );
 }
+writeFileSync(join(root, "dist", "robots.txt"), robots, "utf8");
 
 console.log(
   `sitemap.xml written (${INDEXABLE_PATHS.length} urls)${siteUrl ? ` base=${siteUrl}` : " (set VITE_SITE_URL for absolute locs)"}`,

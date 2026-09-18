@@ -8,14 +8,15 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { INDEXABLE_PATHS, PRERENDER_PAGES } from "./seo-paths.mjs";
 import { ALL_SEO_LANDINGS_META } from "./seo-landings-meta.mjs";
+import { joinSiteUrl, resolveSiteUrl } from "./site-url.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const dist = join(root, "dist");
-const siteUrl = (process.env.VITE_SITE_URL || "").replace(/\/+$/, "");
+const siteUrl = resolveSiteUrl(process.env);
 
 function abs(path) {
-  return siteUrl ? `${siteUrl}${path}` : path;
+  return joinSiteUrl(siteUrl, path);
 }
 
 function escapeHtml(s) {
@@ -47,6 +48,7 @@ function inject(html, page) {
   const description = escapeHtml(page.description);
   const h1 = escapeHtml(page.h1);
   const body = escapeHtml(page.body);
+  const canonicalIsAbsolute = /^https:\/\//i.test(canonical);
 
   let out = html.replace(
     /<title>[^<]*<\/title>/i,
@@ -56,12 +58,12 @@ function inject(html, page) {
   const headExtras = `
     <meta name="description" content="${description}" />
     <meta name="robots" content="index,follow" />
-    <link rel="canonical" href="${escapeHtml(canonical)}" />
+    ${canonicalIsAbsolute ? `<link rel="canonical" href="${escapeHtml(canonical)}" />` : ""}
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="${escapeHtml(canonical)}" />
-    <meta property="og:image" content="${escapeHtml(ogImage)}" />
+    ${canonicalIsAbsolute ? `<meta property="og:url" content="${escapeHtml(canonical)}" />` : ""}
+    ${/^https:\/\//i.test(ogImage) ? `<meta property="og:image" content="${escapeHtml(ogImage)}" />` : ""}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${title}" />
     <meta name="twitter:description" content="${description}" />
@@ -99,4 +101,4 @@ for (const path of INDEXABLE_PATHS) {
   count += 1;
 }
 
-console.log(`Prerendered ${count} SEO pages into dist/`);
+console.log(`Prerendered ${count} SEO pages into dist/${siteUrl ? ` base=${siteUrl}` : " (relative canonical skipped — set VITE_SITE_URL)"}`);

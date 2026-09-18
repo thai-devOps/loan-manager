@@ -3,6 +3,7 @@ import { rideBrand } from "@/features/ride/config/ride-brand";
 import {
   absoluteUrl,
   getSiteUrl,
+  isAbsoluteHttpUrl,
   normalizePath,
 } from "@/features/ride/config/site";
 import type { SEOConfig, SEORobots } from "@/features/ride/seo/types";
@@ -31,6 +32,10 @@ function upsertLink(rel: string, href: string) {
     document.head.appendChild(el);
   }
   el.setAttribute("href", href);
+}
+
+function removeLink(rel: string) {
+  document.head.querySelector(`link[rel="${rel}"]`)?.remove();
 }
 
 function upsertJsonLd(
@@ -79,19 +84,29 @@ export function useSEO({
 
     upsertMeta("name", "description", description);
     upsertMeta("name", "robots", robots);
-    upsertLink("canonical", canonical || pathNorm);
+
+    // Canonical / og:url must be absolute https URLs (never relative "/ride")
+    if (isAbsoluteHttpUrl(canonical)) {
+      upsertLink("canonical", canonical);
+      upsertMeta("property", "og:url", canonical);
+    } else {
+      removeLink("canonical");
+    }
 
     upsertMeta("property", "og:title", fullTitle);
     upsertMeta("property", "og:description", description);
     upsertMeta("property", "og:type", "website");
-    upsertMeta("property", "og:url", canonical || pathNorm);
-    upsertMeta("property", "og:image", ogImage);
+    if (isAbsoluteHttpUrl(ogImage)) {
+      upsertMeta("property", "og:image", ogImage);
+    }
     if (siteUrl) upsertMeta("property", "og:site_name", rideBrand.name);
 
     upsertMeta("name", "twitter:card", "summary_large_image");
     upsertMeta("name", "twitter:title", fullTitle);
     upsertMeta("name", "twitter:description", description);
-    upsertMeta("name", "twitter:image", ogImage);
+    if (isAbsoluteHttpUrl(ogImage)) {
+      upsertMeta("name", "twitter:image", ogImage);
+    }
 
     if (jsonLdKey) {
       upsertJsonLd(
