@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,10 @@ import {
   tripBookingFormSchema,
   type TripBookingFormValues,
 } from "@/features/ride/schemas/trip-booking.schema";
+import {
+  getBookingClientId,
+  newIdempotencyKey,
+} from "@/features/ride/lib/booking-client-id";
 import {
   SERVICE_TYPE_LABELS,
   TRIP_TYPE_LABELS,
@@ -70,6 +75,8 @@ export function RideBookingPage() {
   const [suitable, setSuitable] = useState<Vehicle[] | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const idempotencyKeyRef = useRef(newIdempotencyKey());
+  const honeypotRef = useRef<HTMLInputElement | null>(null);
   const [pickupPlace, setPickupPlace] = useState<Place>({
     address: searchParams.get("pickup") ?? "",
     latitude: Number(searchParams.get("pickupLat")) || null,
@@ -158,26 +165,32 @@ export function RideBookingPage() {
     setSubmitError(null);
     setSubmitting(true);
     try {
-      const trip = await tripService.createTrip({
-        serviceType: data.serviceType,
-        pickup: {
-          address: pickupPlace.address || data.pickupAddress,
-          latitude: pickupPlace.latitude,
-          longitude: pickupPlace.longitude,
+      const trip = await tripService.createTrip(
+        {
+          serviceType: data.serviceType,
+          pickup: {
+            address: pickupPlace.address || data.pickupAddress,
+            latitude: pickupPlace.latitude,
+            longitude: pickupPlace.longitude,
+          },
+          destination: {
+            address: destPlace.address || data.destinationAddress,
+            latitude: destPlace.latitude,
+            longitude: destPlace.longitude,
+          },
+          pickupDate: data.pickupDate,
+          pickupTime: data.pickupTime,
+          tripType: data.tripType,
+          passengers: data.passengers,
+          vehicleId: data.vehicleId,
+          customer: { name: data.customerName, phone: data.customerPhone },
+          note: data.note,
+          clientId: getBookingClientId(),
+          website: honeypotRef.current?.value ?? "",
         },
-        destination: {
-          address: destPlace.address || data.destinationAddress,
-          latitude: destPlace.latitude,
-          longitude: destPlace.longitude,
-        },
-        pickupDate: data.pickupDate,
-        pickupTime: data.pickupTime,
-        tripType: data.tripType,
-        passengers: data.passengers,
-        vehicleId: data.vehicleId,
-        customer: { name: data.customerName, phone: data.customerPhone },
-        note: data.note,
-      });
+        { idempotencyKey: idempotencyKeyRef.current },
+      );
+      idempotencyKeyRef.current = newIdempotencyKey();
       try {
         sessionStorage.setItem("ride.lastBooking", JSON.stringify(trip));
       } catch {
@@ -191,11 +204,32 @@ export function RideBookingPage() {
         { state: { trip } },
       );
     } catch (e) {
-      setSubmitError(
-        e instanceof Error
-          ? e.message
-          : "Không gửi được yêu cầu. Vui lòng thử lại.",
-      );
+      const apiErr = e as ApiError & { code?: string };
+      if (apiErr instanceof ApiError) {
+        if (
+          apiErr.status === 429 ||
+          apiErr.code === "RATE_LIMITED" ||
+          apiErr.code === "PHONE_RATE_LIMITED" ||
+          apiErr.code === "CLIENT_RATE_LIMITED"
+        ) {
+          setSubmitError(
+            "Bạn đã gửi quá nhiều yêu cầu trong thời gian ngắn. Vui lòng thử lại sau.",
+          );
+        } else if (apiErr.code === "SPAM_DETECTED") {
+          setSubmitError("Không thể xử lý yêu cầu.");
+        } else {
+          setSubmitError(
+            apiErr.message || "Không gửi được yêu cầu. Vui lòng thử lại.",
+          );
+        }
+      } else {
+        setSubmitError(
+          e instanceof Error
+            ? e.message
+            : "Không gửi được yêu cầu. Vui lòng thử lại.",
+        );
+      }
+      // Keep same idempotencyKey on failure so retries are safe
     } finally {
       setSubmitting(false);
     }
@@ -374,7 +408,7 @@ export function RideBookingPage() {
           ) : null}
         </section>
 
-        <section className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-6">
+        <section className="relative space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-6">
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Thông tin liên hệ
           </h2>
@@ -410,6 +444,22 @@ export function RideBookingPage() {
                 "Ví dụ:\n- Có người lớn tuổi\n- Có trẻ em\n- Có nhiều hành lý"
               }
               {...form.register("note")}
+            />
+          </div>
+          {/* Honeypot — hidden from users; bots often fill it */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-[-9999px] h-0 w-0 overflow-hidden opacity-0"
+          >
+            <label htmlFor="website">Website</label>
+            <input
+              ref={honeypotRef}
+              id="website"
+              name="website"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              defaultValue=""
             />
           </div>
         </section>

@@ -460,6 +460,10 @@ export type CreateTripInput = {
   customer: TripCustomer;
   note?: string;
   quoteSnapshot?: BookingQuoteSnapshot | null;
+  /** Anti-spam: stable browser client id */
+  clientId?: string;
+  /** Honeypot — must stay empty */
+  website?: string;
 };
 
 export type RideDashboardData = {

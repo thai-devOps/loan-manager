@@ -2,6 +2,13 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { randomUUID } from "node:crypto";
 import { PERMISSIONS } from "../../../_lib/access/catalog.js";
 import { requirePermission } from "../../../_lib/auth.js";
+import { ANTI_SPAM_MESSAGES } from "../../../_lib/booking-anti-spam-config.js";
+import {
+  claimIdempotencyKey,
+  completeIdempotencyKey,
+} from "../../../_lib/booking-idempotency.js";
+import { assertBookingRateLimits } from "../../../_lib/booking-rate-limiter.js";
+import { getClientIp } from "../../../_lib/get-client-ip.js";
 import { methodNotAllowed, readJsonBody, withHandler } from "../../../_lib/http.js";
 import {
   generateBookingCode,
@@ -19,6 +26,7 @@ import {
   rideVehiclesCol,
   stripDoc,
 } from "../../../_lib/mongo.js";
+import { maskPhone } from "../../../../shared/ride/booking-anti-spam-helpers.js";
 
 const SERVICE_TYPES = new Set([
   "TRAVEL",
@@ -44,6 +52,11 @@ function parsePlace(raw?: {
     latitude: Number.isFinite(lat) ? lat : null,
     longitude: Number.isFinite(lng) ? lng : null,
   };
+}
+
+function headerValue(raw: string | string[] | undefined): string {
+  if (Array.isArray(raw)) return raw[0] ?? "";
+  return raw ?? "";
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -100,6 +113,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         vehicleId?: string;
         customer?: { name?: string; phone?: string };
         note?: string;
+        clientId?: string;
+        website?: string;
       }>(req);
 
       const serviceType = (body.serviceType ?? "").trim();
@@ -112,6 +127,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const customerName = (body.customer?.name ?? "").trim();
       const customerPhone = (body.customer?.phone ?? "").trim();
       const passengers = Number(body.passengers);
+      const clientId =
+        typeof body.clientId === "string" ? body.clientId.trim() : "";
 
       if (!SERVICE_TYPES.has(serviceType)) {
         res.status(400).json({ error: "Loại dịch vụ không hợp lệ" });
@@ -139,6 +156,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (!customerName || normalizePhone(customerPhone).length < 9) {
         res.status(400).json({ error: "Thông tin liên hệ không hợp lệ" });
+        return;
+      }
+
+      // Honeypot — bots fill hidden "website" field
+      if (typeof body.website === "string" && body.website.trim() !== "") {
+        console.info(
+          JSON.stringify({
+            event: "booking_spam_detected",
+            phone: maskPhone(customerPhone),
+            timestamp: new Date().toISOString(),
+            route: "POST /api/ride/bookings",
+          }),
+        );
+        res.status(400).json({
+          error: ANTI_SPAM_MESSAGES.SPAM_DETECTED,
+          code: "SPAM_DETECTED",
+        });
+        return;
+      }
+
+      const normalizedPhone = normalizePhone(customerPhone);
+      const ip = getClientIp(req);
+
+      const rateFail = await assertBookingRateLimits({
+        ip,
+        normalizedPhone,
+        clientId: clientId || null,
+      });
+      if (rateFail) {
+        res.status(rateFail.httpStatus).json({
+          error: rateFail.message,
+          code: rateFail.code,
+        });
+        return;
+      }
+
+      const idempotencyRaw = headerValue(req.headers["idempotency-key"]);
+      const claim = await claimIdempotencyKey(idempotencyRaw);
+      if (claim.kind === "error") {
+        res.status(claim.httpStatus).json({
+          error: claim.message,
+          code: claim.code,
+        });
+        return;
+      }
+      if (claim.kind === "reuse") {
+        res.status(200).json(claim.booking);
         return;
       }
 
@@ -192,6 +256,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
 
       await col.insertOne(booking);
+      await completeIdempotencyKey(claim.key, booking.id);
 
       try {
         const { publishRealtimeEvent } = await import(

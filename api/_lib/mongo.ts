@@ -116,6 +116,18 @@ async function ensureIndexes(db: Db): Promise<void> {
     db.collection("audit_logs").createIndex({ createdAt: -1 }),
     db.collection("audit_logs").createIndex({ actorId: 1 }),
     db.collection("audit_logs").createIndex({ targetType: 1, targetId: 1 }),
+    db
+      .collection("ride_booking_rate_limits")
+      .createIndex({ key: 1 }, { unique: true }),
+    db
+      .collection("ride_booking_rate_limits")
+      .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db
+      .collection("ride_booking_idempotency")
+      .createIndex({ key: 1 }, { unique: true }),
+    db
+      .collection("ride_booking_idempotency")
+      .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ]);
   indexesReady = true;
 }
@@ -198,6 +210,43 @@ export async function rolesCol(): Promise<Collection<AppRole>> {
 
 export async function auditLogsCol(): Promise<Collection<AuditLog>> {
   return (await getDb()).collection<AuditLog>("audit_logs");
+}
+
+export type RideBookingRateLimitDoc = {
+  _id?: string;
+  key: string;
+  type: "ip" | "phone" | "phone24" | "client";
+  count: number;
+  windowStart: string;
+  blockedUntil?: string | null;
+  expiresAt: Date;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RideBookingIdempotencyDoc = {
+  _id?: string;
+  key: string;
+  bookingId?: string | null;
+  status: "pending" | "completed";
+  createdAt: string;
+  expiresAt: Date;
+};
+
+export async function rideBookingRateLimitsCol(): Promise<
+  Collection<RideBookingRateLimitDoc>
+> {
+  return (await getDb()).collection<RideBookingRateLimitDoc>(
+    "ride_booking_rate_limits",
+  );
+}
+
+export async function rideBookingIdempotencyCol(): Promise<
+  Collection<RideBookingIdempotencyDoc>
+> {
+  return (await getDb()).collection<RideBookingIdempotencyDoc>(
+    "ride_booking_idempotency",
+  );
 }
 
 /** Strip MongoDB-only fields for API responses */

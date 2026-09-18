@@ -10,7 +10,7 @@ export const rideBrand = {
   tagline:
     "Đặt xe riêng có tài xế tại An Giang — đón tận nơi, uy tín, đúng giờ",
   /** Display labels for hotlines */
-  hotlines: ["035 5511034", "039 7706494"] as string[],
+  hotlines: ["035 5511034"] as string[],
   zaloUrl: "",
   facebookUrl: "",
 };

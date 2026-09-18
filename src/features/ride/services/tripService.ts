@@ -32,17 +32,32 @@ async function publicFetch<T>(
       0,
     );
   }
-  const data = (await res.json().catch(() => ({}))) as { error?: string } & T;
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    code?: string;
+  } & T;
   if (!res.ok) {
-    throw new ApiError(data.error ?? "Request failed", res.status);
+    const err = new ApiError(data.error ?? "Request failed", res.status);
+    (err as ApiError & { code?: string }).code = data.code;
+    throw err;
   }
   return data as T;
 }
 
+export type CreateTripOptions = {
+  idempotencyKey: string;
+};
+
 export const tripService = {
-  async createTrip(input: CreateTripInput): Promise<TripBooking> {
+  async createTrip(
+    input: CreateTripInput,
+    options: CreateTripOptions,
+  ): Promise<TripBooking> {
     return publicFetch<TripBooking>("/api/ride/bookings", {
       method: "POST",
+      headers: {
+        "Idempotency-Key": options.idempotencyKey,
+      },
       body: input,
     });
   },
