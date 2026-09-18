@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BookingStatusBadge } from "@/features/ride-admin/components/booking-status-badge";
+import { ConfirmDeleteDialog } from "@/features/ride-admin/components/confirm-delete-dialog";
 import { Can } from "@/features/auth/can";
 import {
   availabilityAdminService,
@@ -56,6 +57,7 @@ import { MoneyInput } from "@/features/finance/components/money-input";
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
 import { PERMISSIONS } from "@/config/permissions";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 function formatDurationMinutes(totalMinutes: number): string {
@@ -100,6 +102,8 @@ export function RideAdminBookingDetailPage() {
   );
   const [draftPricingSnapshot, setDraftPricingSnapshot] =
     useState<BookingPricingSnapshot | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const autoQuotedForId = useRef<string | null>(null);
 
   async function load() {
     setError(null);
@@ -138,6 +142,17 @@ export function RideAdminBookingDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Auto-quote once when booking has no price yet (e.g. from public pricing table)
+  useEffect(() => {
+    if (!booking) return;
+    if (booking.quotedPrice != null) return;
+    if (booking.tripType === "CUSTOM") return;
+    if (autoQuotedForId.current === booking.id) return;
+    autoQuotedForId.current = booking.id;
+    void calculateAutoQuote({ autoSave: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booking?.id, booking?.quotedPrice, booking?.tripType]);
+
   async function run(body: Record<string, unknown>) {
     setBusy(true);
     setError(null);
@@ -149,6 +164,7 @@ export function RideAdminBookingDetailPage() {
       setPaid(updated.paidAmount ?? 0);
       setVehicleId(updated.vehicleId || "");
       setDriverId(updated.driverId || "");
+      toast.success("Đã cập nhật booking");
       return true;
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Thao tác thất bại");
@@ -165,6 +181,7 @@ export function RideAdminBookingDetailPage() {
       const trip = await tripAdminService.create({ bookingId: id });
       const refreshed = await bookingAdminService.get(id);
       setBooking(refreshed);
+      toast.success("Đã tạo chuyến xe");
       return trip.id;
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Không tạo được chuyến");
@@ -174,7 +191,7 @@ export function RideAdminBookingDetailPage() {
     }
   }
 
-  async function calculateAutoQuote() {
+  async function calculateAutoQuote(opts?: { autoSave?: boolean }) {
     if (!booking) return;
     setCalcBusy(true);
     setError(null);
@@ -236,6 +253,27 @@ export function RideAdminBookingDetailPage() {
       setDraftPricingSnapshot(result.pricingSnapshot ?? null);
       if (result.errorMessage && !result.autoQuote) {
         setError(result.errorMessage);
+      }
+
+      if (
+        opts?.autoSave &&
+        result.autoQuote &&
+        result.amount != null &&
+        result.amount > 0
+      ) {
+        const ok = await run({
+          action: "quote",
+          quotedPrice: result.amount,
+          deposit,
+          paidAmount: paid,
+          quoteSnapshot: result.snapshot ?? null,
+          pricingSnapshot: result.pricingSnapshot ?? null,
+        });
+        if (ok) {
+          setDraftQuote(null);
+          setDraftSnapshot(null);
+          setDraftPricingSnapshot(null);
+        }
       }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Không tính được báo giá");
@@ -424,6 +462,19 @@ export function RideAdminBookingDetailPage() {
                 {action.label}
               </Button>
             ))}
+            <Can permission={PERMISSIONS.FLEET_BOOKING_DELETE}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                disabled={busy}
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="size-4" />
+                Xóa
+              </Button>
+            </Can>
           </div>
         </div>
       </section>
@@ -839,6 +890,34 @@ export function RideAdminBookingDetailPage() {
           </div>
         </section>
       </div>
+
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          if (!open && !busy) setDeleteOpen(false);
+        }}
+        title="Xóa booking?"
+        description={`Xóa booking #${booking.bookingCode}. Thao tác này không thể hoàn tác.`}
+        pending={busy}
+        onConfirm={() => {
+          void (async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              await bookingAdminService.delete(booking.id);
+              toast.success("Đã xóa booking");
+              setDeleteOpen(false);
+              void navigate("/admin/bookings");
+            } catch (e) {
+              setError(
+                e instanceof ApiError ? e.message : "Không xóa được booking",
+              );
+            } finally {
+              setBusy(false);
+            }
+          })();
+        }}
+      />
     </div>
   );
 }

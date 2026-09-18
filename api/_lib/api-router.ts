@@ -147,6 +147,46 @@ export const API_ROUTES: ApiRoute[] = [
     load: () => import("../_routes/ride/pricing/calculate.js"),
   },
   {
+    pattern: /^\/api\/ride\/pricing\/matrix\/?$/,
+    method: "GET",
+    load: () => import("../_routes/ride/pricing/matrix.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/pricing\/routes\/?$/,
+    method: "GET",
+    load: () => import("../_routes/ride/pricing/routes.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/settings\/?$/,
+    load: () => import("../_routes/ride/settings.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/price-routes\/?$/,
+    load: () => import("../_routes/ride/price-routes/index.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/price-routes\/([^/]+)\/?$/,
+    load: () => import("../_routes/ride/price-routes/[id].js"),
+    params: (m) => ({ id: m[1]! }),
+  },
+  {
+    pattern: /^\/api\/ride\/price-vehicle-types\/?$/,
+    load: () => import("../_routes/ride/price-vehicle-types/index.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/price-vehicle-types\/([^/]+)\/?$/,
+    load: () => import("../_routes/ride/price-vehicle-types/[id].js"),
+    params: (m) => ({ id: m[1]! }),
+  },
+  {
+    pattern: /^\/api\/ride\/price-trip-types\/?$/,
+    load: () => import("../_routes/ride/price-trip-types/index.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/price-cells\/?$/,
+    load: () => import("../_routes/ride/price-cells/index.js"),
+  },
+  {
     pattern: /^\/api\/ride\/pricing-rules\/?$/,
     load: () => import("../_routes/ride/pricing-rules/index.js"),
   },

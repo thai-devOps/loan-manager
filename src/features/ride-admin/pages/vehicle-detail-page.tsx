@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Can } from "@/features/auth/can";
 import { PERMISSIONS } from "@/config/permissions";
+import { ConfirmDeleteDialog } from "@/features/ride-admin/components/confirm-delete-dialog";
 import { vehicleAdminService } from "@/features/ride-admin/services/admin-api";
 import {
   formToVehiclePayload,
@@ -38,6 +40,7 @@ export function RideAdminVehicleDetailPage() {
   const [form, setForm] = useState<VehicleFormState | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [odoHistory, setOdoHistory] = useState<OdoEntry[]>([]);
   const [ops, setOps] = useState({
@@ -123,6 +126,7 @@ export function RideAdminVehicleDetailPage() {
       setVehicle(updated);
       setForm(vehicleToForm(updated));
       setEditing(false);
+      toast.success("Đã cập nhật xe");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Lưu thất bại");
     } finally {
@@ -146,6 +150,7 @@ export function RideAdminVehicleDetailPage() {
         registrationExpiry: ops.registrationExpiry || null,
       });
       setVehicle(updated);
+      toast.success("Đã cập nhật vận hành xe");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Lưu thất bại");
     } finally {
@@ -231,13 +236,12 @@ export function RideAdminVehicleDetailPage() {
   }
 
   async function remove() {
-    if (!window.confirm(`Xóa xe "${vehicle?.name}"? Hành động này không hoàn tác.`)) {
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
       await vehicleAdminService.delete(id);
+      toast.success("Đã xóa xe");
+      setDeleteOpen(false);
       navigate("/admin/vehicles", { replace: true });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Xóa thất bại");
@@ -297,7 +301,7 @@ export function RideAdminVehicleDetailPage() {
               size="sm"
               variant="destructive"
               disabled={busy}
-              onClick={() => void remove()}
+              onClick={() => setDeleteOpen(true)}
             >
               <Trash2 className="size-3.5" />
               Xóa
@@ -719,6 +723,19 @@ export function RideAdminVehicleDetailPage() {
           </section>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          if (!open && !busy) setDeleteOpen(false);
+        }}
+        title="Xóa xe?"
+        description={`Xóa xe «${vehicle.name}». Thao tác này không thể hoàn tác.`}
+        pending={busy}
+        onConfirm={() => {
+          void remove();
+        }}
+      />
     </div>
   );
 }

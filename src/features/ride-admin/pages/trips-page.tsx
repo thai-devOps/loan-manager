@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,7 +19,13 @@ import {
   filterSearchClass,
   filterSearchFormClass,
 } from "@/features/ride-admin/components/admin-filter-bar";
+import { ColumnVisibilityMenu } from "@/features/ride-admin/components/column-visibility-menu";
+import { ConfirmDeleteDialog } from "@/features/ride-admin/components/confirm-delete-dialog";
 import { TripStatusBadge } from "@/features/ride-admin/components/trip-status-badge";
+import {
+  useColumnVisibility,
+  type ColumnDef,
+} from "@/features/ride-admin/lib/column-visibility";
 import { TripFormDialog } from "@/features/ride-admin/pages/trip-form-dialog";
 import {
   driverAdminService,
@@ -40,12 +47,33 @@ import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
 import { PERMISSIONS } from "@/config/permissions";
 import { cn } from "@/lib/utils";
-import {
-  formatRideDateTime,
-} from "@/features/ride-admin/lib/format";
+import { formatRideDateTime } from "@/features/ride-admin/lib/format";
 
 const STATUSES = Object.keys(TRIP_STATUS_LABELS) as TripStatus[];
 const TYPES = Object.keys(TRIP_TYPE_LABELS) as TripType[];
+
+type TripColumnId =
+  | "code"
+  | "customer"
+  | "route"
+  | "pickup"
+  | "tripType"
+  | "vehicle"
+  | "driver"
+  | "price"
+  | "status";
+
+const TRIP_COLUMNS: ColumnDef<TripColumnId>[] = [
+  { id: "code", label: "Mã", locked: true, defaultVisible: true },
+  { id: "customer", label: "Khách", locked: true, defaultVisible: true },
+  { id: "route", label: "Hành trình", defaultVisible: true },
+  { id: "pickup", label: "Ngày đón", defaultVisible: true },
+  { id: "tripType", label: "Loại", defaultVisible: false },
+  { id: "vehicle", label: "Xe", defaultVisible: false },
+  { id: "driver", label: "Tài xế", defaultVisible: false },
+  { id: "price", label: "Giá", defaultVisible: true },
+  { id: "status", label: "TT", locked: true, defaultVisible: true },
+];
 
 export function RideAdminTripsPage() {
   const navigate = useNavigate();
@@ -56,7 +84,15 @@ export function RideAdminTripsPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState(searchParams.get("q") ?? "");
-  const [formOpen, setFormOpen] = useState(() => Boolean(searchParams.get("bookingId")));
+  const [formOpen, setFormOpen] = useState(() =>
+    Boolean(searchParams.get("bookingId")),
+  );
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<RideTrip | null>(null);
+  const columns = useColumnVisibility(
+    "ride-admin.trips.visible-columns",
+    TRIP_COLUMNS,
+  );
 
   const status = searchParams.get("status") ?? "";
   const date = searchParams.get("date") ?? "";
@@ -107,6 +143,25 @@ export function RideAdminTripsPage() {
     };
   }, [status, date, tripType, vehicleId, driverId, searchParams]);
 
+  async function reload() {
+    setError(null);
+    const [list, veh, drv] = await Promise.all([
+      tripAdminService.list({
+        status: status || undefined,
+        q: searchParams.get("q") || undefined,
+        date: date || undefined,
+        tripType: tripType || undefined,
+        vehicleId: vehicleId || undefined,
+        driverId: driverId || undefined,
+      }),
+      vehicleAdminService.list(),
+      driverAdminService.list(),
+    ]);
+    setRows(list);
+    setVehicles(veh);
+    setDrivers(drv);
+  }
+
   const dialogOpen = formOpen || Boolean(bookingId);
 
   function vehicleName(id?: string | null) {
@@ -119,6 +174,21 @@ export function RideAdminTripsPage() {
     return drivers.find((d) => d.id === id)?.name ?? "—";
   }
 
+  async function remove(trip: RideTrip) {
+    setBusyId(trip.id);
+    setError(null);
+    try {
+      await tripAdminService.delete(trip.id);
+      toast.success("Đã xóa chuyến xe");
+      setDeleting(null);
+      await reload();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Không xóa được chuyến");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const qParam = searchParams.get("q") ?? "";
   const activeFilterCount = [
     qParam,
@@ -129,6 +199,8 @@ export function RideAdminTripsPage() {
     driverId,
   ].filter(Boolean).length;
 
+  const colSpan = columns.visibleCount + 1;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -138,15 +210,23 @@ export function RideAdminTripsPage() {
             Quản lý lịch trình vận hành, phân xe và tài xế
           </p>
         </div>
-        <Can permission={PERMISSIONS.FLEET_TRIP_CREATE}>
-          <Button
-            className="gap-1.5 bg-teal-800 hover:bg-teal-700"
-            onClick={() => setFormOpen(true)}
-          >
-            <Plus className="size-4" />
-            Tạo chuyến
-          </Button>
-        </Can>
+        <div className="flex flex-wrap gap-2">
+          <ColumnVisibilityMenu
+            columns={TRIP_COLUMNS}
+            isVisible={columns.isVisible}
+            toggle={columns.toggle}
+            reset={columns.reset}
+          />
+          <Can permission={PERMISSIONS.FLEET_TRIP_CREATE}>
+            <Button
+              className="gap-1.5 bg-teal-800 hover:bg-teal-700"
+              onClick={() => setFormOpen(true)}
+            >
+              <Plus className="size-4" />
+              Tạo chuyến
+            </Button>
+          </Can>
+        </div>
       </div>
 
       <AdminFilterBar activeCount={activeFilterCount}>
@@ -163,7 +243,11 @@ export function RideAdminTripsPage() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Mã chuyến / booking / khách / điểm đến"
           />
-          <Button type="submit" size="sm" className="h-9 shrink-0 bg-teal-800 hover:bg-teal-700">
+          <Button
+            type="submit"
+            size="sm"
+            className="h-9 shrink-0 bg-teal-800 hover:bg-teal-700"
+          >
             Tìm
           </Button>
         </form>
@@ -253,60 +337,96 @@ export function RideAdminTripsPage() {
               </p>
             )
             : rows.map((t) => (
-                <Link
+                <div
                   key={t.id}
-                  to={`/admin/trips/${t.id}`}
-                  className="block rounded-xl border border-border bg-card p-4"
+                  className="rounded-xl border border-border bg-card p-4"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-mono text-sm font-semibold">
-                      {t.tripCode || t.id.slice(0, 8)}
+                  <Link to={`/admin/trips/${t.id}`} className="block">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-mono text-sm font-semibold">
+                        {t.tripCode || t.id.slice(0, 8)}
+                      </p>
+                      <TripStatusBadge status={t.status} />
+                    </div>
+                    <p className="mt-2 text-sm font-medium">
+                      {t.customer?.name ?? "—"}
                     </p>
-                    <TripStatusBadge status={t.status} />
+                    <p className="text-sm text-muted-foreground">
+                      {t.routeLabel ||
+                        `${t.pickup?.address ?? "—"} → ${t.destination?.address ?? "—"}`}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatRideDateTime(t.pickupDate, t.pickupTime)} ·{" "}
+                      {vehicleName(t.vehicleId)}
+                    </p>
+                  </Link>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={`/admin/trips/${t.id}`}>Chi tiết</Link>
+                    </Button>
+                    <Can permission={PERMISSIONS.FLEET_TRIP_DELETE}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        disabled={busyId === t.id}
+                        onClick={() => setDeleting(t)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Xóa
+                      </Button>
+                    </Can>
                   </div>
-                  <p className="mt-2 text-sm font-medium">
-                    {t.customer?.name ?? "—"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {t.routeLabel ||
-                      `${t.pickup?.address ?? "—"} → ${t.destination?.address ?? "—"}`}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatRideDateTime(t.pickupDate, t.pickupTime)} ·{" "}
-                    {vehicleName(t.vehicleId)} ·{" "}
-                    {TRIP_TYPE_LABELS[t.tripType] ?? t.tripType ?? "—"}
-                  </p>
-                </Link>
+                </div>
               ))}
       </div>
 
       <div className="hidden overflow-x-auto rounded-2xl border border-border lg:block">
-        <table className="w-full min-w-[960px] text-left text-sm">
+        <table className="w-full text-left text-sm">
           <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
             <tr>
-              <th className="px-3 py-3 font-medium">Mã</th>
-              <th className="px-3 py-3 font-medium">Khách</th>
-              <th className="px-3 py-3 font-medium">Hành trình</th>
-              <th className="px-3 py-3 font-medium">Ngày đón</th>
-              <th className="px-3 py-3 font-medium">Loại</th>
-              <th className="px-3 py-3 font-medium">Xe</th>
-              <th className="px-3 py-3 font-medium">Tài xế</th>
-              <th className="px-3 py-3 font-medium">Giá</th>
-              <th className="px-3 py-3 font-medium">TT</th>
+              {columns.isVisible("code") ? (
+                <th className="px-3 py-3 font-medium">Mã</th>
+              ) : null}
+              {columns.isVisible("customer") ? (
+                <th className="px-3 py-3 font-medium">Khách</th>
+              ) : null}
+              {columns.isVisible("route") ? (
+                <th className="px-3 py-3 font-medium">Hành trình</th>
+              ) : null}
+              {columns.isVisible("pickup") ? (
+                <th className="px-3 py-3 font-medium">Ngày đón</th>
+              ) : null}
+              {columns.isVisible("tripType") ? (
+                <th className="px-3 py-3 font-medium">Loại</th>
+              ) : null}
+              {columns.isVisible("vehicle") ? (
+                <th className="px-3 py-3 font-medium">Xe</th>
+              ) : null}
+              {columns.isVisible("driver") ? (
+                <th className="px-3 py-3 font-medium">Tài xế</th>
+              ) : null}
+              {columns.isVisible("price") ? (
+                <th className="px-3 py-3 font-medium">Giá</th>
+              ) : null}
+              {columns.isVisible("status") ? (
+                <th className="px-3 py-3 font-medium">TT</th>
+              ) : null}
               <th className="px-3 py-3 font-medium" />
             </tr>
           </thead>
           <tbody>
             {rows === null ? (
               <tr>
-                <td colSpan={10} className="px-3 py-6">
+                <td colSpan={colSpan} className="px-3 py-6">
                   <Skeleton className="h-8 w-full" />
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={10}
+                  colSpan={colSpan}
                   className="px-3 py-8 text-center text-muted-foreground"
                 >
                   Chưa có chuyến xe.
@@ -315,44 +435,79 @@ export function RideAdminTripsPage() {
             ) : (
               rows.map((t) => (
                 <tr key={t.id} className="border-b border-border/60">
-                  <td className="px-3 py-3 font-mono text-xs font-semibold">
-                    {t.tripCode}
-                    {t.bookingCode ? (
-                      <div className="font-sans text-[11px] text-muted-foreground">
-                        #{t.bookingCode}
+                  {columns.isVisible("code") ? (
+                    <td className="px-3 py-3 font-mono text-xs font-semibold">
+                      {t.tripCode}
+                      {t.bookingCode ? (
+                        <div className="font-sans text-[11px] text-muted-foreground">
+                          #{t.bookingCode}
+                        </div>
+                      ) : null}
+                    </td>
+                  ) : null}
+                  {columns.isVisible("customer") ? (
+                    <td className="px-3 py-3">
+                      <div>{t.customer?.name ?? "—"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {t.customer?.phone ?? "—"}
                       </div>
-                    ) : null}
-                  </td>
+                    </td>
+                  ) : null}
+                  {columns.isVisible("route") ? (
+                    <td className="max-w-[180px] px-3 py-3">
+                      <div className="truncate">
+                        {t.pickup?.address ?? "—"}
+                      </div>
+                      <div className="truncate text-muted-foreground">
+                        → {t.destination?.address ?? "—"}
+                      </div>
+                    </td>
+                  ) : null}
+                  {columns.isVisible("pickup") ? (
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {formatRideDateTime(t.pickupDate, t.pickupTime)}
+                    </td>
+                  ) : null}
+                  {columns.isVisible("tripType") ? (
+                    <td className="px-3 py-3">
+                      {TRIP_TYPE_LABELS[t.tripType] ?? t.tripType ?? "—"}
+                    </td>
+                  ) : null}
+                  {columns.isVisible("vehicle") ? (
+                    <td className="px-3 py-3">{vehicleName(t.vehicleId)}</td>
+                  ) : null}
+                  {columns.isVisible("driver") ? (
+                    <td className="px-3 py-3">{driverName(t.driverId)}</td>
+                  ) : null}
+                  {columns.isVisible("price") ? (
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {formatCurrency(t.tripPrice || 0)}
+                    </td>
+                  ) : null}
+                  {columns.isVisible("status") ? (
+                    <td className="px-3 py-3">
+                      <TripStatusBadge status={t.status} />
+                    </td>
+                  ) : null}
                   <td className="px-3 py-3">
-                    <div>{t.customer?.name ?? "—"}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {t.customer?.phone ?? "—"}
+                    <div className="flex flex-wrap gap-1">
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={`/admin/trips/${t.id}`}>Chi tiết</Link>
+                      </Button>
+                      <Can permission={PERMISSIONS.FLEET_TRIP_DELETE}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          disabled={busyId === t.id}
+                          onClick={() => setDeleting(t)}
+                        >
+                          <Trash2 className="size-3.5" />
+                          <span className="sr-only">Xóa</span>
+                        </Button>
+                      </Can>
                     </div>
-                  </td>
-                  <td className="max-w-[180px] px-3 py-3">
-                    <div className="truncate">{t.pickup?.address ?? "—"}</div>
-                    <div className="truncate text-muted-foreground">
-                      → {t.destination?.address ?? "—"}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    {formatRideDateTime(t.pickupDate, t.pickupTime)}
-                  </td>
-                  <td className="px-3 py-3">
-                    {TRIP_TYPE_LABELS[t.tripType] ?? t.tripType ?? "—"}
-                  </td>
-                  <td className="px-3 py-3">{vehicleName(t.vehicleId)}</td>
-                  <td className="px-3 py-3">{driverName(t.driverId)}</td>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    {formatCurrency(t.tripPrice || 0)}
-                  </td>
-                  <td className="px-3 py-3">
-                    <TripStatusBadge status={t.status} />
-                  </td>
-                  <td className="px-3 py-3">
-                    <Button asChild size="sm" variant="outline">
-                      <Link to={`/admin/trips/${t.id}`}>Chi tiết</Link>
-                    </Button>
                   </td>
                 </tr>
               ))
@@ -360,6 +515,24 @@ export function RideAdminTripsPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDeleteDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open && !busyId) setDeleting(null);
+        }}
+        title="Xóa chuyến xe?"
+        description={
+          deleting
+            ? `Xóa chuyến ${deleting.tripCode || deleting.id.slice(0, 8)}. Thao tác này không thể hoàn tác.`
+            : ""
+        }
+        pending={!!busyId}
+        onConfirm={() => {
+          if (!deleting) return;
+          void remove(deleting);
+        }}
+      />
 
       <TripFormDialog
         open={dialogOpen}
@@ -375,6 +548,7 @@ export function RideAdminTripsPage() {
         vehicles={vehicles}
         drivers={drivers}
         onSaved={(trip) => {
+          toast.success("Đã lưu chuyến xe");
           setFormOpen(false);
           void navigate(`/admin/trips/${trip.id}`);
         }}

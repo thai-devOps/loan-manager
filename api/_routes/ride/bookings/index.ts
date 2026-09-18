@@ -9,12 +9,19 @@ import {
 } from "../../../_lib/booking-idempotency.js";
 import { assertBookingRateLimits } from "../../../_lib/booking-rate-limiter.js";
 import { getClientIp } from "../../../_lib/get-client-ip.js";
+import { isBookingAntiSpamEnabled } from "../../../_lib/ride-settings.js";
 import { methodNotAllowed, readJsonBody, withHandler } from "../../../_lib/http.js";
 import {
   generateBookingCode,
   normalizePhone,
 } from "../../../_lib/ride-booking.js";
 import { upsertCustomer } from "../../../_lib/ride-customer.js";
+import {
+  getPricingRule,
+  runPricingCalculate,
+  seatsToVehicleCategory,
+} from "../../../_lib/ride-pricing.js";
+import { lookupMatrixPrice } from "../../../_lib/ride-price-matrix.js";
 import type {
   Place,
   RideBooking,
@@ -115,6 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         note?: string;
         clientId?: string;
         website?: string;
+        pricingRuleId?: string;
       }>(req);
 
       const serviceType = (body.serviceType ?? "").trim();
@@ -159,41 +167,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      // Honeypot — bots fill hidden "website" field
-      if (typeof body.website === "string" && body.website.trim() !== "") {
-        console.info(
-          JSON.stringify({
-            event: "booking_spam_detected",
-            phone: maskPhone(customerPhone),
-            timestamp: new Date().toISOString(),
-            route: "POST /api/ride/bookings",
-          }),
-        );
-        res.status(400).json({
-          error: ANTI_SPAM_MESSAGES.SPAM_DETECTED,
-          code: "SPAM_DETECTED",
-        });
-        return;
-      }
+      // Honeypot + rate limits (can be disabled via admin settings / env)
+      const antiSpamOn = await isBookingAntiSpamEnabled();
+      if (antiSpamOn) {
+        if (typeof body.website === "string" && body.website.trim() !== "") {
+          console.info(
+            JSON.stringify({
+              event: "booking_spam_detected",
+              phone: maskPhone(customerPhone),
+              timestamp: new Date().toISOString(),
+              route: "POST /api/ride/bookings",
+            }),
+          );
+          res.status(400).json({
+            error: ANTI_SPAM_MESSAGES.SPAM_DETECTED,
+            code: "SPAM_DETECTED",
+          });
+          return;
+        }
 
-      const normalizedPhone = normalizePhone(customerPhone);
-      const ip = getClientIp(req);
+        const normalizedPhone = normalizePhone(customerPhone);
+        const ip = getClientIp(req);
 
-      const rateFail = await assertBookingRateLimits({
-        ip,
-        normalizedPhone,
-        clientId: clientId || null,
-      });
-      if (rateFail) {
-        res.status(rateFail.httpStatus).json({
-          error: rateFail.message,
-          code: rateFail.code,
+        const rateFail = await assertBookingRateLimits({
+          ip,
+          normalizedPhone,
+          clientId: clientId || null,
         });
-        return;
+        if (rateFail) {
+          res.status(rateFail.httpStatus).json({
+            error: rateFail.message,
+            code: rateFail.code,
+          });
+          return;
+        }
       }
 
       const idempotencyRaw = headerValue(req.headers["idempotency-key"]);
-      const claim = await claimIdempotencyKey(idempotencyRaw);
+      let claim = await claimIdempotencyKey(idempotencyRaw);
+      if (claim.kind === "error" && !antiSpamOn) {
+        // Anti-spam off: mint a key so create can proceed without client header
+        claim = await claimIdempotencyKey(randomUUID());
+      }
       if (claim.kind === "error") {
         res.status(claim.httpStatus).json({
           error: claim.message,
@@ -225,6 +240,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const id = randomUUID();
       const bookingCode = await generateBookingCode();
 
+      // Prefer fixed matrix price; fall back to ACTIVE ROUTE/AIRPORT rules (no km).
+      let quotedPrice: number | null = null;
+      let pricingSnapshot: RideBooking["pricingSnapshot"] = null;
+      const pricingRuleId =
+        typeof body.pricingRuleId === "string" ? body.pricingRuleId.trim() : "";
+      try {
+        const matrixHit = await lookupMatrixPrice({
+          origin: pickup.address,
+          destination: destination.address,
+          seats: passengers,
+          tripType,
+        });
+        if (matrixHit) {
+          const calculatedAt = new Date().toISOString();
+          quotedPrice = matrixHit.amount;
+          pricingSnapshot = {
+            pricingRuleId: `matrix:${matrixHit.routeId}`,
+            version: 1,
+            calculatedAt,
+            basePrice: matrixHit.amount,
+            distanceKm: 0,
+            distancePrice: 0,
+            surcharges: 0,
+            total: matrixHit.amount,
+            matrixRouteId: matrixHit.routeId,
+            matrixVehicleTypeId: matrixHit.vehicleTypeId,
+            matrixTripTypeId: matrixHit.tripTypeId,
+          };
+        } else {
+          let originKey = pickup.address;
+          let destinationKey = destination.address;
+          if (pricingRuleId) {
+            const pinned = await getPricingRule(pricingRuleId);
+            if (pinned?.status === "ACTIVE") {
+              originKey = pinned.originKey || pinned.origin || originKey;
+              destinationKey =
+                pinned.destinationKey || pinned.destination || destinationKey;
+            }
+          }
+          const calc = await runPricingCalculate({
+            serviceType: serviceType as ServiceType,
+            vehicleCategory: seatsToVehicleCategory(passengers),
+            originKey,
+            destinationKey,
+            distanceKm: 0,
+            roundTrip: tripType === "ROUND_TRIP",
+            date: pickupDate,
+          });
+          if (calc.ok && calc.snapshot) {
+            const matched = await getPricingRule(calc.matchedRuleId);
+            const perKm = Number(matched?.pricingConfig?.pricePerKm) || 0;
+            if (perKm <= 0) {
+              quotedPrice = calc.breakdown.total;
+              pricingSnapshot = calc.snapshot;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[Booking] Could not attach public pricing quote", err);
+      }
+
       const booking: RideBooking = {
         _id: id,
         id,
@@ -244,8 +320,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           phone: customerPhone.trim(),
         },
         note: body.note?.trim() || undefined,
-        quotedPrice: null,
+        quotedPrice,
         quoteSnapshot: null,
+        pricingSnapshot,
         deposit: 0,
         paidAmount: 0,
         status: "PENDING",

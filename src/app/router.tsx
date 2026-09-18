@@ -270,6 +270,11 @@ const RideAdminPricingPage = lazy(() =>
     default: m.RideAdminPricingPage,
   })),
 );
+const RideAdminSettingsPage = lazy(() =>
+  import("@/features/ride-admin/pages/settings-page").then((m) => ({
+    default: m.RideAdminSettingsPage,
+  })),
+);
 const RideAdminComingSoonPage = lazy(() =>
   import("@/features/ride-admin/pages/coming-soon-page").then((m) => ({
     default: m.RideAdminComingSoonPage,
@@ -789,7 +794,11 @@ export const router = createBrowserRouter([
                   {
                     path: "settings",
                     element: (
-                      <RideAdminComingSoonPage title="Cài đặt vận hành" />
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_BOOKING_VIEW}
+                      >
+                        <RideAdminSettingsPage />
+                      </PermissionRoute>
                     ),
                   },
                 ],

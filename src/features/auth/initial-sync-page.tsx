@@ -1,7 +1,6 @@
 import { Loader2, RefreshCw, WifiOff } from "lucide-react";
-import { AppLogo } from "@/components/common/app-logo";
 import { Button } from "@/components/ui/button";
-import { APP_NAME } from "@/lib/brand";
+import { APP_BRAND_LOGO_SRC, APP_NAME } from "@/lib/brand";
 import { retryInitialSync } from "@/sync/syncManager";
 import { useSyncStore } from "@/stores/sync.store";
 
@@ -13,11 +12,13 @@ export function InitialSyncPage() {
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-6">
-      <div className="flex w-full max-w-sm flex-col items-center text-center">
-        <AppLogo size="xl" className="rounded-2xl" />
-        <p className="mt-5 font-semibold tracking-tight text-foreground">
-          {APP_NAME}
-        </p>
+      <div className="flex w-full max-w-md flex-col items-center text-center">
+        <img
+          src={APP_BRAND_LOGO_SRC}
+          alt={APP_NAME}
+          className="h-auto w-full max-w-[18rem] object-contain sm:max-w-[22rem]"
+          decoding="async"
+        />
 
         {isError ? (
           <>
@@ -44,12 +45,12 @@ export function InitialSyncPage() {
         ) : (
           <>
             <Loader2
-              className="mt-10 size-8 animate-spin text-muted-foreground"
+              className="mt-8 size-8 animate-spin text-teal-800 dark:text-teal-300"
               aria-hidden
             />
             <h1 className="mt-4 text-lg font-medium text-foreground">
               {phase === "checking"
-                ? "Đang chuẩn bị…"
+                ? "Đang tải quyền…"
                 : "Đang đồng bộ dữ liệu…"}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">

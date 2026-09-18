@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Trash2 } from "lucide-react";
 import { EditIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Can } from "@/features/auth/can";
+import { ConfirmDeleteDialog } from "@/features/ride-admin/components/confirm-delete-dialog";
 import { TripStatusBadge } from "@/features/ride-admin/components/trip-status-badge";
 import { TripFormDialog } from "@/features/ride-admin/pages/trip-form-dialog";
 import {
@@ -52,6 +53,7 @@ import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
 import { PERMISSIONS } from "@/config/permissions";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type CostForm = {
   fuelLiters: string;
@@ -90,6 +92,7 @@ function costsToForm(trip: RideTrip): CostForm {
 
 export function RideAdminTripDetailPage() {
   const { id = "" } = useParams();
+  const navigate = useNavigate();
   const [trip, setTrip] = useState<RideTrip | null | undefined>(undefined);
   const [booking, setBooking] = useState<TripBooking | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -104,6 +107,7 @@ export function RideAdminTripDetailPage() {
   const [costForm, setCostForm] = useState<CostForm>(emptyCostForm());
   const [costEditing, setCostEditing] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [startOdo, setStartOdo] = useState("");
   const [endOdo, setEndOdo] = useState("");
 
@@ -180,6 +184,7 @@ export function RideAdminTripDetailPage() {
           /* ignore */
         }
       }
+      toast.success("Đã cập nhật chuyến xe");
       return updated;
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Thao tác thất bại");
@@ -345,6 +350,19 @@ export function RideAdminTripDetailPage() {
                 Sửa
               </Button>
             ) : null}
+          </Can>
+          <Can permission={PERMISSIONS.FLEET_TRIP_DELETE}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
+              disabled={busy}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="size-3.5" />
+              Xóa
+            </Button>
           </Can>
         </div>
       </div>
@@ -919,6 +937,35 @@ export function RideAdminTripDetailPage() {
         onSaved={(updated) => {
           setTrip(updated);
           setEditOpen(false);
+          toast.success("Đã cập nhật chuyến xe");
+        }}
+      />
+
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          if (!open && !busy) setDeleteOpen(false);
+        }}
+        title="Xóa chuyến xe?"
+        description={`Xóa chuyến ${trip.tripCode}. Thao tác này không thể hoàn tác.`}
+        pending={busy}
+        onConfirm={() => {
+          void (async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              await tripAdminService.delete(trip.id);
+              toast.success("Đã xóa chuyến xe");
+              setDeleteOpen(false);
+              void navigate("/admin/trips");
+            } catch (e) {
+              setError(
+                e instanceof ApiError ? e.message : "Không xóa được chuyến",
+              );
+            } finally {
+              setBusy(false);
+            }
+          })();
         }}
       />
     </div>

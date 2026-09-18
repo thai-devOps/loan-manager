@@ -187,6 +187,7 @@ export function RideBookingPage() {
           note: data.note,
           clientId: getBookingClientId(),
           website: honeypotRef.current?.value ?? "",
+          pricingRuleId: searchParams.get("pricingRuleId")?.trim() || undefined,
         },
         { idempotencyKey: idempotencyKeyRef.current },
       );

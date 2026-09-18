@@ -159,6 +159,104 @@ export type RidePricingRule = {
   updatedAt: string;
 };
 
+/** Public pricing page — ACTIVE ROUTE/AIRPORT rules only. */
+export type PublicPricingRoute = {
+  id: string;
+  name: string;
+  type: "ROUTE" | "AIRPORT";
+  origin: string;
+  destination: string;
+  vehicleCategory: VehicleCategory;
+  serviceType: PricingServiceMatch;
+  pricingConfig: {
+    basePrice: number;
+    pricePerKm: number;
+    minimumPrice?: number;
+    roundTrip?: boolean;
+  };
+  priority: number;
+};
+
+export type PublicPricingRoutesResponse = {
+  items: PublicPricingRoute[];
+};
+
+/** Fixed-price matrix (customer pricing tables). */
+export type PriceTripTypeCode =
+  | "ONE_WAY"
+  | "SAME_DAY_RETURN"
+  | "TWO_DAYS_ONE_NIGHT";
+
+export type RidePriceRoute = {
+  id: string;
+  name: string;
+  origin: string;
+  destination: string;
+  originKey: string;
+  destinationKey: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RidePriceVehicleType = {
+  id: string;
+  name: string;
+  seats: number;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RidePriceTripType = {
+  id: string;
+  code: PriceTripTypeCode;
+  name: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RidePriceCell = {
+  id: string;
+  routeId: string;
+  vehicleTypeId: string;
+  tripTypeId: string;
+  amount: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicMatrixTripCol = {
+  id: string;
+  code: PriceTripTypeCode;
+  name: string;
+};
+
+export type PublicMatrixVehicleRow = {
+  id: string;
+  name: string;
+  seats: number;
+  prices: Record<string, number | null>;
+};
+
+export type PublicMatrixRoute = {
+  id: string;
+  name: string;
+  origin: string;
+  destination: string;
+  tripTypes: PublicMatrixTripCol[];
+  vehicles: PublicMatrixVehicleRow[];
+};
+
+export type PublicPricingMatrixResponse = {
+  routes: PublicMatrixRoute[];
+};
+
 export type BookingPricingSnapshot = {
   pricingRuleId: string;
   version: number;
@@ -173,6 +271,10 @@ export type BookingPricingSnapshot = {
   vehicleCategory?: VehicleCategory;
   serviceType?: PricingServiceMatch;
   roundTrip?: boolean;
+  /** Present when quote came from fixed price matrix */
+  matrixRouteId?: string;
+  matrixVehicleTypeId?: string;
+  matrixTripTypeId?: string;
 };
 
 export type PricingCalculateResult = {
@@ -460,10 +562,13 @@ export type CreateTripInput = {
   customer: TripCustomer;
   note?: string;
   quoteSnapshot?: BookingQuoteSnapshot | null;
+  pricingSnapshot?: BookingPricingSnapshot | null;
   /** Anti-spam: stable browser client id */
   clientId?: string;
   /** Honeypot — must stay empty */
   website?: string;
+  /** Optional ACTIVE pricing rule from /ride/pricing */
+  pricingRuleId?: string;
 };
 
 export type RideDashboardData = {

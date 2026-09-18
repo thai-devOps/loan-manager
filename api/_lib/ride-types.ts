@@ -164,6 +164,10 @@ export type BookingPricingSnapshot = {
   vehicleCategory?: VehicleCategory;
   serviceType?: PricingServiceMatch;
   roundTrip?: boolean;
+  /** Present when quote came from fixed price matrix */
+  matrixRouteId?: string;
+  matrixVehicleTypeId?: string;
+  matrixTripTypeId?: string;
 };
 
 export type VehicleInsurance = {

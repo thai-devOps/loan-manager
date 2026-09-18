@@ -10,8 +10,21 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
+/** Env default when Mongo has no override. */
+export function envBookingAntiSpamEnabled(): boolean {
+  const raw = (process.env.BOOKING_ANTI_SPAM_ENABLED ?? "true")
+    .trim()
+    .toLowerCase();
+  if (["0", "false", "off", "no"].includes(raw)) return false;
+  return true;
+}
+
 /** Tunable via env for production; sensible defaults for Vercel. */
 export const bookingAntiSpamConfig = {
+  /** Default from env; runtime may override via ride_settings. */
+  get enabled() {
+    return envBookingAntiSpamEnabled();
+  },
   ipLimit: envInt("BOOKING_RATE_LIMIT_IP", 5),
   ipWindowMinutes: envInt("BOOKING_RATE_WINDOW_IP_MINUTES", 10),
   ipBlockMinutes: envInt("BOOKING_RATE_BLOCK_IP_MINUTES", 30),

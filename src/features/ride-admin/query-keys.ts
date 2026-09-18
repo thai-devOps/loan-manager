@@ -29,4 +29,11 @@ export const rideAdminQueryKeys = {
   pricingRulesRoot: () => [...rideAdminQueryKeys.all, "pricing-rules"] as const,
   pricingRule: (id: string) =>
     [...rideAdminQueryKeys.all, "pricing-rule", id] as const,
+  priceMatrix: () => [...rideAdminQueryKeys.all, "price-matrix"] as const,
+  priceRoutes: () => [...rideAdminQueryKeys.all, "price-routes"] as const,
+  priceVehicles: () => [...rideAdminQueryKeys.all, "price-vehicles"] as const,
+  priceTripTypes: () =>
+    [...rideAdminQueryKeys.all, "price-trip-types"] as const,
+  priceCells: (routeId?: string) =>
+    [...rideAdminQueryKeys.all, "price-cells", routeId ?? "all"] as const,
 };

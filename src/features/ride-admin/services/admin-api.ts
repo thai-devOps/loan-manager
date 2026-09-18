@@ -7,6 +7,10 @@ import type {
   RideCustomer,
   RideCustomerDetail,
   RideDashboardData,
+  RidePriceCell,
+  RidePriceRoute,
+  RidePriceTripType,
+  RidePriceVehicleType,
   RidePricingRule,
   RideScheduleData,
   RideTrip,
@@ -40,6 +44,10 @@ export const bookingAdminService = {
 
   action(id: string, body: Record<string, unknown>): Promise<TripBooking> {
     return apiFetch(`/api/ride/bookings/${id}`, { method: "PATCH", body });
+  },
+
+  delete(id: string): Promise<void> {
+    return apiFetch(`/api/ride/bookings/${id}`, { method: "DELETE" });
   },
 };
 
@@ -81,6 +89,10 @@ export const tripAdminService = {
 
   action(id: string, body: Record<string, unknown>): Promise<RideTrip> {
     return apiFetch(`/api/ride/trips/${id}`, { method: "PATCH", body });
+  },
+
+  delete(id: string): Promise<void> {
+    return apiFetch(`/api/ride/trips/${id}`, { method: "DELETE" });
   },
 };
 
@@ -231,8 +243,97 @@ export const pricingRuleAdminService = {
       body: { action },
     });
   },
+  delete(id: string): Promise<void> {
+    return apiFetch(`/api/ride/pricing-rules/${id}`, { method: "DELETE" });
+  },
   calculate(body: Record<string, unknown>): Promise<PricingCalculateResult> {
     return apiFetch("/api/ride/pricing/calculate", { method: "POST", body });
+  },
+};
+
+export const priceMatrixAdminService = {
+  listRoutes(): Promise<{ items: RidePriceRoute[] }> {
+    return apiFetch("/api/ride/price-routes?all=1");
+  },
+  createRoute(body: Record<string, unknown>): Promise<RidePriceRoute> {
+    return apiFetch("/api/ride/price-routes", { method: "POST", body });
+  },
+  updateRoute(
+    id: string,
+    body: Record<string, unknown>,
+  ): Promise<RidePriceRoute> {
+    return apiFetch(`/api/ride/price-routes/${id}`, {
+      method: "PATCH",
+      body,
+    });
+  },
+  deleteRoute(id: string): Promise<void> {
+    return apiFetch(`/api/ride/price-routes/${id}`, { method: "DELETE" });
+  },
+  listVehicles(): Promise<{ items: RidePriceVehicleType[] }> {
+    return apiFetch("/api/ride/price-vehicle-types?all=1");
+  },
+  createVehicle(body: Record<string, unknown>): Promise<RidePriceVehicleType> {
+    return apiFetch("/api/ride/price-vehicle-types", { method: "POST", body });
+  },
+  updateVehicle(
+    id: string,
+    body: Record<string, unknown>,
+  ): Promise<RidePriceVehicleType> {
+    return apiFetch(`/api/ride/price-vehicle-types/${id}`, {
+      method: "PATCH",
+      body,
+    });
+  },
+  listTripTypes(): Promise<{ items: RidePriceTripType[] }> {
+    return apiFetch("/api/ride/price-trip-types?all=1");
+  },
+  updateTripType(
+    body: Record<string, unknown>,
+  ): Promise<RidePriceTripType> {
+    return apiFetch("/api/ride/price-trip-types", { method: "PATCH", body });
+  },
+  listCells(routeId?: string): Promise<{ items: RidePriceCell[] }> {
+    const qs = routeId ? `?routeId=${encodeURIComponent(routeId)}` : "";
+    return apiFetch(`/api/ride/price-cells${qs}`);
+  },
+  upsertCell(body: {
+    routeId: string;
+    vehicleTypeId: string;
+    tripTypeId: string;
+    amount: number | null;
+  }): Promise<{ item: RidePriceCell | null }> {
+    return apiFetch("/api/ride/price-cells", { method: "PUT", body });
+  },
+  upsertCellsBulk(
+    cells: Array<{
+      routeId: string;
+      vehicleTypeId: string;
+      tripTypeId: string;
+      amount: number | null;
+    }>,
+  ): Promise<{ updated: number }> {
+    return apiFetch("/api/ride/price-cells", {
+      method: "PUT",
+      body: { bulk: true, cells },
+    });
+  },
+};
+
+export type RideSettingsResponse = {
+  bookingAntiSpamEnabled: boolean;
+  bookingAntiSpamSource: "mongo" | "env";
+  envDefault: boolean;
+};
+
+export const rideSettingsAdminService = {
+  get(): Promise<RideSettingsResponse> {
+    return apiFetch("/api/ride/settings");
+  },
+  update(body: {
+    bookingAntiSpamEnabled?: boolean | null;
+  }): Promise<RideSettingsResponse> {
+    return apiFetch("/api/ride/settings", { method: "PATCH", body });
   },
 };
 

@@ -128,6 +128,24 @@ async function ensureIndexes(db: Db): Promise<void> {
     db
       .collection("ride_booking_idempotency")
       .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection("ride_price_routes").createIndex({ sortOrder: 1 }),
+    db.collection("ride_price_routes").createIndex({ active: 1 }),
+    db
+      .collection("ride_price_routes")
+      .createIndex({ originKey: 1, destinationKey: 1 }),
+    db.collection("ride_price_vehicle_types").createIndex({ sortOrder: 1 }),
+    db.collection("ride_price_vehicle_types").createIndex({ active: 1 }),
+    db
+      .collection("ride_price_trip_types")
+      .createIndex({ code: 1 }, { unique: true }),
+    db.collection("ride_price_trip_types").createIndex({ sortOrder: 1 }),
+    db
+      .collection("ride_price_cells")
+      .createIndex(
+        { routeId: 1, vehicleTypeId: 1, tripTypeId: 1 },
+        { unique: true },
+      ),
+    db.collection("ride_price_cells").createIndex({ routeId: 1 }),
   ]);
   indexesReady = true;
 }
@@ -198,6 +216,94 @@ export async function ridePricingRulesCol(): Promise<
   Collection<RidePricingRule>
 > {
   return (await getDb()).collection<RidePricingRule>("ride_pricing_rules");
+}
+
+export type RidePriceRouteDoc = {
+  _id?: string;
+  id: string;
+  name: string;
+  origin: string;
+  destination: string;
+  originKey: string;
+  destinationKey: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RidePriceVehicleTypeDoc = {
+  _id?: string;
+  id: string;
+  name: string;
+  seats: number;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RidePriceTripTypeDoc = {
+  _id?: string;
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RidePriceCellDoc = {
+  _id?: string;
+  id: string;
+  routeId: string;
+  vehicleTypeId: string;
+  tripTypeId: string;
+  amount: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function ridePriceRoutesCol(): Promise<
+  Collection<RidePriceRouteDoc>
+> {
+  return (await getDb()).collection<RidePriceRouteDoc>("ride_price_routes");
+}
+
+export async function ridePriceVehicleTypesCol(): Promise<
+  Collection<RidePriceVehicleTypeDoc>
+> {
+  return (await getDb()).collection<RidePriceVehicleTypeDoc>(
+    "ride_price_vehicle_types",
+  );
+}
+
+export async function ridePriceTripTypesCol(): Promise<
+  Collection<RidePriceTripTypeDoc>
+> {
+  return (await getDb()).collection<RidePriceTripTypeDoc>(
+    "ride_price_trip_types",
+  );
+}
+
+export async function ridePriceCellsCol(): Promise<
+  Collection<RidePriceCellDoc>
+> {
+  return (await getDb()).collection<RidePriceCellDoc>("ride_price_cells");
+}
+
+export type RideSettingsDoc = {
+  _id?: string;
+  id: string;
+  bookingAntiSpamEnabled?: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function rideSettingsCol(): Promise<Collection<RideSettingsDoc>> {
+  return (await getDb()).collection<RideSettingsDoc>("ride_settings");
 }
 
 export async function usersCol(): Promise<Collection<AppUser>> {

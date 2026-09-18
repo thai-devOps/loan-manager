@@ -1,0 +1,56 @@
+---
+description: Admin CRUD feedback (toast) and responsive overlays (dialog vs bottom sheet)
+globs: src/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# Admin feedback & overlays
+
+## Toast after CRUD
+
+After **thêm / sửa / xóa** succeeds, show a Sonner toast. Do not rely only on inline text or silent refetch.
+
+```tsx
+import { toast } from "sonner";
+
+toast.success("Đã xóa booking");
+toast.success("Đã cập nhật chuyến xe");
+```
+
+- Prefer `toast.success` for happy path; use `toast.error` only when there is no inline error UI.
+- Keep copy short, Vietnamese, past tense (`Đã …`).
+
+## Never use `window.confirm`
+
+Destructive or irreversible confirms must use an in-app overlay — **not** `window.confirm` / `window.alert`.
+
+Reuse `ConfirmDeleteDialog` (`src/features/ride-admin/components/confirm-delete-dialog.tsx`) or the same responsive pattern for other features.
+
+```tsx
+// ❌ BAD
+if (!window.confirm("Xóa?")) return;
+
+// ✅ GOOD
+setDeleting(item); // open ConfirmDeleteDialog
+```
+
+## Desktop dialog, mobile bottom sheet
+
+| Viewport | Overlay |
+| --- | --- |
+| Desktop (`md+`, `useIsDesktop()`) | `Dialog` / `AlertDialog` |
+| Mobile (`< md`) | `Sheet` with `side="bottom"` |
+
+Existing helpers:
+
+- **Forms**: `ResponsiveFormShell` + `ResponsiveFormFooter` (`src/components/ui/responsive-form-shell.tsx`)
+- **Delete / dangerous confirm**: `ConfirmDeleteDialog` (already switches dialog ↔ bottom sheet)
+
+Do **not** ship mobile UX that only uses a centered modal dialog. New confirm/form overlays must follow the responsive shell pattern (or extend those components).
+
+```tsx
+import { useIsDesktop } from "@/hooks/use-media-query";
+
+const isDesktop = useIsDesktop();
+// Dialog/AlertDialog when isDesktop; Sheet side="bottom" otherwise
+```

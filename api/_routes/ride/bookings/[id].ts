@@ -13,6 +13,7 @@ import type { BookingQuoteSnapshot, BookingStatus } from "../../../_lib/ride-typ
 import {
   rideBookingsCol,
   rideDriversCol,
+  rideTripsCol,
   rideVehiclesCol,
   stripDoc,
 } from "../../../_lib/mongo.js";
@@ -34,19 +35,17 @@ type ActionBody = {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   await withHandler(req, res, async () => {
-    const bookingPerm =
-      req.method === "GET"
-        ? PERMISSIONS.FLEET_BOOKING_VIEW
-        : PERMISSIONS.FLEET_BOOKING_UPDATE;
-    if (!(await requirePermission(req, res, bookingPerm))) return;
     const id = req.query.id;
     if (typeof id !== "string" || !id) {
       res.status(400).json({ error: "Missing id" });
       return;
     }
-    const col = await rideBookingsCol();
 
     if (req.method === "GET") {
+      if (!(await requirePermission(req, res, PERMISSIONS.FLEET_BOOKING_VIEW))) {
+        return;
+      }
+      const col = await rideBookingsCol();
       const row = await col.findOne({ id });
       if (!row) {
         res.status(404).json({ error: "Không tìm thấy booking" });
@@ -56,7 +55,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
+    if (req.method === "DELETE") {
+      if (
+        !(await requirePermission(req, res, PERMISSIONS.FLEET_BOOKING_DELETE))
+      ) {
+        return;
+      }
+      const col = await rideBookingsCol();
+      const booking = await col.findOne({ id });
+      if (!booking) {
+        res.status(404).json({ error: "Không tìm thấy booking" });
+        return;
+      }
+      if (booking.tripId) {
+        const trips = await rideTripsCol();
+        await trips.updateOne(
+          { id: booking.tripId },
+          {
+            $set: {
+              bookingId: null,
+              bookingCode: null,
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        );
+      }
+      await col.deleteOne({ id });
+      res.status(204).end();
+      return;
+    }
+
     if (req.method === "PATCH") {
+      if (
+        !(await requirePermission(req, res, PERMISSIONS.FLEET_BOOKING_UPDATE))
+      ) {
+        return;
+      }
+      const col = await rideBookingsCol();
       const body = readJsonBody<ActionBody>(req);
       const booking = await col.findOne({ id });
       if (!booking) {
@@ -323,6 +358,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    methodNotAllowed(res, ["GET", "PATCH"]);
+    methodNotAllowed(res, ["GET", "PATCH", "DELETE"]);
   });
 }

@@ -4,6 +4,9 @@ import type {
   BookingQuoteSnapshot,
   Place,
   PriceQuote,
+  PublicPricingMatrixResponse,
+  PublicPricingRoute,
+  PublicPricingRoutesResponse,
   TripType,
 } from "@/features/ride/types/ride";
 
@@ -158,5 +161,22 @@ export const pricingService = {
 
   async getReferencePricing() {
     return MOCK_PRICING;
+  },
+
+  async listPublicRoutes(date?: string): Promise<PublicPricingRoute[]> {
+    const qs =
+      date && date.trim()
+        ? `?date=${encodeURIComponent(date.trim())}`
+        : "";
+    const data = await publicFetch<PublicPricingRoutesResponse>(
+      `/api/ride/pricing/routes${qs}`,
+    );
+    return data.items ?? [];
+  },
+
+  async getPublicMatrix(): Promise<PublicPricingMatrixResponse> {
+    return publicFetch<PublicPricingMatrixResponse>(
+      "/api/ride/pricing/matrix",
+    );
   },
 };

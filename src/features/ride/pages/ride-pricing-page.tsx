@@ -1,198 +1,191 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
-import type { PricingCalculateResult } from "@/features/ride/types/ride";
+import { pricingService } from "@/features/ride/services/pricingService";
+import type { PublicMatrixRoute } from "@/features/ride/types/ride";
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
+import { cn } from "@/lib/utils";
 
-async function calculatePublic(body: Record<string, unknown>) {
-  const res = await fetch("/api/ride/pricing/calculate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = (await res.json().catch(() => ({}))) as PricingCalculateResult & {
-    error?: string;
-  };
-  if (!res.ok) {
-    throw new ApiError(data.error ?? "Không tính được giá", res.status);
+function formatPriceCell(amount: number | null | undefined): string {
+  if (amount == null || !Number.isFinite(amount) || amount <= 0) {
+    return "Liên hệ";
   }
-  return data;
+  return formatCurrency(amount);
+}
+
+function RoutePricingSection({ route }: { route: PublicMatrixRoute }) {
+  return (
+    <section className="space-y-3" aria-labelledby={`route-${route.id}`}>
+      <h2
+        id={`route-${route.id}`}
+        className="text-lg font-semibold tracking-tight text-foreground sm:text-xl"
+      >
+        {route.name}
+      </h2>
+
+      {/* Desktop table */}
+      <div className="hidden overflow-hidden rounded-xl border border-border md:block">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-teal-800 text-left text-teal-50 dark:bg-teal-700">
+              <th className="px-3 py-3 font-semibold">Loại xe</th>
+              {route.tripTypes.map((tt) => (
+                <th
+                  key={tt.id}
+                  className="px-3 py-3 text-center font-semibold"
+                >
+                  {tt.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {route.vehicles.map((vehicle, idx) => (
+              <tr
+                key={vehicle.id}
+                className={
+                  idx % 2 === 0
+                    ? "bg-card"
+                    : "bg-muted/40 dark:bg-muted/20"
+                }
+              >
+                <th
+                  scope="row"
+                  className="px-3 py-3 text-left font-semibold text-foreground"
+                >
+                  {vehicle.name}
+                </th>
+                {route.tripTypes.map((tt) => {
+                  const amount = vehicle.prices[tt.id] ?? null;
+                  const label = formatPriceCell(amount);
+                  return (
+                    <td
+                      key={tt.id}
+                      className={cn(
+                        "px-3 py-3 text-center tabular-nums",
+                        amount == null
+                          ? "text-muted-foreground"
+                          : "font-medium text-foreground",
+                      )}
+                    >
+                      {label}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile stacked */}
+      <div className="space-y-3 md:hidden">
+        {route.vehicles.map((vehicle) => (
+          <div
+            key={vehicle.id}
+            className="rounded-xl border border-border bg-card p-4"
+          >
+            <h3 className="border-b border-teal-800/15 pb-2 text-base font-semibold text-teal-900 dark:border-teal-300/20 dark:text-teal-200">
+              {vehicle.name}
+            </h3>
+            <ul className="mt-3 space-y-2.5">
+              {route.tripTypes.map((tt) => {
+                const amount = vehicle.prices[tt.id] ?? null;
+                return (
+                  <li
+                    key={tt.id}
+                    className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-2 last:border-0 last:pb-0"
+                  >
+                    <span className="text-sm text-muted-foreground">
+                      {tt.name}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-base tabular-nums",
+                        amount == null
+                          ? "text-muted-foreground"
+                          : "font-semibold text-foreground",
+                      )}
+                    >
+                      {formatPriceCell(amount)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export function RidePricingPage() {
   useRidePageMeta(
     "Bảng giá",
-    "Ước tính giá chuyến xe có tài xế theo bảng giá hệ thống.",
+    "Bảng giá xe có tài xế theo tuyến — rõ ràng, dễ so sánh.",
   );
 
-  const [origin, setOrigin] = useState("Long Xuyên");
-  const [destination, setDestination] = useState("Cần Thơ");
-  const [seats, setSeats] = useState("7");
-  const [date, setDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const query = useQuery({
+    queryKey: ["ride", "pricing", "matrix"],
+    queryFn: () => pricingService.getPublicMatrix(),
   });
-  const [distanceKm, setDistanceKm] = useState("147.58");
-  const [roundTrip, setRoundTrip] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<PricingCalculateResult | null>(null);
 
-  async function onCalculate() {
-    setBusy(true);
-    setError(null);
-    setResult(null);
-    try {
-      const n = Number(seats) || 7;
-      const vehicleCategory =
-        n <= 4 ? "SEAT_4" : n <= 7 ? "SEAT_7" : "SEAT_16";
-      const data = await calculatePublic({
-        serviceType: "TRAVEL",
-        vehicleCategory,
-        origin,
-        destination,
-        distanceKm: Number(distanceKm) || 0,
-        roundTrip,
-        date,
-      });
-      setResult(data);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Không tính được giá");
-    } finally {
-      setBusy(false);
-    }
-  }
+  let errorMessage: string | null = null;
+  if (query.error instanceof ApiError) errorMessage = query.error.message;
+  else if (query.error) errorMessage = "Không tải được bảng giá.";
 
-  const bookingParams = new URLSearchParams({
-    pickup: origin,
-    destination,
-    seats,
-  });
+  const routes = query.data?.routes ?? [];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Bảng giá dịch vụ</h1>
+    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+      <p className="text-xs font-medium tracking-[0.18em] text-teal-800/70 uppercase dark:text-teal-300/70">
+        SiTha Trip
+      </p>
+      <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
+        Bảng giá
+      </h1>
       <p className="mt-2 text-muted-foreground">
-        Ước tính giá theo bảng giá đang áp dụng. Giá dự kiến — giá cuối cùng có
-        thể thay đổi theo lịch trình thực tế.
+        Giá theo tuyến, loại xe và hình thức chuyến. Giá cuối cùng có thể thay
+        đổi theo điểm đón/trả thực tế.
       </p>
 
-      <div className="mt-8 space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
-        <div className="space-y-1.5">
-          <Label>Dịch vụ</Label>
-          <Input value="Xe riêng có tài xế" disabled />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Điểm đón</Label>
-            <Input value={origin} onChange={(e) => setOrigin(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Điểm đến</Label>
-            <Input
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Loại xe (số chỗ)</Label>
-            <select
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-              value={seats}
-              onChange={(e) => setSeats(e.target.value)}
-            >
-              <option value="4">4 chỗ</option>
-              <option value="7">7 chỗ</option>
-              <option value="16">16 chỗ+</option>
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Ngày đi</Label>
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Khoảng cách ước tính (km)</Label>
-            <Input
-              value={distanceKm}
-              onChange={(e) => setDistanceKm(e.target.value)}
-            />
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={roundTrip}
-                onChange={(e) => setRoundTrip(e.target.checked)}
-              />
-              Khứ hồi
-            </label>
-          </div>
-        </div>
-
-        <Button
-          className="bg-teal-800 hover:bg-teal-700"
-          disabled={busy}
-          onClick={() => void onCalculate()}
-        >
-          {busy ? "Đang tính…" : "Tính giá"}
-        </Button>
-
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-        {result ? (
-          <div className="rounded-xl border border-border bg-muted/30 p-4">
-            <h2 className="font-semibold">Ước tính chuyến đi</h2>
-            <p className="mt-1 text-sm">
-              {origin} → {destination}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {seats} chỗ · {result.billableKm.toLocaleString("vi-VN")} km
-              {roundTrip ? " · Khứ hồi" : ""}
-            </p>
-            <dl className="mt-4 space-y-1 text-sm">
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Giá cơ bản</dt>
-                <dd>{formatCurrency(result.breakdown.basePrice)}</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Theo quãng đường</dt>
-                <dd>{formatCurrency(result.breakdown.distancePrice)}</dd>
-              </div>
-              {result.breakdown.surcharges > 0 ? (
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted-foreground">Phụ phí</dt>
-                  <dd>{formatCurrency(result.breakdown.surcharges)}</dd>
-                </div>
-              ) : null}
-              <div className="flex justify-between gap-2 border-t border-border pt-2 text-base font-semibold">
-                <dt>Tổng dự kiến</dt>
-                <dd>{formatCurrency(result.breakdown.total)}</dd>
-              </div>
-            </dl>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Giá dự kiến — giá cuối cùng có thể thay đổi theo lịch trình thực
-              tế.
-            </p>
-            <Button asChild className="mt-4 bg-teal-800 hover:bg-teal-700">
-              <Link to={`/ride/booking?${bookingParams.toString()}`}>
-                Đặt chuyến
-              </Link>
-            </Button>
-          </div>
+      <div className="mt-8 space-y-10">
+        {query.isLoading ? (
+          <>
+            <Skeleton className="h-48 w-full rounded-xl" />
+            <Skeleton className="h-36 w-full rounded-xl" />
+          </>
         ) : null}
+
+        {errorMessage ? (
+          <p className="text-sm text-destructive">{errorMessage}</p>
+        ) : null}
+
+        {!query.isLoading && !errorMessage && routes.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">
+            Chưa có tuyến giá đang áp dụng. Vui lòng liên hệ để được báo giá.
+          </p>
+        ) : null}
+
+        {routes.map((route) => (
+          <RoutePricingSection key={route.id} route={route} />
+        ))}
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-3">
-        <Button asChild variant="outline">
-          <Link to="/ride/contact">Liên hệ tư vấn</Link>
+      <div className="mt-12 space-y-3 rounded-2xl border border-teal-800/20 bg-teal-50/50 p-5 dark:bg-teal-950/30">
+        <h2 className="text-lg font-semibold text-teal-900 dark:text-teal-200">
+          Không thấy tuyến bạn cần?
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Giá có thể thay đổi tùy điểm đón, điểm trả, thời gian chờ và yêu cầu
+          riêng.
+        </p>
+        <Button asChild className="bg-teal-800 hover:bg-teal-700">
+          <Link to="/ride/booking">Nhận báo giá nhanh</Link>
         </Button>
       </div>
     </div>

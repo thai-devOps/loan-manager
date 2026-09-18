@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Can } from "@/features/auth/can";
 import { PERMISSIONS } from "@/config/permissions";
+import { ConfirmDeleteDialog } from "@/features/ride-admin/components/confirm-delete-dialog";
 import { vehicleAdminService } from "@/features/ride-admin/services/admin-api";
 import { VEHICLE_STATUS_LABEL } from "@/features/ride-admin/pages/vehicle-form-fields";
 import type { Vehicle, VehicleStatus } from "@/features/ride/types/ride";
@@ -14,6 +16,7 @@ export function RideAdminVehiclesPage() {
   const [rows, setRows] = useState<Vehicle[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Vehicle | null>(null);
 
   async function load() {
     try {
@@ -25,17 +28,18 @@ export function RideAdminVehiclesPage() {
   }
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => {
+      void load();
+    });
   }, []);
 
   async function remove(v: Vehicle) {
-    if (!window.confirm(`Xóa xe "${v.name}"? Hành động này không hoàn tác.`)) {
-      return;
-    }
     setBusyId(v.id);
     setError(null);
     try {
       await vehicleAdminService.delete(v.id);
+      toast.success("Đã xóa xe");
+      setDeleting(null);
       await load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Xóa thất bại");
@@ -104,7 +108,7 @@ export function RideAdminVehiclesPage() {
                           variant="ghost"
                           className="text-destructive hover:text-destructive"
                           disabled={busyId === v.id}
-                          onClick={() => void remove(v)}
+                          onClick={() => setDeleting(v)}
                         >
                           <Trash2 className="size-3.5" />
                           Xóa
@@ -116,6 +120,24 @@ export function RideAdminVehiclesPage() {
               );
             })}
       </div>
+
+      <ConfirmDeleteDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open && !busyId) setDeleting(null);
+        }}
+        title="Xóa xe?"
+        description={
+          deleting
+            ? `Xóa xe «${deleting.name}». Thao tác này không thể hoàn tác.`
+            : ""
+        }
+        pending={!!busyId}
+        onConfirm={() => {
+          if (!deleting) return;
+          void remove(deleting);
+        }}
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
 import { calculateTripQuote } from "../../../shared/ride/quote-engine.js";
 import { resolveVehiclePricing } from "../../../shared/ride/vehicle-pricing.js";
 import type { TripType } from "../../_lib/ride-types.js";
+import { lookupMatrixPrice } from "../../_lib/ride-price-matrix.js";
 import { rideVehiclesCol, stripDoc } from "../../_lib/mongo.js";
 
 const TRIP_TYPES = new Set(["ONE_WAY", "ROUND_TRIP", "DAILY", "CUSTOM"]);
@@ -238,6 +239,62 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           "Chuyến tùy chỉnh — vui lòng gửi yêu cầu báo giá thủ công.",
       });
       return;
+    }
+
+    // Fixed matrix first (no routing needed when origin/destination match a route).
+    try {
+      const matrixHit = await lookupMatrixPrice({
+        origin: body.pickup?.address ?? "",
+        destination: body.destination?.address ?? "",
+        seats: Number(vehicle.seats) || 1,
+        tripType,
+      });
+      if (matrixHit) {
+        const calculatedAt = new Date().toISOString();
+        const pricingSnapshot = {
+          pricingRuleId: `matrix:${matrixHit.routeId}`,
+          version: 1,
+          calculatedAt,
+          basePrice: matrixHit.amount,
+          distanceKm: 0,
+          distancePrice: 0,
+          surcharges: 0,
+          total: matrixHit.amount,
+          matrixRouteId: matrixHit.routeId,
+          matrixVehicleTypeId: matrixHit.vehicleTypeId,
+          matrixTripTypeId: matrixHit.tripTypeId,
+        };
+        res.status(200).json({
+          display: new Intl.NumberFormat("vi-VN", {
+            style: "currency",
+            currency: "VND",
+            maximumFractionDigits: 0,
+          }).format(matrixHit.amount),
+          amount: matrixHit.amount,
+          autoQuote: true,
+          totalPrice: matrixHit.amount,
+          breakdown: {
+            basePrice: matrixHit.amount,
+            distancePrice: 0,
+            surcharges: 0,
+            total: matrixHit.amount,
+          },
+          pricingSnapshot,
+          snapshot: null,
+          vehicle: stripDoc(vehicle),
+          matrix: {
+            routeId: matrixHit.routeId,
+            routeName: matrixHit.routeName,
+            vehicleTypeId: matrixHit.vehicleTypeId,
+            vehicleName: matrixHit.vehicleName,
+            tripTypeId: matrixHit.tripTypeId,
+            tripTypeName: matrixHit.tripTypeName,
+          },
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn("[Quote] Matrix lookup failed", err);
     }
 
     try {

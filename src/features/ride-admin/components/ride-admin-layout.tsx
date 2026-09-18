@@ -28,6 +28,7 @@ const NAV_PERMISSION: Record<string, string | undefined> = {
   "/admin/trips": PERMISSIONS.FLEET_TRIP_VIEW,
   "/admin/customers": PERMISSIONS.FLEET_CUSTOMER_VIEW,
   "/admin/pricing": PERMISSIONS.FLEET_PRICING_VIEW,
+  "/admin/settings": PERMISSIONS.FLEET_BOOKING_VIEW,
 };
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {

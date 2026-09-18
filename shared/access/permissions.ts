@@ -52,10 +52,12 @@ export const PERMISSIONS = {
   FLEET_BOOKING_CREATE: "fleet.booking.create",
   FLEET_BOOKING_UPDATE: "fleet.booking.update",
   FLEET_BOOKING_CANCEL: "fleet.booking.cancel",
+  FLEET_BOOKING_DELETE: "fleet.booking.delete",
   FLEET_TRIP_VIEW: "fleet.trip.view",
   FLEET_TRIP_CREATE: "fleet.trip.create",
   FLEET_TRIP_UPDATE: "fleet.trip.update",
   FLEET_TRIP_COMPLETE: "fleet.trip.complete",
+  FLEET_TRIP_DELETE: "fleet.trip.delete",
   FLEET_DRIVER_VIEW: "fleet.driver.view",
   FLEET_DRIVER_CREATE: "fleet.driver.create",
   FLEET_DRIVER_UPDATE: "fleet.driver.update",
@@ -68,6 +70,7 @@ export const PERMISSIONS = {
   FLEET_PRICING_CREATE: "fleet.pricing.create",
   FLEET_PRICING_UPDATE: "fleet.pricing.update",
   FLEET_PRICING_PUBLISH: "fleet.pricing.publish",
+  FLEET_PRICING_DELETE: "fleet.pricing.delete",
 
   // Report
   REPORT_FINANCE_VIEW: "report.finance.view",

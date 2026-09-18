@@ -4,9 +4,12 @@ import { requirePermission } from "../../../_lib/auth.js";
 import { methodNotAllowed, readJsonBody, withHandler } from "../../../_lib/http.js";
 import {
   archivePricingRule,
+  deletePricingRule,
   duplicatePricingRule,
   getPricingRule,
   publishPricingRule,
+  restorePricingRule,
+  unpublishPricingRule,
   updatePricingRule,
 } from "../../../_lib/ride-pricing.js";
 import type {
@@ -34,6 +37,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
       res.status(200).json(rule);
+      return;
+    }
+
+    if (req.method === "DELETE") {
+      if (
+        !(await requirePermission(req, res, PERMISSIONS.FLEET_PRICING_DELETE))
+      ) {
+        return;
+      }
+      try {
+        await deletePricingRule(id);
+        res.status(204).end();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Xóa thất bại";
+        const status = msg.includes("Không tìm thấy") ? 404 : 400;
+        res.status(status).json({ error: msg });
+      }
       return;
     }
 
@@ -80,6 +100,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           res.status(200).json(await archivePricingRule(id));
           return;
         }
+        if (action === "unpublish") {
+          if (
+            !(await requirePermission(
+              req,
+              res,
+              PERMISSIONS.FLEET_PRICING_PUBLISH,
+            ))
+          ) {
+            return;
+          }
+          res.status(200).json(await unpublishPricingRule(id));
+          return;
+        }
+        if (action === "restore") {
+          if (
+            !(await requirePermission(
+              req,
+              res,
+              PERMISSIONS.FLEET_PRICING_UPDATE,
+            ))
+          ) {
+            return;
+          }
+          res.status(200).json(await restorePricingRule(id));
+          return;
+        }
         if (action === "duplicate") {
           if (
             !(await requirePermission(
@@ -120,6 +166,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    methodNotAllowed(res, ["GET", "PATCH"]);
+    methodNotAllowed(res, ["GET", "PATCH", "DELETE"]);
   });
 }

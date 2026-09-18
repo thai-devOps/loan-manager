@@ -11,6 +11,14 @@ export function formatCurrency(value: number): string {
   return `${formatted} ₫`;
 }
 
+/** Format digits for money inputs (no currency symbol). */
+export function formatCurrencyInput(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return new Intl.NumberFormat("vi-VN", {
+    maximumFractionDigits: 0,
+  }).format(Math.round(value));
+}
+
 export function parseCurrencyInput(raw: string): number {
   const digits = raw.replace(/[^\d]/g, "");
   if (!digits) return 0;

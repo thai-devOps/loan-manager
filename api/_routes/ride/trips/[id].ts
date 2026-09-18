@@ -13,6 +13,7 @@ import {
 } from "../../../_lib/ride-trip.js";
 import type { TripStatus, TripType } from "../../../_lib/ride-types.js";
 import {
+  rideBookingsCol,
   rideDriversCol,
   rideTripsCol,
   rideVehiclesCol,
@@ -434,6 +435,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    methodNotAllowed(res, ["GET", "PATCH"]);
+    if (req.method === "DELETE") {
+      if (!(await requirePermission(req, res, PERMISSIONS.FLEET_TRIP_DELETE))) {
+        return;
+      }
+      const trip = await col.findOne({ id });
+      if (!trip) {
+        res.status(404).json({ error: "Không tìm thấy chuyến xe" });
+        return;
+      }
+      if (trip.bookingId) {
+        const bookings = await rideBookingsCol();
+        await bookings.updateOne(
+          { id: trip.bookingId },
+          {
+            $set: {
+              tripId: null,
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        );
+      }
+      await col.deleteOne({ id });
+      res.status(204).end();
+      return;
+    }
+
+    methodNotAllowed(res, ["GET", "PATCH", "DELETE"]);
   });
 }

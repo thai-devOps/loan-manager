@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,13 +13,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Can } from "@/features/auth/can";
 import { BookingStatusBadge } from "@/features/ride-admin/components/booking-status-badge";
+import { ColumnVisibilityMenu } from "@/features/ride-admin/components/column-visibility-menu";
+import { ConfirmDeleteDialog } from "@/features/ride-admin/components/confirm-delete-dialog";
 import {
   AdminFilterBar,
   filterControlClass,
   filterSearchClass,
   filterSearchFormClass,
 } from "@/features/ride-admin/components/admin-filter-bar";
+import {
+  useColumnVisibility,
+  type ColumnDef,
+} from "@/features/ride-admin/lib/column-visibility";
 import { rideAdminQueryKeys } from "@/features/ride-admin/query-keys";
 import {
   bookingAdminService,
@@ -31,9 +40,11 @@ import {
 import type {
   BookingStatus,
   ServiceType,
+  TripBooking,
 } from "@/features/ride/types/ride";
 import { formatCurrency } from "@/lib/currency";
 import { ApiError } from "@/api/client";
+import { PERMISSIONS } from "@/config/permissions";
 import { cn } from "@/lib/utils";
 import {
   formatRideDateTime,
@@ -43,9 +54,40 @@ import {
 const STATUSES = Object.keys(BOOKING_STATUS_LABELS) as BookingStatus[];
 const SERVICES = Object.keys(SERVICE_TYPE_LABELS) as ServiceType[];
 
+type BookingColumnId =
+  | "code"
+  | "customer"
+  | "route"
+  | "pickup"
+  | "createdAt"
+  | "service"
+  | "vehicle"
+  | "driver"
+  | "price"
+  | "status";
+
+const BOOKING_COLUMNS: ColumnDef<BookingColumnId>[] = [
+  { id: "code", label: "Mã", locked: true, defaultVisible: true },
+  { id: "customer", label: "Khách", locked: true, defaultVisible: true },
+  { id: "route", label: "Hành trình", defaultVisible: true },
+  { id: "pickup", label: "Ngày đón", defaultVisible: true },
+  { id: "createdAt", label: "Đặt lúc", defaultVisible: false },
+  { id: "service", label: "Dịch vụ", defaultVisible: false },
+  { id: "vehicle", label: "Xe", defaultVisible: false },
+  { id: "driver", label: "Tài xế", defaultVisible: false },
+  { id: "price", label: "Giá", defaultVisible: true },
+  { id: "status", label: "TT", locked: true, defaultVisible: true },
+];
+
 export function RideAdminBookingsPage() {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [q, setQ] = useState(searchParams.get("q") ?? "");
+  const [deleting, setDeleting] = useState<TripBooking | null>(null);
+  const columns = useColumnVisibility(
+    "ride-admin.bookings.visible-columns",
+    BOOKING_COLUMNS,
+  );
 
   const status = searchParams.get("status") ?? "";
   const date = searchParams.get("date") ?? "";
@@ -78,15 +120,25 @@ export function RideAdminBookingsPage() {
     queryFn: () => driverAdminService.list(),
   });
 
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => bookingAdminService.delete(id),
+    onSuccess: async () => {
+      toast.success("Đã xóa booking");
+      setDeleting(null);
+      await queryClient.invalidateQueries({
+        queryKey: rideAdminQueryKeys.bookingsRoot(),
+      });
+    },
+  });
+
   const rows = bookingsQ.data ?? null;
   const vehicles = vehiclesQ.data ?? [];
   const drivers = driversQ.data ?? [];
-  const error =
-    bookingsQ.error instanceof ApiError
-      ? bookingsQ.error.message
-      : bookingsQ.isError
-        ? "Không tải booking"
-        : null;
+  let error: string | null = null;
+  if (bookingsQ.error instanceof ApiError) error = bookingsQ.error.message;
+  else if (bookingsQ.isError) error = "Không tải booking";
+  else if (deleteMut.error instanceof ApiError) error = deleteMut.error.message;
+  else if (deleteMut.isError) error = "Không xóa được booking";
 
   function patchParams(patch: Record<string, string>) {
     const next = new URLSearchParams(searchParams);
@@ -115,13 +167,23 @@ export function RideAdminBookingsPage() {
     driverId,
   ].filter(Boolean).length;
 
+  const colSpan = columns.visibleCount + 1;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Booking</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Quản lý yêu cầu đặt chuyến từ khách hàng
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Booking</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Quản lý yêu cầu đặt chuyến từ khách hàng
+          </p>
+        </div>
+        <ColumnVisibilityMenu
+          columns={BOOKING_COLUMNS}
+          isVisible={columns.isVisible}
+          toggle={columns.toggle}
+          reset={columns.reset}
+        />
       </div>
 
       <AdminFilterBar activeCount={activeFilterCount}>
@@ -138,7 +200,11 @@ export function RideAdminBookingsPage() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Mã / tên / SĐT / điểm đến"
           />
-          <Button type="submit" size="sm" className="h-9 shrink-0 bg-teal-800 hover:bg-teal-700">
+          <Button
+            type="submit"
+            size="sm"
+            className="h-9 shrink-0 bg-teal-800 hover:bg-teal-700"
+          >
             Tìm
           </Button>
         </form>
@@ -226,60 +292,96 @@ export function RideAdminBookingsPage() {
               <p className="text-sm text-muted-foreground">Không có booking.</p>
             )
             : (rows ?? []).map((b) => (
-                <Link
+                <div
                   key={b.id}
-                  to={`/admin/bookings/${b.id}`}
-                  className="block rounded-xl border border-border bg-card p-4"
+                  className="rounded-xl border border-border bg-card p-4"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-mono text-sm font-semibold">
-                      #{b.bookingCode}
+                  <Link to={`/admin/bookings/${b.id}`} className="block">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-mono text-sm font-semibold">
+                        #{b.bookingCode}
+                      </p>
+                      <BookingStatusBadge status={b.status} />
+                    </div>
+                    <p className="mt-2 text-sm font-medium">{b.customer.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {b.pickup.address} → {b.destination.address}
                     </p>
-                    <BookingStatusBadge status={b.status} />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Đón {formatRideDateTime(b.pickupDate, b.pickupTime)} ·{" "}
+                      {vehicleName(b.vehicleId)}
+                    </p>
+                  </Link>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={`/admin/bookings/${b.id}`}>Chi tiết</Link>
+                    </Button>
+                    <Can permission={PERMISSIONS.FLEET_BOOKING_DELETE}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        disabled={deleteMut.isPending}
+                        onClick={() => setDeleting(b)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Xóa
+                      </Button>
+                    </Can>
                   </div>
-                  <p className="mt-2 text-sm font-medium">{b.customer.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {b.pickup.address} → {b.destination.address}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Đón {formatRideDateTime(b.pickupDate, b.pickupTime)} ·{" "}
-                    {vehicleName(b.vehicleId)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Đặt {formatRideTimestamp(b.createdAt)}
-                  </p>
-                </Link>
+                </div>
               ))}
       </div>
 
       <div className="hidden overflow-x-auto rounded-2xl border border-border lg:block">
-        <table className="w-full min-w-[980px] text-left text-sm">
+        <table className="w-full text-left text-sm">
           <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
             <tr>
-              <th className="px-3 py-3 font-medium">Mã</th>
-              <th className="px-3 py-3 font-medium">Khách</th>
-              <th className="px-3 py-3 font-medium">Hành trình</th>
-              <th className="px-3 py-3 font-medium">Ngày đón</th>
-              <th className="px-3 py-3 font-medium">Đặt lúc</th>
-              <th className="px-3 py-3 font-medium">Dịch vụ</th>
-              <th className="px-3 py-3 font-medium">Xe</th>
-              <th className="px-3 py-3 font-medium">Tài xế</th>
-              <th className="px-3 py-3 font-medium">Giá</th>
-              <th className="px-3 py-3 font-medium">TT</th>
+              {columns.isVisible("code") ? (
+                <th className="px-3 py-3 font-medium">Mã</th>
+              ) : null}
+              {columns.isVisible("customer") ? (
+                <th className="px-3 py-3 font-medium">Khách</th>
+              ) : null}
+              {columns.isVisible("route") ? (
+                <th className="px-3 py-3 font-medium">Hành trình</th>
+              ) : null}
+              {columns.isVisible("pickup") ? (
+                <th className="px-3 py-3 font-medium">Ngày đón</th>
+              ) : null}
+              {columns.isVisible("createdAt") ? (
+                <th className="px-3 py-3 font-medium">Đặt lúc</th>
+              ) : null}
+              {columns.isVisible("service") ? (
+                <th className="px-3 py-3 font-medium">Dịch vụ</th>
+              ) : null}
+              {columns.isVisible("vehicle") ? (
+                <th className="px-3 py-3 font-medium">Xe</th>
+              ) : null}
+              {columns.isVisible("driver") ? (
+                <th className="px-3 py-3 font-medium">Tài xế</th>
+              ) : null}
+              {columns.isVisible("price") ? (
+                <th className="px-3 py-3 font-medium">Giá</th>
+              ) : null}
+              {columns.isVisible("status") ? (
+                <th className="px-3 py-3 font-medium">TT</th>
+              ) : null}
               <th className="px-3 py-3 font-medium" />
             </tr>
           </thead>
           <tbody>
             {bookingsQ.isLoading ? (
               <tr>
-                <td colSpan={11} className="px-3 py-6">
+                <td colSpan={colSpan} className="px-3 py-6">
                   <Skeleton className="h-8 w-full" />
                 </td>
               </tr>
             ) : !rows || rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={colSpan}
                   className="px-3 py-8 text-center text-muted-foreground"
                 >
                   Không có booking.
@@ -288,44 +390,79 @@ export function RideAdminBookingsPage() {
             ) : (
               rows.map((b) => (
                 <tr key={b.id} className="border-b border-border/60">
-                  <td className="px-3 py-3 font-mono text-xs font-semibold">
-                    #{b.bookingCode}
-                  </td>
+                  {columns.isVisible("code") ? (
+                    <td className="px-3 py-3 font-mono text-xs font-semibold">
+                      #{b.bookingCode}
+                    </td>
+                  ) : null}
+                  {columns.isVisible("customer") ? (
+                    <td className="px-3 py-3">
+                      <div>{b.customer.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {b.customer.phone}
+                      </div>
+                    </td>
+                  ) : null}
+                  {columns.isVisible("route") ? (
+                    <td className="max-w-[180px] px-3 py-3">
+                      <div className="truncate">{b.pickup.address}</div>
+                      <div className="truncate text-muted-foreground">
+                        → {b.destination.address}
+                      </div>
+                    </td>
+                  ) : null}
+                  {columns.isVisible("pickup") ? (
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {formatRideDateTime(b.pickupDate, b.pickupTime)}
+                    </td>
+                  ) : null}
+                  {columns.isVisible("createdAt") ? (
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {formatRideTimestamp(b.createdAt)}
+                    </td>
+                  ) : null}
+                  {columns.isVisible("service") ? (
+                    <td className="px-3 py-3">
+                      {SERVICE_TYPE_LABELS[b.serviceType]}
+                    </td>
+                  ) : null}
+                  {columns.isVisible("vehicle") ? (
+                    <td className="px-3 py-3">{vehicleName(b.vehicleId)}</td>
+                  ) : null}
+                  {columns.isVisible("driver") ? (
+                    <td className="px-3 py-3">{driverName(b.driverId)}</td>
+                  ) : null}
+                  {columns.isVisible("price") ? (
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {b.quotedPrice == null
+                        ? "Chưa báo giá"
+                        : formatCurrency(b.quotedPrice)}
+                    </td>
+                  ) : null}
+                  {columns.isVisible("status") ? (
+                    <td className="px-3 py-3">
+                      <BookingStatusBadge status={b.status} />
+                    </td>
+                  ) : null}
                   <td className="px-3 py-3">
-                    <div>{b.customer.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {b.customer.phone}
+                    <div className="flex flex-wrap gap-1">
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={`/admin/bookings/${b.id}`}>Chi tiết</Link>
+                      </Button>
+                      <Can permission={PERMISSIONS.FLEET_BOOKING_DELETE}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          disabled={deleteMut.isPending}
+                          onClick={() => setDeleting(b)}
+                        >
+                          <Trash2 className="size-3.5" />
+                          <span className="sr-only">Xóa</span>
+                        </Button>
+                      </Can>
                     </div>
-                  </td>
-                  <td className="max-w-[180px] px-3 py-3">
-                    <div className="truncate">{b.pickup.address}</div>
-                    <div className="truncate text-muted-foreground">
-                      → {b.destination.address}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    {formatRideDateTime(b.pickupDate, b.pickupTime)}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    {formatRideTimestamp(b.createdAt)}
-                  </td>
-                  <td className="px-3 py-3">
-                    {SERVICE_TYPE_LABELS[b.serviceType]}
-                  </td>
-                  <td className="px-3 py-3">{vehicleName(b.vehicleId)}</td>
-                  <td className="px-3 py-3">{driverName(b.driverId)}</td>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    {b.quotedPrice == null
-                      ? "Chưa báo giá"
-                      : formatCurrency(b.quotedPrice)}
-                  </td>
-                  <td className="px-3 py-3">
-                    <BookingStatusBadge status={b.status} />
-                  </td>
-                  <td className="px-3 py-3">
-                    <Button asChild size="sm" variant="outline">
-                      <Link to={`/admin/bookings/${b.id}`}>Chi tiết</Link>
-                    </Button>
                   </td>
                 </tr>
               ))
@@ -333,6 +470,24 @@ export function RideAdminBookingsPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDeleteDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open && !deleteMut.isPending) setDeleting(null);
+        }}
+        title="Xóa booking?"
+        description={
+          deleting
+            ? `Xóa booking #${deleting.bookingCode}. Thao tác này không thể hoàn tác.`
+            : ""
+        }
+        pending={deleteMut.isPending}
+        onConfirm={() => {
+          if (!deleting) return;
+          deleteMut.mutate(deleting.id);
+        }}
+      />
     </div>
   );
 }
