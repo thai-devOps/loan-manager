@@ -69,7 +69,13 @@ function inject(html, page) {
 
   out = out.replace("</head>", `${headExtras}</head>`);
 
-  const prerenderBody = `<div id="root"><article class="seo-prerender" aria-hidden="true"><h1>${h1}</h1><p>${body}</p><p><a href="/ride/booking">Đặt chuyến</a> · <a href="/ride/dich-vu">Dịch vụ</a></p></article></div>`;
+  // LCP shell sits outside #root so React mount does not wipe the painted image.
+  const lcpShell =
+    page.path === "/ride"
+      ? `<div class="ride-lcp-shell" id="ride-lcp-boot" aria-hidden="true"><img src="/hero_image.webp" srcset="/hero_image-sm.webp 960w, /hero_image.webp 1280w" sizes="100vw" alt="" width="1280" height="680" fetchpriority="high" decoding="async" /></div>`
+      : "";
+
+  const prerenderBody = `${lcpShell}<div id="root"><article class="seo-prerender" aria-hidden="true"><h1>${h1}</h1><p>${body}</p><p><a href="/ride/booking">Đặt chuyến</a> · <a href="/ride/dich-vu">Dịch vụ</a></p></article></div>`;
 
   out = out.replace(/<div id="root"><\/div>/, prerenderBody);
 

@@ -97,6 +97,9 @@ export function RidePublicLayout() {
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            <Button asChild size="sm" variant="outline" className="hidden sm:inline-flex">
+              <Link to="/login">Đăng nhập</Link>
+            </Button>
             <Button asChild size="sm" className="hidden sm:inline-flex bg-teal-800 hover:bg-teal-700">
               <Link to="/ride/booking">Đặt chuyến</Link>
             </Button>
@@ -115,6 +118,9 @@ export function RidePublicLayout() {
                   <NavLinks onNavigate={() => setOpen(false)} />
                   <Button asChild className="bg-teal-800 hover:bg-teal-700" onClick={() => setOpen(false)}>
                     <Link to="/ride/booking">Đặt chuyến ngay</Link>
+                  </Button>
+                  <Button asChild variant="outline" onClick={() => setOpen(false)}>
+                    <Link to="/login">Đăng nhập</Link>
                   </Button>
                 </div>
               </SheetContent>

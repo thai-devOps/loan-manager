@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -16,6 +16,19 @@ import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 
+const OUTFIT_HREF =
+  "https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap";
+
+function useOutfitFont() {
+  useEffect(() => {
+    if (document.querySelector(`link[href="${OUTFIT_HREF}"]`)) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = OUTFIT_HREF;
+    document.head.appendChild(link);
+  }, []);
+}
+
 function resolvePostLoginPath(from?: string): string {
   if (!from || from === "/" || from === "/login" || from === "/apps") {
     return "/apps";
@@ -24,6 +37,7 @@ function resolvePostLoginPath(from?: string): string {
 }
 
 export function LoginPage() {
+  useOutfitFont();
   const navigate = useNavigate();
   const location = useLocation();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

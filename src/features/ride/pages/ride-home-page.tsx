@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   Check,
@@ -16,7 +16,6 @@ import {
   UserRoundCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { QuickBookingForm } from "@/features/ride/components/quick-booking-form";
 import { ServiceCard } from "@/features/ride/components/service-card";
 import { VehicleCard } from "@/features/ride/components/vehicle-card";
 import { rideBrand } from "@/features/ride/config/ride-brand";
@@ -30,6 +29,12 @@ import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
 import { vehicleService } from "@/features/ride/services/vehicleService";
 import type { Vehicle } from "@/features/ride/types/ride";
 import { cn } from "@/lib/utils";
+
+const QuickBookingForm = lazy(() =>
+  import("@/features/ride/components/quick-booking-form").then((m) => ({
+    default: m.QuickBookingForm,
+  })),
+);
 
 const FEATURED_VEHICLES_FALLBACK = MOCK_VEHICLES.filter((v) => v.active).slice(
   0,
@@ -121,48 +126,38 @@ function SectionEyebrow({ children }: { children: ReactNode }) {
 }
 
 const HERO_IMAGE_SRC = "/hero_image.webp";
+const HERO_IMAGE_SRC_SM = "/hero_image-sm.webp";
 
-function useHeroImageReady() {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const img = new Image();
-    img.src = HERO_IMAGE_SRC;
-
-    void img
-      .decode()
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setReady(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return ready;
-}
-
-/** Background only — content stays hidden until the image is ready. */
-function HeroBackgroundImage({ ready }: Readonly<{ ready: boolean }>) {
+/** Paint immediately for LCP — image is also preloaded + in prerender shell. */
+function HeroBackgroundImage() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 bg-muted/20">
-      {ready ? (
-        <>
-          <img
-            src={HERO_IMAGE_SRC}
-            alt=""
-            width={1720}
-            height={914}
-            decoding="async"
-            fetchPriority="high"
-            className="absolute inset-0 size-full object-cover object-[center_40%]"
-          />
-          <div className="absolute inset-0 bg-linear-to-r from-background from-0% via-background/92 via-42% to-transparent to-72% dark:from-background dark:via-background/95" />
-        </>
-      ) : null}
+      <img
+        src={HERO_IMAGE_SRC}
+        srcSet={`${HERO_IMAGE_SRC_SM} 960w, ${HERO_IMAGE_SRC} 1280w`}
+        sizes="100vw"
+        alt=""
+        width={1280}
+        height={680}
+        decoding="async"
+        fetchPriority="high"
+        className="absolute inset-0 size-full object-cover object-[center_40%]"
+      />
+      <div className="absolute inset-0 bg-linear-to-r from-background from-0% via-background/92 via-42% to-transparent to-72% dark:from-background dark:via-background/95" />
+    </div>
+  );
+}
+
+function QuickBookingFallback() {
+  return (
+    <div className="rounded-2xl border border-border/80 bg-background/90 p-5 shadow-sm backdrop-blur-sm sm:p-6">
+      <p className="text-sm font-medium text-foreground">Đặt chuyến nhanh</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Nhập điểm đón và điểm đến để gửi yêu cầu.
+      </p>
+      <Button asChild className="mt-4 w-full min-h-11 bg-teal-800 hover:bg-teal-700">
+        <Link to="/ride/booking">Mở form đặt chuyến</Link>
+      </Button>
     </div>
   );
 }
@@ -173,8 +168,17 @@ export function RideHomePage() {
     "Đặt xe riêng có tài xế tại An Giang. Đón trả tận nơi tại Long Xuyên, Châu Đốc, Tri Tôn — du lịch, khám bệnh, sân bay và chuyến liên tỉnh.",
   );
 
-  const heroReady = useHeroImageReady();
   const [vehicles, setVehicles] = useState<Vehicle[]>(FEATURED_VEHICLES_FALLBACK);
+
+  useEffect(() => {
+    // Drop static LCP cover after React hero has painted (same cached image).
+    const boot = document.getElementById("ride-lcp-boot");
+    if (!boot) return;
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => boot.remove());
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,53 +192,51 @@ export function RideHomePage() {
 
   return (
     <div>
-      {/* Hero + Quick booking — hold content until hero image is ready */}
-      <section className="relative min-h-[min(70vh,36rem)] overflow-hidden border-b border-border lg:min-h-[min(75vh,40rem)]">
-        <HeroBackgroundImage ready={heroReady} />
-        {heroReady ? (
-          <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-16 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500">
-            <div>
-              <p className="text-xs font-medium tracking-[0.2em] text-teal-800 uppercase dark:text-teal-300">
-                {rideBrand.shortName}
-              </p>
-              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-balance text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
-                Đưa bạn đến nơi,
-                <br />
-                an tâm suốt hành trình.
-              </h1>
-              <p className="mt-4 max-w-lg text-base leading-relaxed text-foreground/90 sm:text-lg">
-                Xe riêng có tài xế cho du lịch, khám bệnh, hành hương, sân bay và
-                các chuyến đi theo yêu cầu.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Button asChild size="lg" className="min-h-11 bg-teal-800 hover:bg-teal-700">
-                  <Link to="/ride/booking">Đặt chuyến ngay</Link>
-                </Button>
-                <Button
-                  asChild
-                  size="lg"
-                  variant="outline"
-                  className="min-h-11 border-border bg-background hover:bg-background"
-                >
-                  <Link to="/ride/dich-vu">Xem dịch vụ</Link>
-                </Button>
-              </div>
-              <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-foreground/85">
-                {["Uy tín", "An toàn", "Đúng giờ", "Tận tâm", "Giá rõ ràng"].map(
-                  (item) => (
-                    <li key={item} className="inline-flex items-center gap-1.5">
-                      <ShieldCheck className="size-3.5 text-teal-700" aria-hidden />
-                      {item}
-                    </li>
-                  ),
-                )}
-              </ul>
+      {/* Hero + Quick booking */}
+      <section className="relative overflow-hidden border-b border-border">
+        <HeroBackgroundImage />
+        <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-16">
+          <div>
+            <p className="text-xs font-medium tracking-[0.2em] text-teal-800 uppercase dark:text-teal-300">
+              {rideBrand.shortName}
+            </p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-balance text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
+              Đưa bạn đến nơi,
+              <br />
+              an tâm suốt hành trình.
+            </h1>
+            <p className="mt-4 max-w-lg text-base leading-relaxed text-foreground/90 sm:text-lg">
+              Xe riêng có tài xế cho du lịch, khám bệnh, hành hương, sân bay và
+              các chuyến đi theo yêu cầu.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button asChild size="lg" className="min-h-11 bg-teal-800 hover:bg-teal-700">
+                <Link to="/ride/booking">Đặt chuyến ngay</Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="min-h-11 border-border bg-background hover:bg-background"
+              >
+                <Link to="/ride/dich-vu">Xem dịch vụ</Link>
+              </Button>
             </div>
-            <QuickBookingForm />
+            <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-foreground/85">
+              {["Uy tín", "An toàn", "Đúng giờ", "Tận tâm", "Giá rõ ràng"].map(
+                (item) => (
+                  <li key={item} className="inline-flex items-center gap-1.5">
+                    <ShieldCheck className="size-3.5 text-teal-700" aria-hidden />
+                    {item}
+                  </li>
+                ),
+              )}
+            </ul>
           </div>
-        ) : (
-          <div className="relative min-h-[inherit]" aria-hidden />
-        )}
+          <Suspense fallback={<QuickBookingFallback />}>
+            <QuickBookingForm />
+          </Suspense>
+        </div>
       </section>
 
       {/* Services */}

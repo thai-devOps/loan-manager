@@ -42,21 +42,40 @@
       media="print"
       onload="this.media='all'"
     />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap"
-      rel="stylesheet"
-      media="print"
-      onload="this.media='all'"
-    />
     <noscript>
       <link
-        href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap"
         rel="stylesheet"
       />
     </noscript>
-    <link rel="preload" as="image" href="/hero_image.webp" type="image/webp" fetchpriority="high" />
-    <!-- Hide SEO prerender HTML until React mounts (avoids content flash on reload). -->
+    <link
+      rel="preload"
+      as="image"
+      href="/hero_image.webp"
+      imagesrcset="/hero_image-sm.webp 960w, /hero_image.webp 1280w"
+      imagesizes="100vw"
+      type="image/webp"
+      fetchpriority="high"
+    />
     <style>
+      /* Early paint before React: LCP shell + hide SEO text flash */
+      .ride-lcp-shell {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: #eef1ef;
+        pointer-events: none;
+      }
+      .dark .ride-lcp-shell {
+        background: #0f1412;
+      }
+      .ride-lcp-shell img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center 40%;
+      }
       .seo-prerender {
         position: absolute !important;
         width: 1px !important;
