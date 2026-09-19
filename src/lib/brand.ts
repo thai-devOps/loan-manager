@@ -5,10 +5,9 @@ export const APP_NAME = "SiTha Trip";
 export const APP_MARK = "ST";
 
 /** Compact square mark (sidebar / small chips). */
-export const APP_LOGO_SRC = "/logo.png";
+export const APP_LOGO_SRC = "/sithatrip_icon.png";
 
 /** Full brand wordmark + illustration (loading / marketing). */
-export const APP_BRAND_LOGO_SRC = "/sithatrip.png";
-
+export const APP_BRAND_LOGO_SRC = "/sithatrip_icon.png";
 export const APP_TAGLINE =
   "Đặt xe riêng có tài xế tại An Giang — đón tận nơi, uy tín, đúng giờ";
