@@ -193,15 +193,17 @@ export function VehicleFormFields({
           multiple={false}
           value={form.imageUrl}
           publicIds={form.imagePublicId}
-          onChange={(next) =>
-            set("imageUrl", typeof next === "string" ? next : (next[0] ?? ""))
-          }
-          onPublicIdsChange={(next) =>
-            set(
-              "imagePublicId",
-              typeof next === "string" ? next : (next[0] ?? ""),
-            )
-          }
+          onChange={(next, nextPublicIds) => {
+            const imageUrl =
+              typeof next === "string" ? next : (next[0] ?? "");
+            const imagePublicId =
+              nextPublicIds == null
+                ? form.imagePublicId
+                : typeof nextPublicIds === "string"
+                  ? nextPublicIds
+                  : (nextPublicIds[0] ?? "");
+            onChange({ ...form, imageUrl, imagePublicId });
+          }}
         />
       </div>
 

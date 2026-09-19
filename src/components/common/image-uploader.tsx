@@ -14,7 +14,14 @@ const UPLOAD_CONCURRENCY = 3;
 
 type ImageUploaderProps = {
   value?: string | string[];
-  onChange: (value: string | string[]) => void;
+  /**
+   * Called with URLs and matching publicIds in one shot so parents can
+   * update both fields without a stale-state race.
+   */
+  onChange: (
+    value: string | string[],
+    publicIds?: string | string[],
+  ) => void;
   folder?: string;
   multiple?: boolean;
   publicIds?: string | string[];
@@ -29,20 +36,17 @@ function toArray(value: string | string[] | undefined): string[] {
   return value ? [value] : [];
 }
 
-function emitValue(
+function emitAssets(
   urls: string[],
-  multiple: boolean,
-  onChange: (value: string | string[]) => void,
-) {
-  onChange(multiple ? urls : (urls[0] ?? ""));
-}
-
-function emitPublicIds(
   ids: string[],
   multiple: boolean,
+  onChange: (value: string | string[], publicIds?: string | string[]) => void,
   onPublicIdsChange?: (value: string | string[]) => void,
 ) {
-  onPublicIdsChange?.(multiple ? ids : (ids[0] ?? ""));
+  const nextValue = multiple ? urls : (urls[0] ?? "");
+  const nextIds = multiple ? ids : (ids[0] ?? "");
+  onChange(nextValue, nextIds);
+  onPublicIdsChange?.(nextIds);
 }
 
 async function mapWithConcurrency<T, R>(
@@ -130,18 +134,20 @@ export function ImageUploader({
       const newIds = uploaded.map((u) => u.publicId);
 
       if (multiple) {
-        const nextUrls = [...urls, ...newUrls];
-        const nextIds = [...ids, ...newIds];
-        emitValue(nextUrls, true, onChange);
-        emitPublicIds(nextIds, true, onPublicIdsChange);
+        emitAssets(
+          [...urls, ...newUrls],
+          [...ids, ...newIds],
+          true,
+          onChange,
+          onPublicIdsChange,
+        );
       } else {
         // Replace previous; best-effort delete old Cloudinary asset
         const prevId = ids[0];
         if (prevId) {
           void deleteUploadedImage(prevId).catch(() => undefined);
         }
-        emitValue(newUrls, false, onChange);
-        emitPublicIds(newIds, false, onPublicIdsChange);
+        emitAssets(newUrls, newIds, false, onChange, onPublicIdsChange);
       }
       toast.success(multiple ? "Đã tải ảnh lên" : "Đã cập nhật ảnh");
     } catch (err) {
@@ -167,8 +173,7 @@ export function ImageUploader({
       }
       const nextUrls = urls.filter((_, i) => i !== index);
       const nextIds = ids.filter((_, i) => i !== index);
-      emitValue(nextUrls, multiple, onChange);
-      emitPublicIds(nextIds, multiple, onPublicIdsChange);
+      emitAssets(nextUrls, nextIds, multiple, onChange, onPublicIdsChange);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Xóa ảnh thất bại";
