@@ -61,6 +61,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fuel: (body.fuel ?? "Xăng").trim(),
         year: body.year ? Number(body.year) : undefined,
         images: Array.isArray(body.images) ? body.images : [],
+        imagePublicIds: Array.isArray(body.imagePublicIds)
+          ? body.imagePublicIds.map(String).filter(Boolean)
+          : undefined,
         features: Array.isArray(body.features) ? body.features : ["Xe riêng + tài xế"],
         suitableFor: (Array.isArray(body.suitableFor)
           ? body.suitableFor
@@ -71,6 +74,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         createdAt: now,
         updatedAt: now,
       };
+      if (!vehicle.imagePublicIds?.length) {
+        delete vehicle.imagePublicIds;
+      }
       await col.insertOne(vehicle);
       res.status(201).json(stripDoc(vehicle));
       return;

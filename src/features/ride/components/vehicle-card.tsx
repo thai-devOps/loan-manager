@@ -4,6 +4,7 @@ import { ArrowUpRight, Check, Users } from "lucide-react";
 import { rideBrand } from "@/features/ride/config/ride-brand";
 import type { Vehicle } from "@/features/ride/types/ride";
 import { SUITABLE_FOR_LABELS } from "@/features/ride/lib/labels";
+import { getCloudinaryImageUrl } from "@/lib/cloudinary";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -36,7 +37,7 @@ export function VehicleCard({
         <div className="aspect-4/3 p-4 sm:p-5">
           {image ? (
             <img
-              src={image}
+              src={getCloudinaryImageUrl(image, { width: 640 })}
               alt={vehicle.name}
               className="size-full object-contain object-center transition-transform duration-500 ease-out group-hover:scale-[1.04]"
               loading="lazy"

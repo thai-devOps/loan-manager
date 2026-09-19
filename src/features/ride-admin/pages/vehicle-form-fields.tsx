@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ImageUploader } from "@/components/common/image-uploader";
 import type { Vehicle, VehicleStatus } from "@/features/ride/types/ride";
 import { DEFAULT_VEHICLE_PRICING } from "@shared/ride/vehicle-pricing";
 
@@ -28,6 +29,7 @@ export type VehicleFormState = {
   status: VehicleStatus;
   active: boolean;
   imageUrl: string;
+  imagePublicId: string;
   features: string;
   suitableFor: string;
   fuelConsumptionPer100Km: string;
@@ -51,6 +53,7 @@ export const emptyVehicleForm = (): VehicleFormState => ({
   status: "AVAILABLE",
   active: true,
   imageUrl: "",
+  imagePublicId: "",
   features: "Xe riêng + tài xế",
   suitableFor: "travel",
   fuelConsumptionPer100Km: String(DEFAULT_VEHICLE_PRICING.fuelConsumptionPer100Km),
@@ -76,6 +79,7 @@ export function vehicleToForm(v: Vehicle): VehicleFormState {
     status: (v.status as VehicleStatus) || "AVAILABLE",
     active: v.active,
     imageUrl: v.images[0] ?? "",
+    imagePublicId: v.imagePublicIds?.[0] ?? "",
     features: (v.features ?? []).join(", "),
     suitableFor: (v.suitableFor ?? []).join(", "),
     fuelConsumptionPer100Km: String(p.fuelConsumptionPer100Km),
@@ -91,6 +95,7 @@ export function vehicleToForm(v: Vehicle): VehicleFormState {
 
 export function formToVehiclePayload(form: VehicleFormState): Partial<Vehicle> {
   const imageUrl = form.imageUrl.trim();
+  const imagePublicId = form.imagePublicId.trim();
   const features = form.features
     .split(",")
     .map((s) => s.trim())
@@ -111,6 +116,7 @@ export function formToVehiclePayload(form: VehicleFormState): Partial<Vehicle> {
     status: form.status,
     active: form.active,
     images: imageUrl ? [imageUrl] : [],
+    imagePublicIds: imagePublicId ? [imagePublicId] : [],
     features: features.length > 0 ? features : ["Xe riêng + tài xế"],
     suitableFor: suitableFor.length > 0 ? suitableFor : ["travel"],
     pricing: {
@@ -181,23 +187,22 @@ export function VehicleFormFields({
       </div>
 
       <div className="space-y-1.5 sm:col-span-2">
-        <Label htmlFor="vehicle-imageUrl">URL ảnh</Label>
-        <Input
-          id="vehicle-imageUrl"
-          type="url"
-          placeholder="https://..."
+        <Label>Ảnh xe</Label>
+        <ImageUploader
+          folder="sitha-trip/rides"
+          multiple={false}
           value={form.imageUrl}
-          onChange={(e) => set("imageUrl", e.target.value)}
+          publicIds={form.imagePublicId}
+          onChange={(next) =>
+            set("imageUrl", typeof next === "string" ? next : (next[0] ?? ""))
+          }
+          onPublicIdsChange={(next) =>
+            set(
+              "imagePublicId",
+              typeof next === "string" ? next : (next[0] ?? ""),
+            )
+          }
         />
-        {form.imageUrl.trim() ? (
-          <div className="mt-2 overflow-hidden rounded-xl border border-border bg-muted">
-            <img
-              src={form.imageUrl.trim()}
-              alt="Xem trước"
-              className="aspect-video w-full max-w-md object-cover"
-            />
-          </div>
-        ) : null}
       </div>
 
       <div className="space-y-1.5 sm:col-span-2">

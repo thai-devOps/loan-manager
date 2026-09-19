@@ -20,6 +20,7 @@ import {
 import { SUITABLE_FOR_LABELS } from "@/features/ride/lib/labels";
 import type { SuitableFor, Vehicle, VehicleStatus } from "@/features/ride/types/ride";
 import { formatCurrency } from "@/lib/currency";
+import { getCloudinaryImageUrl } from "@/lib/cloudinary";
 import { ApiError } from "@/api/client";
 import { DEFAULT_VEHICLE_PRICING } from "@shared/ride/vehicle-pricing";
 
@@ -379,7 +380,7 @@ export function RideAdminVehicleDetailPage() {
           {image ? (
             <div className="overflow-hidden rounded-2xl border border-border bg-muted">
               <img
-                src={image}
+                src={getCloudinaryImageUrl(image, { width: 1200 })}
                 alt={vehicle.name}
                 className="aspect-video w-full object-cover"
               />

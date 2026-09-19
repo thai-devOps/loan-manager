@@ -23,7 +23,13 @@ export async function apiFetch<T>(
 
   const session = getSession();
   const headers = new Headers(options.headers);
-  if (!headers.has("Content-Type") && options.body !== undefined) {
+  const isFormData =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
+  if (
+    !headers.has("Content-Type") &&
+    options.body !== undefined &&
+    !isFormData
+  ) {
     headers.set("Content-Type", "application/json");
   }
   if (session?.token) {
@@ -38,8 +44,8 @@ export async function apiFetch<T>(
       body:
         options.body === undefined
           ? undefined
-          : typeof options.body === "string"
-            ? options.body
+          : typeof options.body === "string" || isFormData
+            ? (options.body as BodyInit)
             : JSON.stringify(options.body),
     });
   } catch (error) {
@@ -62,11 +68,14 @@ export async function apiFetch<T>(
 
   const data = (await res.json().catch(() => ({}))) as {
     error?: string;
+    message?: string;
   } & T;
 
   if (!res.ok) {
     throw new ApiError(
-      (data as { error?: string }).error ?? "Request failed",
+      (data as { message?: string; error?: string }).message ??
+        (data as { error?: string }).error ??
+        "Request failed",
       res.status,
     );
   }

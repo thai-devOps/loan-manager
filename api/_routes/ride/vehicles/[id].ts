@@ -161,6 +161,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             images: Array.isArray(body.images)
               ? body.images
               : (current.images ?? []),
+            imagePublicIds: Array.isArray(body.imagePublicIds)
+              ? body.imagePublicIds.map(String).filter(Boolean)
+              : (current.imagePublicIds ?? []),
             features: Array.isArray(body.features)
               ? body.features
               : (current.features ?? []),

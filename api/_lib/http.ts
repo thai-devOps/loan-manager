@@ -13,7 +13,9 @@ export function handleError(res: VercelResponse, error: unknown) {
   const message =
     error instanceof Error ? error.message : "Internal server error";
   const status =
-    message.includes("not configured") || message.includes("MONGODB_URI")
+    message.includes("not configured") ||
+    message.includes("MONGODB_URI") ||
+    message.includes("CLOUDINARY_")
       ? 500
       : message.includes("Không tìm thấy")
         ? 404

@@ -117,6 +117,10 @@ export const API_ROUTES: ApiRoute[] = [
     params: (m) => ({ action: m[1]! }),
   },
   {
+    pattern: /^\/api\/upload\/?$/,
+    load: () => import("../_routes/upload/index.js"),
+  },
+  {
     pattern: /^\/api\/ride\/dashboard\/?$/,
     load: () => import("../_routes/ride/dashboard.js"),
   },

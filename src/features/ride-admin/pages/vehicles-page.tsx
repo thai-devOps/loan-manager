@@ -11,6 +11,7 @@ import { vehicleAdminService } from "@/features/ride-admin/services/admin-api";
 import { VEHICLE_STATUS_LABEL } from "@/features/ride-admin/pages/vehicle-form-fields";
 import type { Vehicle, VehicleStatus } from "@/features/ride/types/ride";
 import { ApiError } from "@/api/client";
+import { getCloudinaryImageUrl } from "@/lib/cloudinary";
 
 export function RideAdminVehiclesPage() {
   const [rows, setRows] = useState<Vehicle[] | null>(null);
@@ -81,7 +82,7 @@ export function RideAdminVehiclesPage() {
                 >
                   {image ? (
                     <img
-                      src={image}
+                      src={getCloudinaryImageUrl(image, { width: 800 })}
                       alt=""
                       className="aspect-video w-full object-cover"
                     />

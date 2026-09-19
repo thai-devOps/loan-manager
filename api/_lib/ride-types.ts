@@ -219,6 +219,8 @@ export type RideVehicle = {
   fuel: string;
   year?: number;
   images: string[];
+  /** Parallel to `images` — Cloudinary public_id when uploaded via ImageUploader. */
+  imagePublicIds?: string[];
   features: string[];
   suitableFor: SuitableFor[];
   pricing?: VehiclePricingConfig;

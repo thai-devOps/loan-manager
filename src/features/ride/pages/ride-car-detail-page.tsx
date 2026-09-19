@@ -7,6 +7,7 @@ import { SUITABLE_FOR_LABELS } from "@/features/ride/lib/labels";
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
 import { vehicleService } from "@/features/ride/services/vehicleService";
 import type { Vehicle } from "@/features/ride/types/ride";
+import { getCloudinaryImageUrl } from "@/lib/cloudinary";
 
 export function RideCarDetailPage() {
   const { id = "" } = useParams();
@@ -63,7 +64,7 @@ export function RideCarDetailPage() {
               className="overflow-hidden rounded-2xl border border-border bg-muted"
             >
               <img
-                src={src}
+                src={getCloudinaryImageUrl(src, { width: 1200 })}
                 alt={`${vehicle.name} — ảnh ${i + 1}`}
                 className="aspect-video w-full object-cover"
               />

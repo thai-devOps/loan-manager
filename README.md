@@ -21,13 +21,17 @@ MONGODB_URI=mongodb+srv://USER:PASS@cluster0....mongodb.net/loan-db?retryWrites=
 ORS_API_KEY=your-ors-api-key
 # Ably — realtime signals for ride admin (server-only; token auth for browser)
 ABLY_API_KEY=your-ably-api-key
+# Cloudinary — signed direct upload (server-only; never expose CLOUDINARY_API_SECRET)
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
 # Public site origin for ride SEO (canonical, sitemap, Open Graph) — no trailing slash
 VITE_SITE_URL=https://your-domain.com
 # Optional GA4 for /ride public pages only
 VITE_GA_MEASUREMENT_ID=
 ```
 
-Trên Vercel → Project → Environment Variables, thêm cùng các key trên (Production). **Không** dùng prefix `VITE_` cho `ORS_API_KEY` / `ABLY_API_KEY` / secrets server. `VITE_SITE_URL` và `VITE_GA_MEASUREMENT_ID` là biến public (được nhúng vào bundle).
+Trên Vercel → Project → Environment Variables, thêm cùng các key trên (Production). **Không** dùng prefix `VITE_` cho `ORS_API_KEY` / `ABLY_API_KEY` / `CLOUDINARY_*` / secrets server. `VITE_SITE_URL` và `VITE_GA_MEASUREMENT_ID` là biến public (được nhúng vào bundle).
 
 Atlas Network Access: cho phép IP serverless (thường `0.0.0.0/0`) và user DB có quyền read/write.
 
