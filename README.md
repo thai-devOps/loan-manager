@@ -31,7 +31,7 @@ VITE_SITE_URL=https://www.chauthai.id.vn
 VITE_GA_MEASUREMENT_ID=
 ```
 
-Trên Vercel → Project → Environment Variables, thêm cùng các key trên (Production). **Không** dùng prefix `VITE_` cho `ORS_API_KEY` / `ABLY_API_KEY` / `CLOUDINARY_*` / `PNJ_ZONE` / `GOLD_PRICE_SYNC_SECRET` / secrets server. `VITE_SITE_URL` và `VITE_GA_MEASUREMENT_ID` là biến public (được nhúng vào bundle). Production canonical host là `https://www.chauthai.id.vn` (khớp Domains + sitemap). Cron giá vàng: `GOLD_PRICE_SYNC_SECRET` (hoặc `CRON_SECRET`) cho `/api/jobs/gold-price-sync`.
+Trên Vercel → Project → Environment Variables, thêm cùng các key trên (Production). **Không** dùng prefix `VITE_` cho `ORS_API_KEY` / `ABLY_API_KEY` / `CLOUDINARY_*` / `PNJ_ZONE` / `GOLD_PRICE_SYNC_SECRET` / secrets server. `VITE_SITE_URL` và `VITE_GA_MEASUREMENT_ID` là biến public (được nhúng vào bundle). Production canonical host là `https://www.chauthai.id.vn` (khớp Domains + sitemap). Cron giá vàng (Hobby: 1 lần/ngày, `0 2 * * *` UTC ≈ 09:00 VN): `GOLD_PRICE_SYNC_SECRET` (hoặc `CRON_SECRET`) cho `/api/jobs/gold-price-sync`. Khi mở trang vàng, API vẫn tự refresh nếu snapshot quá TTL.
 
 Atlas Network Access: cho phép IP serverless (thường `0.0.0.0/0`) và user DB có quyền read/write.
 
