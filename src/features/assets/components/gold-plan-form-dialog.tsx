@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,8 +16,6 @@ import {
   type GoldPlanFormValues,
 } from "@/schemas/assets.schema";
 import {
-  estimateMonthsFromQuantity,
-  estimatePhanFromBudget,
   normalizeGoldPlan,
   phanToFormQuantity,
   purchasesBeforeMonth,
@@ -29,10 +28,16 @@ import {
 import { createGoldPriceService } from "@/features/assets/lib/gold-price-service";
 import { currentMonthKey } from "@/features/finance/lib/calculations";
 import { useUpsertGoldPlanMutation } from "@/api/mutations";
-import { useAssetSummaryQuery } from "@/api/queries";
+import { useAssetSummaryQuery, useGoldPricesLatestQuery } from "@/api/queries";
 import { formatCurrency } from "@/lib/currency";
 import type { AssetSettings, GoldPlan, GoldPurchase, GoldType } from "@/types/assets";
 import { cn } from "@/lib/utils";
+import {
+  defaultReferenceSourceCode,
+  computeGoldPlanMetrics,
+  draftPlanFromForm,
+} from "@/features/assets/lib/gold-plan-metrics";
+import { resolveReferenceBuyPrice } from "@/features/assets/lib/resolve-reference-price";
 
 const selectClass =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm";
@@ -40,6 +45,11 @@ const selectClass =
 const GOLD_TYPE_OPTIONS = (Object.keys(GOLD_TYPE_LABELS) as GoldType[]).filter(
   (t) => t === "9999" || t === "18k" || t === "other",
 );
+
+function formatMonthLabel(month: string): string {
+  const [y, m] = month.split("-");
+  return `${m}/${y}`;
+}
 
 export function GoldPlanFormDialog({
   open,
@@ -90,6 +100,7 @@ function GoldPlanFormFields({
   const upsert = useUpsertGoldPlanMutation();
   const [error, setError] = useState<string | null>(null);
   const priceService = useMemo(() => createGoldPriceService(prices), [prices]);
+  const marketQ = useGoldPricesLatestQuery(true);
   const normalized = existing ? normalizeGoldPlan(existing) : null;
   const targetForm = phanToFormQuantity(
     normalized?.targetQuantityInPhan && normalized.targetQuantityInPhan > 0
@@ -111,10 +122,14 @@ function GoldPlanFormFields({
     normalized?.startMonth ??
     currentMonthKey();
 
+  const defaultGoldType = normalized?.goldType ?? "9999";
   const form = useForm<GoldPlanFormValues>({
     resolver: zodResolver(goldPlanSchema),
     defaultValues: {
-      goldType: normalized?.goldType ?? "9999",
+      goldType: defaultGoldType,
+      referenceSourceCode:
+        normalized?.referenceSourceCode ??
+        defaultReferenceSourceCode(defaultGoldType),
       targetQuantity: targetForm.quantity,
       targetUnit: targetForm.unit,
       targetAmount: normalized?.targetAmount,
@@ -122,7 +137,7 @@ function GoldPlanFormFields({
       initialQuantity: hasInitialDefault ? initialForm.quantity : undefined,
       initialUnit: initialForm.unit,
       includeInitialQuantity: normalized?.includeInitialQuantity ?? true,
-      monthlyBudget: normalized?.monthlyBudget ?? 2_000_000,
+      monthlyBudget: normalized?.monthlyBudget ?? 7_000_000,
       budgetEffectiveFrom: latestBudgetFrom,
       plannedPurchaseDay: normalized?.plannedPurchaseDay ?? 25,
       startMonth: normalized?.startMonth ?? currentMonthKey(),
@@ -133,6 +148,7 @@ function GoldPlanFormFields({
   });
 
   const goldType = form.watch("goldType");
+  const referenceSourceCode = form.watch("referenceSourceCode");
   const targetQuantity = form.watch("targetQuantity");
   const targetUnit = form.watch("targetUnit");
   const hasInitialGold = form.watch("hasInitialGold");
@@ -140,26 +156,61 @@ function GoldPlanFormFields({
   const initialUnit = form.watch("initialUnit") ?? "chi";
   const includeInitial = form.watch("includeInitialQuantity");
   const startMonth = form.watch("startMonth");
+  const endMonth = form.watch("endMonth");
   const monthlyBudget = form.watch("monthlyBudget");
+  const plannedPurchaseDay = form.watch("plannedPurchaseDay");
 
   const targetPhan = toPhan(targetQuantity || 0, targetUnit);
   const initialPhan = hasInitialGold
     ? toPhan(initialQuantity || 0, initialUnit)
     : 0;
-  const remainingPreview = Math.max(
-    targetPhan - (includeInitial && hasInitialGold ? initialPhan : 0),
-    0,
-  );
 
-  const pricePerChi = priceService.getCurrentGoldPrice(goldType);
-  const estimatedMonthlyPhan = estimatePhanFromBudget(
+  const fallbackPrice = priceService.getCurrentGoldPrice(goldType);
+  const resolved = resolveReferenceBuyPrice({
+    goldType,
+    referenceSourceCode,
+    market: marketQ.data,
+    fallbackPricePerChi: fallbackPrice,
+  });
+  const pricePerChi = resolved.pricePerChi;
+
+  const liveMetrics = useMemo(() => {
+    const draft = draftPlanFromForm({
+      goldType,
+      referenceSourceCode: referenceSourceCode ?? null,
+      targetQuantityInPhan: targetPhan,
+      initialQuantityInPhan: initialPhan,
+      includeInitialQuantity: Boolean(hasInitialGold && includeInitial),
+      monthlyBudget: monthlyBudget || 0,
+      plannedPurchaseDay: plannedPurchaseDay || 25,
+      startMonth: startMonth || currentMonthKey(),
+      endMonth: endMonth || currentMonthKey(),
+      existing: normalized,
+    });
+    return computeGoldPlanMetrics(
+      draft,
+      existing ? purchases : [],
+      pricePerChi,
+      currentMonthKey(),
+    );
+  }, [
+    goldType,
+    referenceSourceCode,
+    targetPhan,
+    initialPhan,
+    hasInitialGold,
+    includeInitial,
     monthlyBudget,
+    plannedPurchaseDay,
+    startMonth,
+    endMonth,
+    normalized,
+    existing,
+    purchases,
     pricePerChi,
-  );
-  const estimatedMonths =
-    estimatedMonthlyPhan != null
-      ? estimateMonthsFromQuantity(remainingPreview, estimatedMonthlyPhan)
-      : null;
+  ]);
+
+  const marketOptions = marketQ.data?.prices ?? [];
 
   const prefillPhan = useMemo(() => {
     if (!startMonth) return 0;
@@ -167,6 +218,13 @@ function GoldPlanFormFields({
       .filter((p) => p.type === goldType)
       .reduce((s, p) => s + p.quantityInPhan, 0);
   }, [purchases, startMonth, goldType]);
+
+  const unitPreview =
+    targetUnit === "cay"
+      ? `${targetQuantity || 0} cây = ${formatGoldQuantity(targetPhan)}`
+      : targetUnit === "chi"
+        ? `${targetQuantity || 0} chỉ = ${formatGoldQuantity(targetPhan)}`
+        : formatGoldQuantity(targetPhan);
 
   return (
     <form
@@ -187,17 +245,17 @@ function GoldPlanFormFields({
           : 0;
         const includeInitialQuantity =
           hasInitial && values.includeInitialQuantity;
-        if (
-          includeInitialQuantity &&
-          initialQuantityInPhan >= targetQuantityInPhan
-        ) {
-          setError("Mục tiêu phải lớn hơn số vàng hiện có");
-          return;
-        }
 
+        // Allow existing >= target (goal already met) — do not block save.
+        const price = priceService.getCurrentGoldPrice(values.goldType);
         let amount = Math.max(values.monthlyBudget, 1);
         if (values.targetAmount && values.targetAmount > 0) {
           amount = values.targetAmount;
+        } else if (price > 0) {
+          amount = Math.max(
+            1,
+            Math.round((targetQuantityInPhan / 10) * price),
+          );
         } else if (normalized?.targetAmount && normalized.targetAmount > 0) {
           amount = normalized.targetAmount;
         }
@@ -207,6 +265,7 @@ function GoldPlanFormFields({
             targetAmount: amount,
             targetQuantityInPhan,
             goldType: values.goldType,
+            referenceSourceCode: values.referenceSourceCode ?? null,
             initialQuantityInPhan,
             includeInitialQuantity,
             monthlyBudget: values.monthlyBudget,
@@ -229,57 +288,131 @@ function GoldPlanFormFields({
         }
       })}
     >
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
-        <div className="grid gap-5 md:grid-cols-2 md:gap-6">
-          <div className="space-y-4">
-            <section className="space-y-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium">Thông tin mục tiêu</p>
-                <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                  Số lượng vàng
-                </span>
-              </div>
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4 sm:px-6">
+        {/* GROUP 1 — Mục tiêu */}
+        <section className="space-y-3 rounded-2xl border border-border/80 p-4">
+          <p className="text-sm font-semibold">1. Mục tiêu</p>
+          <div className="space-y-1.5">
+            <Label htmlFor="plan-gold-type">Loại vàng</Label>
+            <select
+              id="plan-gold-type"
+              className={selectClass}
+              {...form.register("goldType", {
+                onChange: (e) => {
+                  const next = e.target.value as GoldType;
+                  form.setValue(
+                    "referenceSourceCode",
+                    defaultReferenceSourceCode(next),
+                  );
+                },
+              })}
+            >
+              {GOLD_TYPE_OPTIONS.map((key) => (
+                <option key={key} value={key}>
+                  {GOLD_TYPE_LABELS[key]}
+                </option>
+              ))}
+            </select>
+          </div>
+          {marketOptions.length > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="plan-ref-code">Giá tham chiếu (PNJ)</Label>
+              <select
+                id="plan-ref-code"
+                className={selectClass}
+                value={referenceSourceCode ?? ""}
+                onChange={(e) =>
+                  form.setValue(
+                    "referenceSourceCode",
+                    e.target.value || null,
+                    { shouldValidate: true },
+                  )
+                }
+              >
+                <option value="">— Dùng giá thủ công —</option>
+                {marketOptions.map((p) => (
+                  <option key={p.sourceCode} value={p.sourceCode}>
+                    {p.sourceCode} · {p.sourceName}
+                    {p.buyPricePerChi != null
+                      ? ` · ${formatCurrency(p.buyPricePerChi)}/chỉ`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Giá mua vào đang dùng:{" "}
+                {pricePerChi > 0 ? formatCurrency(pricePerChi) : "—"}/chỉ
+                {resolved.fromMarket ? " (PNJ)" : " (thủ công)"}
+              </p>
+            </div>
+          )}
+          <div className="grid grid-cols-[1fr_7rem] gap-2.5">
+            <div className="space-y-1.5">
+              <Label htmlFor="plan-target-qty">Mục tiêu</Label>
+              <Input
+                id="plan-target-qty"
+                type="number"
+                step="any"
+                min={0}
+                {...form.register("targetQuantity", { valueAsNumber: true })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="plan-target-unit">Đơn vị</Label>
+              <select
+                id="plan-target-unit"
+                className={selectClass}
+                {...form.register("targetUnit")}
+              >
+                <option value="cay">Cây</option>
+                <option value="chi">Chỉ</option>
+                <option value="phan">Phân</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Preview: {unitPreview} {GOLD_TYPE_LABELS[goldType]}
+          </p>
+        </section>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="plan-gold-type">Loại vàng mua</Label>
-                <select
-                  id="plan-gold-type"
-                  className={selectClass}
-                  {...form.register("goldType")}
-                >
-                  {GOLD_TYPE_OPTIONS.map((key) => (
-                    <option key={key} value={key}>
-                      {GOLD_TYPE_LABELS[key]}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-muted-foreground">
-                  Giá tham chiếu:{" "}
-                  {pricePerChi > 0
-                    ? `${formatCurrency(pricePerChi)}/chỉ`
-                    : "chưa có — vào Giá tham chiếu để nhập"}
-                </p>
-              </div>
+        {/* GROUP 2 — Vàng hiện có */}
+        <section className="space-y-3 rounded-2xl border border-border/80 p-4">
+          <p className="text-sm font-semibold">2. Vàng hiện có</p>
+          <label className="flex items-start gap-2.5 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 shrink-0 rounded border"
+              checked={Boolean(hasInitialGold && includeInitial)}
+              onChange={(e) => {
+                const on = e.target.checked;
+                form.setValue("hasInitialGold", on);
+                form.setValue("includeInitialQuantity", on);
+              }}
+            />
+            <span>Tính vàng hiện có vào mục tiêu</span>
+          </label>
 
+          {hasInitialGold && includeInitial ? (
+            <div className="space-y-2.5">
               <div className="grid grid-cols-[1fr_7rem] gap-2.5">
                 <div className="space-y-1.5">
-                  <Label htmlFor="plan-target-qty">Mục tiêu</Label>
+                  <Label htmlFor="plan-initial-qty">Vàng hiện có</Label>
                   <Input
-                    id="plan-target-qty"
+                    id="plan-initial-qty"
                     type="number"
                     step="any"
                     min={0}
-                    {...form.register("targetQuantity", {
+                    {...form.register("initialQuantity", {
                       valueAsNumber: true,
                     })}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="plan-target-unit">Đơn vị</Label>
+                  <Label htmlFor="plan-initial-unit">Đơn vị</Label>
                   <select
-                    id="plan-target-unit"
+                    id="plan-initial-unit"
                     className={selectClass}
-                    {...form.register("targetUnit")}
+                    {...form.register("initialUnit")}
                   >
                     <option value="cay">Cây</option>
                     <option value="chi">Chỉ</option>
@@ -287,238 +420,165 @@ function GoldPlanFormFields({
                   </select>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {formatGoldQuantity(targetPhan)} {GOLD_TYPE_LABELS[goldType]}
-              </p>
-            </section>
-
-            <section className="space-y-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium">Số dư ban đầu</p>
-                <div className="flex gap-1.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 px-3"
-                    variant={hasInitialGold ? "default" : "outline"}
-                    onClick={() => form.setValue("hasInitialGold", true)}
-                  >
-                    Có
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 px-3"
-                    variant={!hasInitialGold ? "default" : "outline"}
-                    onClick={() => {
-                      form.setValue("hasInitialGold", false);
-                      form.setValue("includeInitialQuantity", false);
-                    }}
-                  >
-                    Không
-                  </Button>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Đã có {GOLD_TYPE_LABELS[goldType]} trước khi bắt đầu kế hoạch?
-              </p>
-              {hasInitialGold && (
-                <div className="space-y-2.5 rounded-lg border p-3">
-                  <div className="grid grid-cols-[1fr_7rem] gap-2.5">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="plan-initial-qty">Số vàng hiện có</Label>
-                      <Input
-                        id="plan-initial-qty"
-                        type="number"
-                        step="any"
-                        min={0}
-                        {...form.register("initialQuantity", {
-                          valueAsNumber: true,
-                        })}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="plan-initial-unit">Đơn vị</Label>
-                      <select
-                        id="plan-initial-unit"
-                        className={selectClass}
-                        {...form.register("initialUnit")}
-                      >
-                        <option value="cay">Cây</option>
-                        <option value="chi">Chỉ</option>
-                        <option value="phan">Phân</option>
-                      </select>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {formatGoldQuantity(initialPhan)}
-                    {includeInitial && targetPhan > 0
-                      ? ` · Còn thiếu ${formatGoldQuantity(remainingPreview)}`
-                      : ""}
-                  </p>
-                  {prefillPhan > 0 && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-8 w-full whitespace-normal text-left text-xs leading-snug"
-                      onClick={() => {
-                        const q = phanToFormQuantity(prefillPhan);
-                        form.setValue("initialQuantity", q.quantity);
-                        form.setValue("initialUnit", q.unit);
-                        form.setValue("includeInitialQuantity", true);
-                      }}
-                    >
-                      Lấy từ {GOLD_TYPE_LABELS[goldType]} mua trước {startMonth}{" "}
-                      ({formatGoldQuantity(prefillPhan)})
-                    </Button>
-                  )}
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      className="size-4 shrink-0 rounded border"
-                      checked={includeInitial}
-                      onChange={(e) =>
-                        form.setValue(
-                          "includeInitialQuantity",
-                          e.target.checked,
-                        )
-                      }
-                    />
-                    <span>Tính số vàng hiện có vào mục tiêu</span>
-                  </label>
-                </div>
+              {prefillPhan > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-auto w-full whitespace-normal py-2 text-left text-xs leading-snug"
+                  onClick={() => {
+                    const q = phanToFormQuantity(prefillPhan);
+                    form.setValue("hasInitialGold", true);
+                    form.setValue("initialQuantity", q.quantity);
+                    form.setValue("initialUnit", q.unit);
+                    form.setValue("includeInitialQuantity", true);
+                  }}
+                >
+                  Lấy từ giao dịch {GOLD_TYPE_LABELS[goldType]} trước{" "}
+                  {startMonth} ({formatGoldQuantity(prefillPhan)})
+                </Button>
               )}
-            </section>
+              <p className="text-xs text-muted-foreground">
+                Đã có {formatGoldQuantity(initialPhan)} · Còn cần{" "}
+                {formatGoldQuantity(liveMetrics.remainingPhan)}
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Vàng hiện có không được tính vào mục tiêu.
+            </p>
+          )}
+        </section>
+
+        {/* GROUP 3 — Ngân sách & thời gian */}
+        <section className="space-y-3 rounded-2xl border border-border/80 p-4">
+          <p className="text-sm font-semibold">3. Ngân sách & thời gian</p>
+          <div
+            className={cn(
+              "grid gap-2.5",
+              existing ? "sm:grid-cols-2" : "grid-cols-1",
+            )}
+          >
+            <div className="space-y-1.5">
+              <Label>Ngân sách / tháng</Label>
+              <MoneyInput
+                value={monthlyBudget}
+                onChange={(v) =>
+                  form.setValue("monthlyBudget", v, { shouldValidate: true })
+                }
+              />
+            </div>
+            {existing && (
+              <div className="space-y-1.5">
+                <Label htmlFor="budget-from">Áp dụng từ</Label>
+                <MonthPicker
+                  id="budget-from"
+                  value={form.watch("budgetEffectiveFrom") ?? ""}
+                  onChange={(v) =>
+                    form.setValue("budgetEffectiveFrom", v, {
+                      shouldValidate: true,
+                    })
+                  }
+                />
+              </div>
+            )}
           </div>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="plan-day">Ngày nhắc</Label>
+              <Input
+                id="plan-day"
+                type="number"
+                min={1}
+                max={28}
+                {...form.register("plannedPurchaseDay", {
+                  valueAsNumber: true,
+                })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="plan-start">Áp dụng từ</Label>
+              <MonthPicker
+                id="plan-start"
+                value={form.watch("startMonth")}
+                onChange={(v) =>
+                  form.setValue("startMonth", v, { shouldValidate: true })
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="plan-end">Mục tiêu hoàn thành</Label>
+              <MonthPicker
+                id="plan-end"
+                value={form.watch("endMonth")}
+                onChange={(v) =>
+                  form.setValue("endMonth", v, { shouldValidate: true })
+                }
+              />
+            </div>
+          </div>
+        </section>
 
-          <div className="space-y-4">
-            <section className="space-y-2.5">
-              <p className="text-sm font-medium">Ngân sách</p>
-              <div
-                className={cn(
-                  "grid gap-2.5",
-                  existing ? "sm:grid-cols-2" : "grid-cols-1",
-                )}
-              >
-                <div className="space-y-1.5">
-                  <Label>Ngân sách / tháng</Label>
-                  <MoneyInput
-                    value={monthlyBudget}
-                    onChange={(v) =>
-                      form.setValue("monthlyBudget", v, {
-                        shouldValidate: true,
-                      })
-                    }
-                  />
-                </div>
-                {existing && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="budget-from">Áp dụng từ tháng</Label>
-                    <MonthPicker
-                      id="budget-from"
-                      value={form.watch("budgetEffectiveFrom") ?? ""}
-                      onChange={(v) =>
-                        form.setValue("budgetEffectiveFrom", v, {
-                          shouldValidate: true,
-                        })
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Tháng ngân sách hiện tại bắt đầu có hiệu lực (trong khoảng
-                      Bắt đầu → Kết thúc).
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
-                {pricePerChi <= 0 ? (
-                  <p className="text-muted-foreground">
-                    Chưa có giá tham chiếu {GOLD_TYPE_LABELS[goldType]}. Nhập
-                    giá tham chiếu để xem ước tính số vàng mua được mỗi tháng.
-                  </p>
-                ) : estimatedMonthlyPhan == null || estimatedMonthlyPhan <= 0 ? (
-                  <p className="text-muted-foreground">
-                    Ngân sách chưa đủ mua 1 phân theo giá{" "}
-                    {formatCurrency(pricePerChi)}/chỉ.
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    <p>
-                      Ước tính mua được{" "}
-                      <span className="font-semibold">
-                        ~{formatGoldQuantity(estimatedMonthlyPhan)}
-                      </span>{" "}
-                      {GOLD_TYPE_LABELS[goldType]}/tháng
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Theo giá tham chiếu {formatCurrency(pricePerChi)}/chỉ.
-                      {remainingPreview > 0 && estimatedMonths != null
-                        ? ` Còn thiếu ${formatGoldQuantity(remainingPreview)} ≈ ${estimatedMonths} tháng (ước tính).`
-                        : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Chỉ mang tính tham khảo — giá thực tế khi mua có thể khác.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {existing && (
-                <p className="text-xs text-muted-foreground">
-                  Ngân sách các tháng trước không bị ghi đè.
+        {/* Live calculation */}
+        <section className="space-y-2 rounded-2xl border border-sky-200/70 bg-sky-50/50 p-4 text-sm dark:border-sky-900/50 dark:bg-sky-950/20">
+          <p className="text-sm font-semibold">Ước tính trực tiếp</p>
+          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 sm:text-sm">
+            <LiveRow label="Mục tiêu" value={formatGoldQuantity(targetPhan)} />
+            <LiveRow
+              label="Đã có"
+              value={formatGoldQuantity(liveMetrics.existingPhan)}
+            />
+            <LiveRow
+              label="Cần mua"
+              value={formatGoldQuantity(liveMetrics.remainingPhan)}
+            />
+            <LiveRow
+              label="Ngân sách"
+              value={`${formatCurrency(monthlyBudget || 0)}/tháng`}
+            />
+            <LiveRow
+              label="Ước tính mua"
+              value={
+                liveMetrics.estimatedMonthlyPhan != null &&
+                liveMetrics.estimatedMonthlyPhan > 0
+                  ? `~${liveMetrics.estimatedMonthlyPhan.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} phân/tháng`
+                  : "—"
+              }
+            />
+            <LiveRow
+              label="Thời gian ước tính"
+              value={
+                liveMetrics.estimatedMonths != null
+                  ? `~${liveMetrics.estimatedMonths.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tháng`
+                  : "—"
+              }
+            />
+          </div>
+          {liveMetrics.estimatedEndMonth && (
+            <p className="text-xs text-muted-foreground">
+              Dự kiến hoàn thành: ~{formatMonthLabel(liveMetrics.estimatedEndMonth)}{" "}
+              (ước tính, không cam kết).
+            </p>
+          )}
+          {!liveMetrics.paceOk && liveMetrics.requiredBudgetPerMonth != null && (
+            <div className="flex gap-2 rounded-xl border border-amber-300/70 bg-amber-50/80 px-3 py-2.5 dark:border-amber-800/60 dark:bg-amber-950/30">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
+              <div className="min-w-0 space-y-0.5 text-xs">
+                <p className="font-medium text-amber-900 dark:text-amber-200">
+                  Ngân sách hiện tại có thể chưa đủ.
                 </p>
-              )}
-            </section>
-
-            <section className="space-y-2.5">
-              <p className="text-sm font-medium">Ngày nhắc & thời gian</p>
-              <div className="grid grid-cols-3 gap-2.5">
-                <div className="space-y-1.5">
-                  <Label htmlFor="plan-day">Ngày mua</Label>
-                  <Input
-                    id="plan-day"
-                    type="number"
-                    min={1}
-                    max={28}
-                    {...form.register("plannedPurchaseDay", {
-                      valueAsNumber: true,
-                    })}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="plan-start">Bắt đầu</Label>
-                  <MonthPicker
-                    id="plan-start"
-                    value={form.watch("startMonth")}
-                    onChange={(v) =>
-                      form.setValue("startMonth", v, { shouldValidate: true })
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="plan-end">Kết thúc</Label>
-                  <MonthPicker
-                    id="plan-end"
-                    value={form.watch("endMonth")}
-                    onChange={(v) =>
-                      form.setValue("endMonth", v, { shouldValidate: true })
-                    }
-                  />
-                </div>
+                <p className="text-amber-800/90 dark:text-amber-300/90">
+                  Ngân sách ước tính cần: ~
+                  {formatCurrency(liveMetrics.requiredBudgetPerMonth)}/tháng để
+                  đạt mục tiêu đúng hạn.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Bắt đầu / Kết thúc là cửa sổ kế hoạch (tháng tính tiến độ). Ngày
-                nhắc chỉ mang tính kế hoạch. Thời gian hoàn thành phụ thuộc vào
-                giá vàng và số lượng mua thực tế.
-              </p>
-            </section>
-          </div>
-        </div>
+            </div>
+          )}
+        </section>
 
         {error && (
-          <p className="mt-4 rounded-md border border-destructive/25 bg-destructive/8 px-3 py-2 text-sm text-destructive">
+          <p className="rounded-md border border-destructive/25 bg-destructive/8 px-3 py-2 text-sm text-destructive">
             {error}
           </p>
         )}
@@ -530,5 +590,14 @@ function GoldPlanFormFields({
         </Button>
       </ResponsiveFormFooter>
     </form>
+  );
+}
+
+function LiveRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg bg-background/70 px-2.5 py-2 dark:bg-background/40">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="truncate font-semibold tabular-nums">{value}</p>
+    </div>
   );
 }

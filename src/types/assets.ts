@@ -24,7 +24,12 @@ export interface ManualAsset {
 
 export interface GoldPurchase {
   id: string;
+  /** Legacy purity bucket for aggregation / settings fallback */
   type: GoldType;
+  /** PNJ product code from gold_types (e.g. N24K, SJC, 75) */
+  sourceCode?: string | null;
+  /** Display name from gold_types at purchase time */
+  sourceName?: string | null;
   quantityInPhan: number;
   purchasePricePerChi: number;
   totalCost: number;
@@ -56,6 +61,11 @@ export interface GoldPlan {
   targetQuantityInPhan?: number | null;
   /** Loại vàng kế hoạch mua (9999 / 18k / other) */
   goldType?: GoldType | null;
+  /**
+   * PNJ/source product code for reference price (e.g. N24K, SJC).
+   * Null → fall back to AssetSettings map by goldType.
+   */
+  referenceSourceCode?: string | null;
   initialQuantityInPhan: number;
   includeInitialQuantity: boolean;
   monthlyBudget: number;

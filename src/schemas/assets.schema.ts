@@ -54,7 +54,8 @@ export const manualAssetSchema = z
 export type ManualAssetFormValues = z.infer<typeof manualAssetSchema>;
 
 export const goldPurchaseSchema = z.object({
-  type: z.enum(["9999", "18k", "other"]),
+  sourceCode: z.string().trim().min(1, "Chọn loại vàng"),
+  sourceName: z.string().trim().min(1).optional(),
   quantity: z.number().positive("Khối lượng phải lớn hơn 0"),
   unit: z.enum(["cay", "chi", "phan"]),
   purchasePricePerChi: z.number().int().nonnegative("Giá mua không hợp lệ"),
@@ -73,6 +74,8 @@ export const goldPlanSchema = z
     goldType: z.enum(["9999", "18k", "other"], {
       message: "Chọn loại vàng",
     }),
+    /** PNJ/source product code for live reference price */
+    referenceSourceCode: z.string().trim().min(1).nullable().optional(),
     targetQuantity: z.number().positive("Mục tiêu phải lớn hơn 0"),
     targetUnit: z.enum(["cay", "chi", "phan"]),
     /** Legacy money reference — kept for API compatibility */

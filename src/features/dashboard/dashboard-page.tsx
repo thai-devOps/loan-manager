@@ -473,14 +473,14 @@ function DashboardAssetsWidgets() {
   const s = summaryQ.data;
   const purchases = purchasesQ.data ?? EMPTY_ARRAY;
   const plan = s.plan ? normalizeGoldPlan(s.plan) : null;
-  const progress = plan
-    ? planHasQuantityTarget(plan)
+  const hasQty = plan ? planHasQuantityTarget(plan) : false;
+  const progress =
+    plan && hasQty
       ? calculateGoldGoalProgress(
           planAccumulatedPhan(plan, purchases),
           plan.targetQuantityInPhan!,
         )
-      : calculateGoldGoalProgress(s.goldCost, plan.targetAmount)
-    : 0;
+      : null;
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -531,31 +531,26 @@ function DashboardAssetsWidgets() {
             <p className="text-sm text-muted-foreground">
               Chưa có kế hoạch tích lũy vàng.
             </p>
-          ) : (
+          ) : hasQty ? (
             <div className="space-y-2">
-              <p className="text-sm">
-                {planHasQuantityTarget(plan) ? (
-                  <>
-                    {formatGoldQuantity(planAccumulatedPhan(plan, purchases))} /{" "}
-                    {formatGoldQuantity(plan.targetQuantityInPhan!)}
-                  </>
-                ) : (
-                  <>
-                    {formatCurrency(s.goldCost)} /{" "}
-                    {formatCurrency(plan.targetAmount)}
-                  </>
-                )}
+              <p className="text-sm font-medium tabular-nums">
+                {formatGoldQuantity(planAccumulatedPhan(plan, purchases))} /{" "}
+                {formatGoldQuantity(plan.targetQuantityInPhan!)}
               </p>
               <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-amber-600"
-                  style={{ width: `${progress}%` }}
+                  style={{ width: `${progress ?? 0}%` }}
                 />
               </div>
               <p className="text-xs text-muted-foreground">
                 {progress}% · {formatCurrency(plan.monthlyBudget)} / tháng
               </p>
             </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Cần cập nhật mục tiêu số lượng vàng để theo dõi tiến độ.
+            </p>
           )}
         </CardContent>
       </Card>

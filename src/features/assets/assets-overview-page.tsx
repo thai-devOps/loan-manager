@@ -67,14 +67,14 @@ export function AssetsOverviewPage() {
   const purchases = purchasesQ.data ?? EMPTY_ARRAY;
   const segments = s.allocation.segments.filter((seg) => seg.amount > 0);
   const plan = s.plan ? normalizeGoldPlan(s.plan) : null;
-  const planProgress = plan
-    ? planHasQuantityTarget(plan)
+  const hasQty = plan ? planHasQuantityTarget(plan) : false;
+  const planProgress =
+    plan && hasQty
       ? calculateGoldGoalProgress(
           planAccumulatedPhan(plan, purchases),
           plan.targetQuantityInPhan!,
         )
-      : calculateGoldGoalProgress(s.goldCost, plan.targetAmount)
-    : 0;
+      : null;
 
   return (
     <div className="space-y-6">
@@ -201,34 +201,34 @@ export function AssetsOverviewPage() {
               />
             ) : (
               <div className="space-y-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Đã tích lũy</span>
-                  <span className="font-medium">
-                    {plan && planHasQuantityTarget(plan) ? (
-                      <>
+                {hasQty ? (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Đã tích lũy</span>
+                      <span className="font-medium tabular-nums">
                         {formatGoldQuantity(
-                          planAccumulatedPhan(plan, purchases),
+                          planAccumulatedPhan(plan!, purchases),
                         )}{" "}
-                        / {formatGoldQuantity(plan.targetQuantityInPhan!)}
-                      </>
-                    ) : (
-                      <>
-                        {formatCurrency(s.goldCost)} /{" "}
-                        {formatCurrency(s.plan.targetAmount)}
-                      </>
-                    )}
-                  </span>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${planProgress}%` }}
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Tiến độ {planProgress}% · Ngân sách dự kiến{" "}
-                  {formatCurrency(s.plan.monthlyBudget)} / tháng
-                </p>
+                        / {formatGoldQuantity(plan!.targetQuantityInPhan!)}
+                      </span>
+                    </div>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-amber-600/90"
+                        style={{ width: `${planProgress ?? 0}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Tiến độ {planProgress}% · theo số lượng vàng · Ngân sách{" "}
+                      {formatCurrency(s.plan.monthlyBudget)} / tháng
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Kế hoạch chưa có mục tiêu số lượng. Cập nhật kế hoạch để theo
+                    dõi tiến độ vàng thực tế.
+                  </p>
+                )}
                 <Button asChild variant="outline" size="sm">
                   <Link to="/assets/gold-plan">
                     Xem kế hoạch

@@ -173,9 +173,15 @@ export function normalizeGoldPlan(plan: GoldPlan): GoldPlan {
     plan.goldType === "other"
       ? plan.goldType
       : null;
+  const referenceSourceCode =
+    typeof plan.referenceSourceCode === "string" &&
+    plan.referenceSourceCode.trim()
+      ? plan.referenceSourceCode.trim()
+      : null;
   return {
     ...plan,
     goldType,
+    referenceSourceCode,
     targetQuantityInPhan:
       plan.targetQuantityInPhan == null ||
       !Number.isFinite(plan.targetQuantityInPhan)
@@ -279,9 +285,9 @@ export function monthlyPlanStatusLabel(status: MonthlyPlanStatus): string {
     case "in_progress":
       return "Đang thực hiện";
     case "completed":
-      return "Đã hoàn thành";
+      return "Đạt mục tiêu";
     case "exceeded":
-      return "Vượt kế hoạch";
+      return "Vượt mục tiêu";
     case "deferred":
       return "Đã bỏ qua";
     case "paused":
@@ -341,15 +347,38 @@ export function expectedPurchaseCost(
 }
 
 /**
+ * Ước tính số chỉ mua được từ ngân sách theo giá tham chiếu (₫/chỉ).
+ * Fractional — không làm tròn xuống phân.
+ */
+export function estimateChiFromBudget(
+  monthlyBudget: number,
+  pricePerChi: number,
+): number | null {
+  if (monthlyBudget <= 0 || pricePerChi <= 0) return null;
+  return monthlyBudget / pricePerChi;
+}
+
+/**
  * Ước tính số phân mua được từ ngân sách theo giá tham chiếu (₫/chỉ).
- * Làm tròn xuống phân nguyên — không cam kết giá thực tế.
+ * Legacy floor-to-phân helper — prefer estimateChiFromBudget for estimates.
  */
 export function estimatePhanFromBudget(
   monthlyBudget: number,
   pricePerChi: number,
 ): number | null {
-  if (monthlyBudget <= 0 || pricePerChi <= 0) return null;
-  return Math.floor((monthlyBudget / pricePerChi) * 10);
+  const chi = estimateChiFromBudget(monthlyBudget, pricePerChi);
+  if (chi == null) return null;
+  return Math.floor(chi * 10);
+}
+
+/** Số tháng ước tính (fractional) để đủ remainingChi. */
+export function estimateMonthsFromChi(
+  remainingChi: number,
+  chiPerMonth: number,
+): number | null {
+  if (remainingChi <= 0) return 0;
+  if (chiPerMonth <= 0) return null;
+  return remainingChi / chiPerMonth;
 }
 
 /** Số tháng ước tính để đủ remainingPhan nếu mỗi tháng mua được monthlyPhan. */

@@ -12,6 +12,10 @@ import type {
   ManualAsset,
 } from "./types.js";
 import type {
+  GoldPriceSnapshot,
+  GoldTypeCatalogEntry,
+} from "./gold-price/types.js";
+import type {
   RideBooking,
   RideCustomer,
   RideDriver,
@@ -66,6 +70,15 @@ async function ensureIndexes(db: Db): Promise<void> {
     db.collection("gold_purchases").createIndex({ purchaseDate: 1 }),
     db.collection("gold_purchases").createIndex({ type: 1 }),
     db.collection("asset_snapshots").createIndex({ month: 1 }, { unique: true }),
+    db
+      .collection("gold_price_snapshots")
+      .createIndex({ source: 1, zone: 1, capturedAt: -1 }),
+    db.collection("gold_price_snapshots").createIndex({ capturedAt: -1 }),
+    db
+      .collection("gold_types")
+      .createIndex({ source: 1, sourceCode: 1 }, { unique: true }),
+    db.collection("gold_types").createIndex({ source: 1, zone: 1 }),
+    db.collection("gold_types").createIndex({ lastSeenAt: -1 }),
     db
       .collection("ride_bookings")
       .createIndex({ bookingCode: 1 }, { unique: true }),
@@ -190,6 +203,18 @@ export async function assetSettingsCol(): Promise<Collection<AssetSettings>> {
 
 export async function assetSnapshotsCol(): Promise<Collection<AssetSnapshot>> {
   return (await getDb()).collection<AssetSnapshot>("asset_snapshots");
+}
+
+export async function goldPriceSnapshotsCol(): Promise<
+  Collection<GoldPriceSnapshot>
+> {
+  return (await getDb()).collection<GoldPriceSnapshot>("gold_price_snapshots");
+}
+
+export async function goldTypesCol(): Promise<
+  Collection<GoldTypeCatalogEntry>
+> {
+  return (await getDb()).collection<GoldTypeCatalogEntry>("gold_types");
 }
 
 export async function rideVehiclesCol(): Promise<Collection<RideVehicle>> {

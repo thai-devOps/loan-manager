@@ -108,6 +108,25 @@ export const API_ROUTES: ApiRoute[] = [
     load: () => import("../_routes/assets/index.js"),
   },
   {
+    method: "GET",
+    pattern: /^\/api\/gold\/prices\/latest\/?$/,
+    load: () => import("../_routes/gold/prices-latest.js"),
+  },
+  {
+    method: "GET",
+    pattern: /^\/api\/gold\/prices\/?$/,
+    load: () => import("../_routes/gold/prices.js"),
+  },
+  {
+    method: "GET",
+    pattern: /^\/api\/gold\/types\/?$/,
+    load: () => import("../_routes/gold/types.js"),
+  },
+  {
+    pattern: /^\/api\/jobs\/gold-price-sync\/?$/,
+    load: () => import("../_routes/jobs/gold-price-sync.js"),
+  },
+  {
     pattern: /^\/api\/stats\/?$/,
     load: () => import("../_routes/stats/index.js"),
   },

@@ -38,6 +38,7 @@ import type {
   ManualAsset,
   ManualAssetType,
 } from "../../_lib/types.js";
+import { mapSourceCodeToGoldType } from "../../_lib/gold-price/map-purity.js";
 
 const ASSET_TYPES = new Set<ManualAssetType>([
   "cash",
@@ -252,6 +253,8 @@ function validateAssetBody(body: {
 
 function validatePurchaseBody(body: {
   type?: string;
+  sourceCode?: string | null;
+  sourceName?: string | null;
   quantityInPhan?: number;
   purchasePricePerChi?: number;
   totalCost?: number;
@@ -259,8 +262,23 @@ function validatePurchaseBody(body: {
   seller?: string;
   note?: string;
 }): Omit<GoldPurchase, "_id" | "id" | "createdAt" | "updatedAt"> {
-  const type = body.type as GoldType;
-  if (!GOLD_TYPES.has(type)) throw new Error("Loại vàng không hợp lệ");
+  const sourceCode =
+    typeof body.sourceCode === "string" && body.sourceCode.trim()
+      ? body.sourceCode.trim()
+      : null;
+  const sourceName =
+    typeof body.sourceName === "string" && body.sourceName.trim()
+      ? body.sourceName.trim()
+      : null;
+
+  let type: GoldType;
+  if (sourceCode) {
+    type = mapSourceCodeToGoldType(sourceCode);
+  } else {
+    type = body.type as GoldType;
+    if (!GOLD_TYPES.has(type)) throw new Error("Loại vàng không hợp lệ");
+  }
+
   const quantityInPhan = Number(body.quantityInPhan);
   if (
     !Number.isFinite(quantityInPhan) ||
@@ -289,6 +307,8 @@ function validatePurchaseBody(body: {
   if (!isValidDate(purchaseDate)) throw new Error("Ngày mua không hợp lệ");
   return {
     type,
+    sourceCode,
+    sourceName,
     quantityInPhan,
     purchasePricePerChi,
     totalCost,
@@ -320,6 +340,11 @@ function normalizeGoldPlan(
     plan.goldType === "9999" || plan.goldType === "18k" || plan.goldType === "other"
       ? plan.goldType
       : null;
+  const refCode =
+    typeof plan.referenceSourceCode === "string" &&
+    plan.referenceSourceCode.trim()
+      ? plan.referenceSourceCode.trim()
+      : null;
   return {
     id: plan.id,
     targetAmount: plan.targetAmount,
@@ -328,6 +353,7 @@ function normalizeGoldPlan(
         ? null
         : Math.max(0, Math.round(targetQty)),
     goldType,
+    referenceSourceCode: refCode,
     initialQuantityInPhan: Number.isInteger(plan.initialQuantityInPhan)
       ? Math.max(0, plan.initialQuantityInPhan)
       : 0,
@@ -348,6 +374,7 @@ function validatePlanBody(
     targetAmount?: number;
     targetQuantityInPhan?: number | null;
     goldType?: string | null;
+    referenceSourceCode?: string | null;
     initialQuantityInPhan?: number;
     includeInitialQuantity?: boolean;
     monthlyBudget?: number;
@@ -519,10 +546,22 @@ function validatePlanBody(
     throw new Error("Vui lòng chọn loại vàng (9999 / 18K)");
   }
 
+  let referenceSourceCode: string | null = null;
+  if (body.referenceSourceCode !== undefined) {
+    const raw =
+      typeof body.referenceSourceCode === "string"
+        ? body.referenceSourceCode.trim()
+        : "";
+    referenceSourceCode = raw || null;
+  } else if (existing?.referenceSourceCode) {
+    referenceSourceCode = existing.referenceSourceCode;
+  }
+
   return {
     targetAmount,
     targetQuantityInPhan,
     goldType,
+    referenceSourceCode,
     initialQuantityInPhan,
     includeInitialQuantity,
     monthlyBudget,

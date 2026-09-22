@@ -13,6 +13,52 @@ import type {
   GoldPurchase,
   ManualAsset,
 } from "@/types/assets";
+
+export type GoldMarketPrice = {
+  source: "PNJ";
+  sourceCode: string;
+  sourceName: string;
+  buyPricePerChi: number | null;
+  sellPricePerChi: number | null;
+  unit: "VND_PER_CHI";
+  branch: string;
+  zone: string;
+  capturedAt: string;
+  sourceUpdatedAt: string | null;
+  note?: string;
+};
+
+export type GoldPricesLatestResponse = {
+  source: "PNJ";
+  zone: string;
+  branch: string;
+  sourceUpdatedAt: string | null;
+  capturedAt: string;
+  note?: string;
+  stale?: boolean;
+  prices: GoldMarketPrice[];
+};
+
+export type GoldTypeCatalogItem = {
+  id: string;
+  source: "PNJ";
+  sourceCode: string;
+  sourceName: string;
+  zone: string;
+  branch: string;
+  lastBuyPricePerChi: number | null;
+  lastSellPricePerChi: number | null;
+  lastSourceUpdatedAt: string | null;
+  lastSeenAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GoldTypesResponse = {
+  source: "PNJ";
+  zone: string;
+  items: GoldTypeCatalogItem[];
+};
 import type { BorrowerFormValues } from "@/schemas/borrower.schema";
 import type { LoanFormValues } from "@/schemas/loan.schema";
 
@@ -290,5 +336,30 @@ export function updateAssetSettings(body: {
 export function fetchAssetSnapshots(months = 12) {
   return apiFetch<AssetSnapshot[]>(
     assetsUrl("snapshots", { months: String(months) }),
+  );
+}
+
+export function fetchGoldPricesLatest(zone?: string) {
+  const q = zone ? `?zone=${encodeURIComponent(zone)}` : "";
+  return apiFetch<GoldPricesLatestResponse>(`/api/gold/prices/latest${q}`);
+}
+
+export function fetchGoldTypes(zone?: string) {
+  const q = zone ? `?zone=${encodeURIComponent(zone)}` : "";
+  return apiFetch<GoldTypesResponse>(`/api/gold/types${q}`);
+}
+
+export function fetchGoldPrices(params?: {
+  source?: string;
+  zone?: string;
+  code?: string;
+}) {
+  const sp = new URLSearchParams();
+  if (params?.source) sp.set("source", params.source);
+  if (params?.zone) sp.set("zone", params.zone);
+  if (params?.code) sp.set("code", params.code);
+  const q = sp.toString();
+  return apiFetch<GoldPricesLatestResponse>(
+    `/api/gold/prices${q ? `?${q}` : ""}`,
   );
 }

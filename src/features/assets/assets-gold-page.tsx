@@ -35,6 +35,7 @@ import { MoneyInput } from "@/features/finance/components/money-input";
 import { GoldPurchaseFormDialog } from "@/features/assets/components/gold-purchase-form-dialog";
 import {
   useAssetSummaryQuery,
+  useGoldPricesLatestQuery,
   useGoldPurchasesQuery,
 } from "@/api/queries";
 import {
@@ -49,16 +50,22 @@ import {
   monthQuantityPhan,
   monthSpend,
 } from "@/features/assets/lib/calculations";
-import { createGoldPriceService } from "@/features/assets/lib/gold-price-service";
+import {
+  buildGoldPriceMapFromMarket,
+  estimatePurchaseMarketValue,
+  estimatePurchasesMarketValue,
+  formatBranchLabel,
+  resolvePurchaseBuyPrice,
+} from "@/features/assets/lib/resolve-reference-price";
 import {
   formatChiDecimal,
   formatGoldQuantity,
-  GOLD_TYPE_LABELS,
-  phanToChi,
 } from "@/features/assets/lib/gold-units";
+import { goldPurchaseLabel } from "@/features/assets/lib/gold-type-catalog";
 import { goldPricesSchema } from "@/schemas/assets.schema";
 import type { GoldPurchase } from "@/types/assets";
 import { EMPTY_ARRAY } from "@/lib/empty";
+import { cn } from "@/lib/utils";
 import { z } from "zod";
 
 function recentCalendarMonths(count: number): string[] {
@@ -80,6 +87,7 @@ function recentCalendarMonths(count: number): string[] {
 export function AssetsGoldPage() {
   const summaryQ = useAssetSummaryQuery();
   const purchasesQ = useGoldPurchasesQuery();
+  const marketQ = useGoldPricesLatestQuery(true);
   const deleteM = useDeleteGoldPurchaseMutation();
 
   const [purchaseOpen, setPurchaseOpen] = useState(false);
@@ -90,31 +98,61 @@ export function AssetsGoldPage() {
   const purchases = purchasesQ.data ?? EMPTY_ARRAY;
   const summary = summaryQ.data;
 
-  const holdings = useMemo(() => {
-    if (!summary) return [];
-    const priceService = createGoldPriceService(
+  const valuation = useMemo(() => {
+    if (!summary) {
+      return {
+        prices: { "9999": 0, "18k": 0, other: 0 },
+        anyFromMarket: false,
+        goldValue: 0,
+        goldDifference: 0,
+      };
+    }
+    const { prices, anyFromMarket } = buildGoldPriceMapFromMarket(
       summary.settings.goldReferencePricePerChi,
+      marketQ.data,
     );
-    return (
-      Object.keys(GOLD_TYPE_LABELS) as Array<keyof typeof GOLD_TYPE_LABELS>
-    )
-      .map((type) => {
-        const phan = summary.quantityByType[type] ?? 0;
-        if (phan <= 0) return null;
-        const cost = purchases
-          .filter((p) => p.type === type)
-          .reduce((s, p) => s + p.totalCost, 0);
-        const price = priceService.getCurrentGoldPrice(type);
-        const value = Math.round(phanToChi(phan) * price);
-        return { type, phan, cost, value };
-      })
-      .filter(Boolean) as {
-      type: keyof typeof GOLD_TYPE_LABELS;
-      phan: number;
-      cost: number;
-      value: number;
-    }[];
-  }, [summary, purchases]);
+    const fromPurchases = estimatePurchasesMarketValue(
+      purchases,
+      marketQ.data,
+      prices,
+    );
+    return {
+      prices,
+      anyFromMarket: anyFromMarket || Boolean(marketQ.data?.prices?.length),
+      goldValue: fromPurchases.goldValue,
+      goldDifference: fromPurchases.goldDifference,
+    };
+  }, [summary, marketQ.data, purchases]);
+
+  const holdings = useMemo(() => {
+    const map = new Map<
+      string,
+      { key: string; label: string; phan: number; cost: number; value: number }
+    >();
+    for (const p of purchases) {
+      const key = p.sourceCode?.trim() || `legacy:${p.type}`;
+      const label = goldPurchaseLabel(p);
+      const price = resolvePurchaseBuyPrice({
+        sourceCode: p.sourceCode,
+        type: p.type,
+        market: marketQ.data,
+        fallbackPrices: valuation.prices,
+      });
+      const value = estimatePurchaseMarketValue(p.quantityInPhan, price);
+      const cur = map.get(key) ?? {
+        key,
+        label,
+        phan: 0,
+        cost: 0,
+        value: 0,
+      };
+      cur.phan += p.quantityInPhan;
+      cur.cost += p.totalCost;
+      cur.value += value;
+      map.set(key, cur);
+    }
+    return [...map.values()].filter((h) => h.phan > 0);
+  }, [purchases, marketQ.data, valuation.prices]);
 
   if (summaryQ.isLoading || purchasesQ.isLoading) {
     return <StatCardsSkeleton />;
@@ -135,10 +173,28 @@ export function AssetsGoldPage() {
   }
 
   const goldShare = calculateAllocationPercentage(
-    summary.goldValue,
-    summary.totalAssets,
+    valuation.goldValue,
+    summary.totalAssets - summary.goldValue + valuation.goldValue,
   );
   const recentMonths = recentCalendarMonths(6);
+  const priceHint = valuation.anyFromMarket
+    ? marketQ.data?.stale
+      ? `PNJ · ${formatBranchLabel(marketQ.data.branch)} (snapshot cũ)`
+      : marketQ.data?.branch
+        ? `Theo giá mua PNJ · ${formatBranchLabel(marketQ.data.branch)}`
+        : "Theo giá mua PNJ"
+    : "Theo giá tham chiếu thủ công (fallback)";
+
+  function purchaseTempProfit(p: GoldPurchase) {
+    const price = resolvePurchaseBuyPrice({
+      sourceCode: p.sourceCode,
+      type: p.type,
+      market: marketQ.data,
+      fallbackPrices: valuation.prices,
+    });
+    const marketValue = estimatePurchaseMarketValue(p.quantityInPhan, price);
+    return marketValue - p.totalCost;
+  }
 
   return (
     <div className="space-y-6">
@@ -184,8 +240,8 @@ export function AssetsGoldPage() {
         />
         <StatCard
           title="Giá trị ước tính"
-          value={formatCurrency(summary.goldValue)}
-          hint="Theo giá tham chiếu bạn đã nhập"
+          value={formatCurrency(valuation.goldValue)}
+          hint={priceHint}
         />
         <StatCard
           title="Giá vốn"
@@ -194,8 +250,8 @@ export function AssetsGoldPage() {
         />
         <StatCard
           title="Lãi tạm tính"
-          value={`${summary.goldDifference >= 0 ? "+" : ""}${formatCurrency(summary.goldDifference)}`}
-          hint="Giá trị hiện tại − giá vốn"
+          value={`${valuation.goldDifference >= 0 ? "+" : ""}${formatCurrency(valuation.goldDifference)}`}
+          hint="Giá trị theo PNJ − giá vốn"
         />
       </div>
 
@@ -223,8 +279,8 @@ export function AssetsGoldPage() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {holdings.map((h) => (
-                <div key={h.type} className="rounded-xl border p-4">
-                  <p className="font-medium">{GOLD_TYPE_LABELS[h.type]}</p>
+                <div key={h.key} className="rounded-xl border p-4">
+                  <p className="font-medium">{h.label}</p>
                   <p className="mt-1 text-lg font-semibold">
                     {formatGoldQuantity(h.phan)}
                   </p>
@@ -233,6 +289,17 @@ export function AssetsGoldPage() {
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Giá trị ước tính: {formatCurrency(h.value)}
+                  </p>
+                  <p
+                    className={cn(
+                      "text-sm tabular-nums",
+                      h.value - h.cost >= 0
+                        ? "text-emerald-700 dark:text-emerald-400"
+                        : "text-rose-700 dark:text-rose-400",
+                    )}
+                  >
+                    Lãi tạm: {h.value - h.cost >= 0 ? "+" : ""}
+                    {formatCurrency(h.value - h.cost)}
                   </p>
                 </div>
               ))}
@@ -288,96 +355,129 @@ export function AssetsGoldPage() {
                       <TableHead>Khối lượng</TableHead>
                       <TableHead className="text-right">Giá mua</TableHead>
                       <TableHead className="text-right">Thành tiền</TableHead>
+                      <TableHead className="text-right">Lãi tạm</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {purchases.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              aria-label="Sửa"
-                              onClick={() => {
-                                setEditing(p);
-                                setPurchaseOpen(true);
-                              }}
-                            >
-                              <EditIcon />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              aria-label="Xóa"
-                              onClick={() => setDeleting(p)}
-                            >
-                              <DeleteIcon />
-                            </Button>
-                          </div>
-                        </TableCell>
-                        <TableCell>{formatDateOnly(p.purchaseDate)}</TableCell>
-                        <TableCell>{GOLD_TYPE_LABELS[p.type]}</TableCell>
-                        <TableCell>
-                          {formatGoldQuantity(p.quantityInPhan)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCurrency(p.purchasePricePerChi)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCurrency(p.totalCost)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {purchases.map((p) => {
+                      const temp = purchaseTempProfit(p);
+                      return (
+                        <TableRow key={p.id}>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label="Sửa"
+                                onClick={() => {
+                                  setEditing(p);
+                                  setPurchaseOpen(true);
+                                }}
+                              >
+                                <EditIcon />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label="Xóa"
+                                onClick={() => setDeleting(p)}
+                              >
+                                <DeleteIcon />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {formatDateOnly(p.purchaseDate)}
+                          </TableCell>
+                          <TableCell>{goldPurchaseLabel(p)}</TableCell>
+                          <TableCell>
+                            {formatGoldQuantity(p.quantityInPhan)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatCurrency(p.purchasePricePerChi)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatCurrency(p.totalCost)}
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              "text-right tabular-nums",
+                              temp >= 0
+                                ? "text-emerald-700 dark:text-emerald-400"
+                                : "text-rose-700 dark:text-rose-400",
+                            )}
+                          >
+                            {temp >= 0 ? "+" : ""}
+                            {formatCurrency(temp)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
 
               <div className="space-y-3 md:hidden">
-                {purchases.map((p) => (
-                  <div key={p.id} className="rounded-xl border p-4">
-                    <div className="flex justify-between gap-2">
-                      <div>
-                        <p className="font-medium">
-                          {GOLD_TYPE_LABELS[p.type]}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDateOnly(p.purchaseDate)}
-                        </p>
+                {purchases.map((p) => {
+                  const temp = purchaseTempProfit(p);
+                  return (
+                    <div key={p.id} className="rounded-xl border p-4">
+                      <div className="flex justify-between gap-2">
+                        <div>
+                          <p className="font-medium">
+                            {goldPurchaseLabel(p)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDateOnly(p.purchaseDate)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold tabular-nums">
+                            {formatCurrency(p.totalCost)}
+                          </p>
+                          <p
+                            className={cn(
+                              "text-xs tabular-nums",
+                              temp >= 0
+                                ? "text-emerald-700 dark:text-emerald-400"
+                                : "text-rose-700 dark:text-rose-400",
+                            )}
+                          >
+                            Lãi tạm {temp >= 0 ? "+" : ""}
+                            {formatCurrency(temp)}
+                          </p>
+                        </div>
                       </div>
-                      <p className="font-semibold tabular-nums">
-                        {formatCurrency(p.totalCost)}
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {formatGoldQuantity(p.quantityInPhan)} ·{" "}
+                        {formatCurrency(p.purchasePricePerChi)}/chỉ
                       </p>
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            setEditing(p);
+                            setPurchaseOpen(true);
+                          }}
+                        >
+                          <EditIcon size={14} />
+                          Sửa
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-destructive"
+                          onClick={() => setDeleting(p)}
+                        >
+                          <DeleteIcon size={14} />
+                          Xóa
+                        </Button>
+                      </div>
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {formatGoldQuantity(p.quantityInPhan)} ·{" "}
-                      {formatCurrency(p.purchasePricePerChi)}/chỉ
-                    </p>
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => {
-                          setEditing(p);
-                          setPurchaseOpen(true);
-                        }}
-                      >
-                        <EditIcon size={14} />
-                        Sửa
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-destructive"
-                        onClick={() => setDeleting(p)}
-                      >
-                        <DeleteIcon size={14} />
-                        Xóa
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -400,15 +500,23 @@ export function AssetsGoldPage() {
             />
             <AnalyticRow
               label="Giá trị hiện tại"
-              value={formatCurrency(summary.goldValue)}
+              value={formatCurrency(valuation.goldValue)}
             />
             <AnalyticRow
               label="Lãi / lỗ tạm tính"
-              value={`${summary.goldDifference >= 0 ? "+" : ""}${formatCurrency(summary.goldDifference)}`}
+              value={`${valuation.goldDifference >= 0 ? "+" : ""}${formatCurrency(valuation.goldDifference)}`}
             />
             <AnalyticRow
               label="Tỷ trọng vàng trong tổng tài sản"
               value={`${goldShare}%`}
+            />
+            <AnalyticRow
+              label="Nguồn giá"
+              value={
+                valuation.anyFromMarket
+                  ? `PNJ · ${formatBranchLabel(marketQ.data?.branch ?? "")}`
+                  : "Giá thủ công"
+              }
             />
           </div>
 

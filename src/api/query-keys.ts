@@ -34,6 +34,8 @@ export const queryKeys = {
     list: ["assets", "list"] as const,
     goldPurchases: ["assets", "gold-purchases"] as const,
     goldPlan: ["assets", "gold-plan"] as const,
+    goldPricesLatest: ["assets", "gold-prices", "latest"] as const,
+    goldTypes: ["assets", "gold-types"] as const,
     settings: ["assets", "settings"] as const,
     snapshots: (months: number) => ["assets", "snapshots", months] as const,
   },

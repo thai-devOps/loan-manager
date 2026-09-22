@@ -105,6 +105,9 @@ export interface GoldPurchase {
   _id?: string;
   id: string;
   type: GoldType;
+  /** PNJ product code from gold_types catalog */
+  sourceCode?: string | null;
+  sourceName?: string | null;
   /** Integer: 1 chỉ = 10 phân, 1 cây = 100 phân */
   quantityInPhan: number;
   purchasePricePerChi: number;
@@ -138,6 +141,8 @@ export interface GoldPlan {
   targetQuantityInPhan?: number | null;
   /** Loại vàng kế hoạch mua (9999 / 18k / other) */
   goldType?: GoldType | null;
+  /** PNJ product code for reference price (e.g. N24K). */
+  referenceSourceCode?: string | null;
   initialQuantityInPhan: number;
   includeInitialQuantity: boolean;
   monthlyBudget: number;

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchAssetSnapshots, syncSchedules } from "@/api/endpoints";
+import { fetchAssetSnapshots, fetchGoldPricesLatest, fetchGoldTypes, syncSchedules } from "@/api/endpoints";
 import { queryKeys } from "@/api/query-keys";
 import { assetRepository } from "@/db/repositories/assetRepository";
 import { borrowerRepository } from "@/db/repositories/borrowerRepository";
@@ -200,5 +200,27 @@ export function useAssetSnapshotsQuery(months = 12) {
     // Snapshots remain server-derived for now (not stored in Dexie)
     queryFn: () => fetchAssetSnapshots(months),
     enabled: dbReady,
+  });
+}
+
+export function useGoldPricesLatestQuery(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.assets.goldPricesLatest,
+    queryFn: () => fetchGoldPricesLatest(),
+    enabled,
+    staleTime: 5 * 60_000,
+    refetchInterval: 12 * 60_000,
+    retry: 1,
+  });
+}
+
+export function useGoldTypesQuery(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.assets.goldTypes,
+    queryFn: () => fetchGoldTypes(),
+    enabled,
+    staleTime: 10 * 60_000,
+    refetchInterval: 15 * 60_000,
+    retry: 1,
   });
 }
