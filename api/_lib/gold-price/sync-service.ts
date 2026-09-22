@@ -5,6 +5,7 @@ import {
   goldTypesCol,
 } from "../mongo.js";
 import {
+  isSameGoldSnapshotContent,
   pickBuyPriceByCodes,
   PREFERRED_18K_CODES,
   PREFERRED_9999_CODES,
@@ -23,6 +24,8 @@ import type {
 } from "./types.js";
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
+/** Keep recent history per source+zone; prune older docs after each new insert. */
+export const GOLD_SNAPSHOT_KEEP_COUNT = 48;
 
 export function getGoldPriceCacheTtlMs(): number {
   const raw = Number(process.env.GOLD_PRICE_CACHE_TTL_MS);
@@ -137,21 +140,10 @@ export async function upsertGoldTypesFromResult(
   return (res.upsertedCount ?? 0) + (res.modifiedCount ?? 0);
 }
 
-export async function saveGoldPriceSnapshot(
+async function afterFetchSideEffects(
   result: GoldPriceResult,
-): Promise<GoldPriceSnapshot> {
-  const doc: GoldPriceSnapshot = {
-    id: randomUUID(),
-    source: result.source,
-    zone: result.zone,
-    branch: result.branch,
-    sourceUpdatedAt: result.sourceUpdatedAt,
-    capturedAt: result.capturedAt,
-    note: result.note,
-    prices: toSnapshotPrices(result.prices),
-  };
-  const col = await goldPriceSnapshotsCol();
-  await col.insertOne(doc);
+  prices: GoldPriceSnapshot["prices"],
+): Promise<void> {
   try {
     await upsertGoldTypesFromResult(result);
   } catch (e) {
@@ -161,13 +153,91 @@ export async function saveGoldPriceSnapshot(
     });
   }
   try {
-    await mirrorPricesToAssetSettings(doc.prices);
+    await mirrorPricesToAssetSettings(prices);
   } catch (e) {
     console.error("[gold-price] mirror AssetSettings failed", {
       error: e instanceof Error ? e.message : String(e),
       at: new Date().toISOString(),
     });
   }
+}
+
+/** Delete older snapshots beyond keepCount for the same source+zone. */
+export async function pruneGoldPriceSnapshots(
+  source: GoldPriceSnapshot["source"],
+  zone: string,
+  keepCount: number = GOLD_SNAPSHOT_KEEP_COUNT,
+): Promise<number> {
+  if (keepCount < 1) return 0;
+  const col = await goldPriceSnapshotsCol();
+  const keep = await col
+    .find({ source, zone })
+    .sort({ capturedAt: -1 })
+    .limit(keepCount)
+    .project({ id: 1 })
+    .toArray();
+  const keepIds = keep.map((d) => d.id).filter(Boolean);
+  if (keepIds.length === 0) return 0;
+  const res = await col.deleteMany({
+    source,
+    zone,
+    id: { $nin: keepIds },
+  });
+  return res.deletedCount ?? 0;
+}
+
+/**
+ * Persist a snapshot only when content changed vs latest.
+ * Always refreshes gold_types + AssetSettings mirror.
+ */
+export async function saveGoldPriceSnapshot(
+  result: GoldPriceResult,
+  existing?: GoldPriceSnapshot | null,
+): Promise<GoldPriceSnapshot> {
+  const prices = toSnapshotPrices(result.prices);
+  const latest =
+    existing !== undefined
+      ? existing
+      : await findLatestSnapshot(result.source, result.zone);
+
+  if (
+    latest &&
+    isSameGoldSnapshotContent(
+      {
+        sourceUpdatedAt: latest.sourceUpdatedAt,
+        prices: latest.prices,
+      },
+      {
+        sourceUpdatedAt: result.sourceUpdatedAt,
+        prices,
+      },
+    )
+  ) {
+    await afterFetchSideEffects(result, prices);
+    return latest;
+  }
+
+  const doc: GoldPriceSnapshot = {
+    id: randomUUID(),
+    source: result.source,
+    zone: result.zone,
+    branch: result.branch,
+    sourceUpdatedAt: result.sourceUpdatedAt,
+    capturedAt: result.capturedAt,
+    note: result.note,
+    prices,
+  };
+  const col = await goldPriceSnapshotsCol();
+  await col.insertOne(doc);
+  try {
+    await pruneGoldPriceSnapshots(doc.source, doc.zone);
+  } catch (e) {
+    console.error("[gold-price] prune snapshots failed", {
+      error: e instanceof Error ? e.message : String(e),
+      at: new Date().toISOString(),
+    });
+  }
+  await afterFetchSideEffects(result, prices);
   return doc;
 }
 
@@ -202,7 +272,7 @@ export async function getGoldPrices(
   const provider = options.provider ?? createDefaultGoldPriceProvider();
   try {
     const fetched = await provider.getPrices({ zone });
-    const saved = await saveGoldPriceSnapshot(fetched);
+    const saved = await saveGoldPriceSnapshot(fetched, latest);
     return filterResult(snapshotToResult(saved), options.code);
   } catch (e) {
     console.error("[gold-price] PNJ fetch failed", {

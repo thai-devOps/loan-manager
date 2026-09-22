@@ -173,3 +173,32 @@ export function pickBuyPriceByCodes(
   }
   return null;
 }
+
+type SnapshotContent = {
+  sourceUpdatedAt: string | null;
+  prices: Array<{
+    sourceCode: string;
+    buyPricePerChi: number | null;
+    sellPricePerChi: number | null;
+  }>;
+};
+
+/** True when PNJ content is unchanged (skip inserting another snapshot). */
+export function isSameGoldSnapshotContent(
+  a: SnapshotContent,
+  b: SnapshotContent,
+): boolean {
+  if (a.sourceUpdatedAt !== b.sourceUpdatedAt) return false;
+  if (a.prices.length !== b.prices.length) return false;
+  const map = new Map(
+    a.prices.map((p) => [p.sourceCode.toUpperCase(), p] as const),
+  );
+  for (const p of b.prices) {
+    const hit = map.get(p.sourceCode.toUpperCase());
+    if (!hit) return false;
+    if (hit.buyPricePerChi !== p.buyPricePerChi) return false;
+    if (hit.sellPricePerChi !== p.sellPricePerChi) return false;
+  }
+  return true;
+}
+

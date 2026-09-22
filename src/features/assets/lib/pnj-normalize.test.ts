@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isSameGoldSnapshotContent,
   normalizePnjResponse,
   parsePnjRawPrice,
   parsePnjUpdateDate,
@@ -52,5 +53,67 @@ describe("normalizePnjResponse", () => {
     const raw9999 = result.prices.find((p) => p.sourceCode === "RAW_9999")!;
     expect(raw9999.buyPricePerChi).toBe(13_580_000);
     expect(raw9999.sellPricePerChi).toBeNull();
+  });
+});
+
+describe("isSameGoldSnapshotContent", () => {
+  const base = {
+    sourceUpdatedAt: "2026-09-22T06:17:45.000Z",
+    prices: [
+      {
+        sourceCode: "SJC",
+        buyPricePerChi: 14_250_000,
+        sellPricePerChi: 14_550_000,
+      },
+      {
+        sourceCode: "N24K",
+        buyPricePerChi: 14_200_000,
+        sellPricePerChi: 14_500_000,
+      },
+    ],
+  };
+
+  it("returns true for identical content (case-insensitive code)", () => {
+    expect(
+      isSameGoldSnapshotContent(base, {
+        sourceUpdatedAt: base.sourceUpdatedAt,
+        prices: [
+          {
+            sourceCode: "n24k",
+            buyPricePerChi: 14_200_000,
+            sellPricePerChi: 14_500_000,
+          },
+          {
+            sourceCode: "sjc",
+            buyPricePerChi: 14_250_000,
+            sellPricePerChi: 14_550_000,
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when one buy price changes", () => {
+    expect(
+      isSameGoldSnapshotContent(base, {
+        ...base,
+        prices: [
+          base.prices[0]!,
+          {
+            ...base.prices[1]!,
+            buyPricePerChi: 14_210_000,
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false when sourceUpdatedAt differs", () => {
+    expect(
+      isSameGoldSnapshotContent(base, {
+        ...base,
+        sourceUpdatedAt: "2026-09-22T07:00:00.000Z",
+      }),
+    ).toBe(false);
   });
 });
