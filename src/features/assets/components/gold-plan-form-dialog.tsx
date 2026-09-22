@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle } from "lucide-react";
@@ -99,6 +99,9 @@ function GoldPlanFormFields({
 }) {
   const upsert = useUpsertGoldPlanMutation();
   const [error, setError] = useState<string | null>(null);
+  /** When true, keep user's monthlyBudget until plan drivers change. */
+  const [budgetManual, setBudgetManual] = useState(Boolean(existing));
+  const skipBudgetDriverReset = useRef(Boolean(existing));
   const priceService = useMemo(() => createGoldPriceService(prices), [prices]);
   const marketQ = useGoldPricesLatestQuery(true);
   const normalized = existing ? normalizeGoldPlan(existing) : null;
@@ -211,6 +214,34 @@ function GoldPlanFormFields({
   ]);
 
   const marketOptions = marketQ.data?.prices ?? [];
+  const suggestedBudget = liveMetrics.requiredBudgetPerMonth;
+
+  // Re-enable auto budget when mục tiêu / thời gian / giá / vàng hiện có đổi.
+  useEffect(() => {
+    if (skipBudgetDriverReset.current) {
+      skipBudgetDriverReset.current = false;
+      return;
+    }
+    setBudgetManual(false);
+  }, [
+    targetPhan,
+    goldType,
+    referenceSourceCode,
+    startMonth,
+    endMonth,
+    initialPhan,
+    hasInitialGold,
+    includeInitial,
+    pricePerChi,
+  ]);
+
+  // Auto-fill ngân sách từ (còn cần × giá PNJ) ÷ số tháng đến hạn.
+  useEffect(() => {
+    if (budgetManual) return;
+    if (suggestedBudget == null || suggestedBudget <= 0) return;
+    if (monthlyBudget === suggestedBudget) return;
+    form.setValue("monthlyBudget", suggestedBudget, { shouldValidate: true });
+  }, [suggestedBudget, budgetManual, form, monthlyBudget]);
 
   const prefillPhan = useMemo(() => {
     if (!startMonth) return 0;
@@ -463,10 +494,40 @@ function GoldPlanFormFields({
               <Label>Ngân sách / tháng</Label>
               <MoneyInput
                 value={monthlyBudget}
-                onChange={(v) =>
-                  form.setValue("monthlyBudget", v, { shouldValidate: true })
-                }
+                onChange={(v) => {
+                  setBudgetManual(true);
+                  form.setValue("monthlyBudget", v, { shouldValidate: true });
+                }}
               />
+              {suggestedBudget != null && suggestedBudget > 0 ? (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                  <span>
+                    Gợi ý theo PNJ: {formatCurrency(suggestedBudget)}/tháng
+                    {liveMetrics.remainingMonthsToEnd != null
+                      ? ` · còn ${formatGoldQuantity(liveMetrics.remainingPhan)} / ${liveMetrics.remainingMonthsToEnd} tháng`
+                      : ""}
+                  </span>
+                  {budgetManual && monthlyBudget !== suggestedBudget && (
+                    <button
+                      type="button"
+                      className="font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-400"
+                      onClick={() => {
+                        setBudgetManual(false);
+                        form.setValue("monthlyBudget", suggestedBudget, {
+                          shouldValidate: true,
+                        });
+                      }}
+                    >
+                      Áp dụng gợi ý
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Nhập mục tiêu, thời gian hoàn thành và có giá PNJ để tự tính
+                  ngân sách.
+                </p>
+              )}
             </div>
             {existing && (
               <div className="space-y-1.5">
