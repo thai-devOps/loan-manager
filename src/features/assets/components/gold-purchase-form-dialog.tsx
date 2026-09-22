@@ -150,20 +150,14 @@ function GoldPurchaseFields({
   }, [catalog, editing, form, sourceCode]);
 
   useEffect(() => {
-    if (!editing) {
-      form.setValue("totalCost", expected);
-    }
-  }, [expected, editing, form]);
+    form.setValue("totalCost", expected);
+  }, [expected, form]);
 
   function onSelectType(code: string) {
     const hit = catalog.find((i) => i.sourceCode === code);
     form.setValue("sourceCode", code, { shouldValidate: true });
     form.setValue("sourceName", hit?.sourceName);
-    if (
-      !editing &&
-      hit?.lastBuyPricePerChi != null &&
-      hit.lastBuyPricePerChi > 0
-    ) {
+    if (hit?.lastBuyPricePerChi != null && hit.lastBuyPricePerChi > 0) {
       form.setValue("purchasePricePerChi", hit.lastBuyPricePerChi, {
         shouldValidate: true,
       });
