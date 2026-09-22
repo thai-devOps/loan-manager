@@ -15,9 +15,14 @@ import {
 import {
   anchorMonthKey,
   defaultTransactionDateForRange,
+  isSalaryCyclePreset,
   resolveDateRangePreset,
   type DateRangePreset,
 } from "@/features/finance/lib/date-range";
+import {
+  getSalaryPayday,
+  setSalaryPayday,
+} from "@/features/finance/lib/finance-prefs";
 import type { FinanceTransaction } from "@/types/finance";
 import { Can } from "@/features/auth/can";
 import { PERMISSIONS } from "@/config/permissions";
@@ -26,9 +31,13 @@ import { useEnsureModuleSynced } from "@/sync/use-ensure-module-synced";
 
 export function FinanceLayout() {
   useEnsureModuleSynced("finance");
-  const [preset, setPresetState] = useState<DateRangePreset>("this_month");
+  const [preset, setPresetState] =
+    useState<DateRangePreset>("this_salary_cycle");
+  const [salaryPayday, setSalaryPaydayState] = useState(getSalaryPayday);
   const [range, setRange] = useState(() =>
-    resolveDateRangePreset("this_month"),
+    resolveDateRangePreset("this_salary_cycle", {
+      salaryPayday: getSalaryPayday(),
+    }),
   );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [defaultType, setDefaultType] = useState<"income" | "expense">(
@@ -40,15 +49,30 @@ export function FinanceLayout() {
   const setPreset = (next: DateRangePreset) => {
     setPresetState(next);
     if (next !== "custom") {
-      setRange(resolveDateRangePreset(next));
+      setRange(resolveDateRangePreset(next, { salaryPayday }));
     } else {
-      setRange((prev) => resolveDateRangePreset("custom", prev));
+      setRange((prev) =>
+        resolveDateRangePreset("custom", { custom: prev, salaryPayday }),
+      );
     }
   };
 
   const setCustomRange = (from: string, to: string) => {
     setPresetState("custom");
-    setRange(resolveDateRangePreset("custom", { from, to }));
+    setRange(
+      resolveDateRangePreset("custom", {
+        custom: { from, to },
+        salaryPayday,
+      }),
+    );
+  };
+
+  const onSalaryPaydayChange = (day: number) => {
+    const next = setSalaryPayday(day);
+    setSalaryPaydayState(next);
+    if (isSalaryCyclePreset(preset)) {
+      setRange(resolveDateRangePreset(preset, { salaryPayday: next }));
+    }
   };
 
   const month = anchorMonthKey(range.to);
@@ -68,7 +92,7 @@ export function FinanceLayout() {
         setDialogOpen(true);
       },
     }),
-    [preset, range.from, range.to, month, hasPermission],
+    [preset, range.from, range.to, month, hasPermission, salaryPayday],
   );
 
   const outletContext = useMemo(
@@ -117,8 +141,10 @@ export function FinanceLayout() {
           preset={preset}
           from={range.from}
           to={range.to}
+          salaryPayday={salaryPayday}
           onPresetChange={setPreset}
           onCustomRangeChange={setCustomRange}
+          onSalaryPaydayChange={onSalaryPaydayChange}
         />
 
         <Outlet context={outletContext} />

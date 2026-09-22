@@ -1,4 +1,4 @@
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker, formatDateDisplay } from "@/components/ui/date-picker";
 import {
   Select,
   SelectContent,
@@ -8,27 +8,35 @@ import {
 } from "@/components/ui/select";
 import {
   DATE_RANGE_PRESET_OPTIONS,
+  isSalaryCyclePreset,
   type DateRangePreset,
 } from "@/features/finance/lib/date-range";
+import { SALARY_PAYDAY_OPTIONS } from "@/features/finance/lib/finance-prefs";
 import { cn } from "@/lib/utils";
 
 export function PeriodFilter({
   preset,
   from,
   to,
+  salaryPayday,
   onPresetChange,
   onCustomRangeChange,
+  onSalaryPaydayChange,
   className,
   id = "period-filter",
 }: {
   preset: DateRangePreset;
   from: string;
   to: string;
+  salaryPayday: number;
   onPresetChange: (preset: DateRangePreset) => void;
   onCustomRangeChange: (from: string, to: string) => void;
+  onSalaryPaydayChange: (day: number) => void;
   className?: string;
   id?: string;
 }) {
+  const showPayday = isSalaryCyclePreset(preset);
+
   return (
     <div
       className={cn(
@@ -36,7 +44,7 @@ export function PeriodFilter({
         className,
       )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Select
           value={preset}
           onValueChange={(v) => onPresetChange(v as DateRangePreset)}
@@ -44,7 +52,7 @@ export function PeriodFilter({
           <SelectTrigger
             id={id}
             aria-label="Khoảng thời gian"
-            className="w-full min-w-[10.5rem] sm:w-[11.5rem]"
+            className="w-full min-w-[10.5rem] sm:w-[12.5rem]"
           >
             <SelectValue />
           </SelectTrigger>
@@ -56,6 +64,28 @@ export function PeriodFilter({
             ))}
           </SelectContent>
         </Select>
+
+        {showPayday && (
+          <Select
+            value={String(salaryPayday)}
+            onValueChange={(v) => onSalaryPaydayChange(Number(v))}
+          >
+            <SelectTrigger
+              id={`${id}-payday`}
+              aria-label="Ngày nhận lương"
+              className="w-full min-w-[8.5rem] sm:w-[9.5rem]"
+            >
+              <SelectValue placeholder="Ngày lương" />
+            </SelectTrigger>
+            <SelectContent>
+              {SALARY_PAYDAY_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {preset === "custom" && (
@@ -80,6 +110,13 @@ export function PeriodFilter({
             className="w-[9.5rem]"
           />
         </div>
+      )}
+
+      {showPayday && (
+        <p className="text-xs text-muted-foreground sm:basis-full sm:text-right">
+          Từ ngày lương đến trước kỳ lương tiếp theo:{" "}
+          {formatDateDisplay(from)} – {formatDateDisplay(to)}
+        </p>
       )}
     </div>
   );

@@ -1,190 +1,347 @@
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, LogOut, UserRound } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  LayoutGrid,
+  LogOut,
+  Search,
+  Target,
+  UserRound,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/common/theme-toggle";
-import { AppLogo } from "@/components/common/app-logo";
-import { APP_FEATURES, canAccessFeature, type AppFeatureId } from "@/components/layout/nav-items";
+import {
+  APP_FEATURES,
+  canAccessFeature,
+  type AppFeature,
+} from "@/components/layout/nav-items";
 import { Button } from "@/components/ui/button";
-import { useAuthStore } from "@/stores/auth.store";
-import { APP_NAME } from "@/lib/brand";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  featureDisplayDescription,
+  featureDisplayTitle,
+  filterFeaturesByQuery,
+  HUB_ACCENT,
+  initialsFromName,
+} from "@/features/apps/hub-meta";
+import { useHubBadges } from "@/features/apps/use-hub-badges";
+import { APP_BRAND_LOGO_SRC, APP_NAME } from "@/lib/brand";
 import { prefetchFeatureRoute } from "@/lib/prefetch-feature";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth.store";
 
-const FEATURE_ACCENT: Record<
-  AppFeatureId,
-  { glow: string; icon: string; ring: string }
-> = {
-  loans: {
-    glow: "from-teal-500/20 via-teal-600/5 to-transparent",
-    icon: "bg-teal-700 text-teal-50 group-hover:bg-teal-600",
-    ring: "group-hover:border-teal-600/40 group-hover:shadow-teal-900/10 dark:group-hover:shadow-teal-400/10",
-  },
-  finance: {
-    glow: "from-emerald-500/20 via-emerald-600/5 to-transparent",
-    icon: "bg-emerald-800 text-emerald-50 group-hover:bg-emerald-700",
-    ring: "group-hover:border-emerald-600/40 group-hover:shadow-emerald-900/10 dark:group-hover:shadow-emerald-400/10",
-  },
-  assets: {
-    glow: "from-amber-500/25 via-amber-600/5 to-transparent",
-    icon: "bg-amber-800 text-amber-50 group-hover:bg-amber-700",
-    ring: "group-hover:border-amber-600/40 group-hover:shadow-amber-900/10 dark:group-hover:shadow-amber-400/10",
-  },
-  analytics: {
-    glow: "from-slate-500/20 via-slate-600/5 to-transparent",
-    icon: "bg-slate-800 text-slate-50 group-hover:bg-slate-700 dark:bg-slate-700",
-    ring: "group-hover:border-slate-500/40 group-hover:shadow-slate-900/10 dark:group-hover:shadow-slate-400/10",
-  },
-  rideSite: {
-    glow: "from-sky-500/20 via-sky-600/5 to-transparent",
-    icon: "bg-sky-800 text-sky-50 group-hover:bg-sky-700",
-    ring: "group-hover:border-sky-600/40 group-hover:shadow-sky-900/10 dark:group-hover:shadow-sky-400/10",
-  },
-  rideOps: {
-    glow: "from-cyan-500/20 via-cyan-600/5 to-transparent",
-    icon: "bg-cyan-800 text-cyan-50 group-hover:bg-cyan-700",
-    ring: "group-hover:border-cyan-600/40 group-hover:shadow-cyan-900/10 dark:group-hover:shadow-cyan-400/10",
-  },
-  accessAdmin: {
-    glow: "from-rose-500/20 via-rose-600/5 to-transparent",
-    icon: "bg-rose-800 text-rose-50 group-hover:bg-rose-700",
-    ring: "group-hover:border-rose-600/40 group-hover:shadow-rose-900/10 dark:group-hover:shadow-rose-400/10",
-  },
-};
+function AppFeatureCard({
+  feature,
+  badge,
+  className,
+}: {
+  feature: AppFeature;
+  badge: string;
+  className?: string;
+}) {
+  const Icon = feature.icon;
+  const accent = HUB_ACCENT[feature.id];
+  const title = featureDisplayTitle(feature.id, feature.title);
+  const description = featureDisplayDescription(
+    feature.id,
+    feature.description,
+  );
+
+  return (
+    <Link
+      to={feature.href}
+      onPointerDown={() => prefetchFeatureRoute(feature.href)}
+      className={cn(
+        "group relative flex min-w-0 items-center gap-4 overflow-hidden rounded-2xl border border-border/80 bg-card/90 p-4 shadow-sm backdrop-blur-sm",
+        "transition-all duration-200 ease-out",
+        "hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:bg-muted/40",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/35",
+        accent.ring,
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "flex size-12 shrink-0 items-center justify-center rounded-2xl transition-transform duration-200 group-hover:scale-105",
+          accent.icon,
+        )}
+      >
+        <Icon className="size-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
+          {title}
+        </h2>
+        <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-muted-foreground">
+          {description}
+        </p>
+        <span
+          className={cn(
+            "mt-2.5 inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium",
+            accent.badge,
+          )}
+        >
+          {badge}
+        </span>
+      </div>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground" />
+    </Link>
+  );
+}
 
 export function AppsHubPage() {
   const navigate = useNavigate();
   const logout = useAuthStore((s) => s.logout);
   const username = useAuthStore((s) => s.session?.username);
+  const user = useAuthStore((s) => s.user);
+  const roles = useAuthStore((s) => s.roles);
   const hasModuleAccess = useAuthStore((s) => s.hasModuleAccess);
   const hasAnyPermission = useAuthStore((s) => s.hasAnyPermission);
 
-  const visibleFeatures = APP_FEATURES.filter((feature) =>
-    canAccessFeature(feature, { hasModuleAccess, hasAnyPermission }),
+  const [query, setQuery] = useState("");
+
+  const displayName =
+    user?.name?.trim() || username || "bạn";
+
+  const roleLabel = (() => {
+    if (roles[0]) return roles[0].replaceAll("_", " ");
+    if (hasAnyPermission(["user.view", "role.view"])) return "Admin";
+    return "Thành viên";
+  })();
+
+  const visibleFeatures = useMemo(
+    () =>
+      APP_FEATURES.filter((feature) =>
+        canAccessFeature(feature, { hasModuleAccess, hasAnyPermission }),
+      ),
+    [hasModuleAccess, hasAnyPermission],
   );
+
+  const filtered = useMemo(
+    () => filterFeaturesByQuery(visibleFeatures, query),
+    [visibleFeatures, query],
+  );
+
+  const gridFeatures = filtered.filter((f) => f.id !== "accessAdmin");
+  const adminFeature = filtered.find((f) => f.id === "accessAdmin");
+  const showGoals =
+    !query.trim() &&
+    (hasModuleAccess("gold") || hasModuleAccess("asset"));
+
+  const badges = useHubBadges({
+    loans: visibleFeatures.some((f) => f.id === "loans"),
+    finance: visibleFeatures.some((f) => f.id === "finance"),
+    assets: visibleFeatures.some((f) => f.id === "assets"),
+  });
+
   function handleLogout() {
     logout();
     void navigate("/login", { replace: true });
   }
 
   return (
-    <div className="apps-hub relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-background pb-32 md:pb-0">
+    <div className="apps-hub relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[#f5f8fc] pb-28 dark:bg-background md:pb-0">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 overflow-hidden"
       >
-        <div
-          className="absolute inset-0 opacity-[0.45] dark:opacity-[0.2]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 1px 1px, rgb(15 118 110 / 0.16) 1px, transparent 0)",
-            backgroundSize: "22px 22px",
-          }}
-        />
-        {/* Soft atmospheric orbs — keep fully behind content, no clipped “panels” */}
-        <div className="absolute -top-24 right-[-10%] hidden h-72 w-72 rounded-full bg-teal-300/25 blur-3xl md:block dark:bg-teal-500/10" />
-        <div className="absolute bottom-[-15%] left-[-8%] hidden h-80 w-80 rounded-full bg-emerald-200/30 blur-3xl md:block dark:bg-emerald-500/10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-sky-100/80 via-transparent to-transparent dark:from-sky-950/40" />
+        <div className="absolute -top-20 right-[-8%] hidden h-72 w-72 rounded-full bg-sky-200/40 blur-3xl md:block dark:bg-sky-500/10" />
+        <div className="absolute bottom-[-10%] left-[-6%] hidden h-80 w-80 rounded-full bg-emerald-100/50 blur-3xl md:block dark:bg-emerald-500/10" />
       </div>
 
-      <header className="relative z-10 flex w-full min-w-0 items-center justify-between gap-3 px-5 py-5 sm:px-8">
-        <div className="flex min-w-0 items-center gap-3">
-          <AppLogo size="lg" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold leading-none text-foreground">
-              {APP_NAME}
-            </p>
-            {username && (
-              <p className="mt-1.5 truncate text-xs text-muted-foreground">
-                Xin chào, {username}
-              </p>
-            )}
-          </div>
+      <header className="relative z-10 flex w-full min-w-0 flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-8 sm:py-5">
+        <div className="relative w-full min-w-0 sm:max-w-md lg:max-w-lg">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Tìm kiếm ứng dụng... (VD: vay, chi tiêu, vàng)"
+            aria-label="Tìm kiếm ứng dụng"
+            className="h-10 rounded-xl border-border/70 bg-card/90 pl-9 shadow-sm backdrop-blur-sm"
+          />
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <ThemeToggle />
-          <Button variant="outline" size="icon" asChild>
-            <Link
-              to="/profile"
-              aria-label="Tài khoản"
-              title={username ? `Tài khoản · ${username}` : "Tài khoản"}
-            >
-              <UserRound className="size-4" />
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleLogout}>
-            <LogOut className="size-4" />
-            <span className="hidden sm:inline">Đăng xuất</span>
-          </Button>
+
+        <div className="flex shrink-0 items-center justify-end gap-2">
+          <ThemeToggle className="rounded-xl" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-10 gap-2 rounded-xl border-border/70 bg-card/90 px-2.5 shadow-sm backdrop-blur-sm"
+              >
+                <span className="relative flex size-7 shrink-0 overflow-hidden rounded-full bg-sky-600 text-[11px] font-semibold text-white">
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex size-full items-center justify-center">
+                      {initialsFromName(displayName)}
+                    </span>
+                  )}
+                </span>
+                <span className="hidden min-w-0 text-left sm:block">
+                  <span className="block max-w-32 truncate text-sm font-medium leading-tight">
+                    {displayName}
+                  </span>
+                  <span className="block text-[11px] leading-tight text-muted-foreground capitalize">
+                    {roleLabel}
+                  </span>
+                </span>
+                <ChevronDown className="hidden size-3.5 text-muted-foreground sm:block" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-48">
+              <DropdownMenuLabel className="font-normal">
+                <p className="text-sm font-medium">{displayName}</p>
+                <p className="text-xs text-muted-foreground">{APP_NAME}</p>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/profile">
+                  <UserRound className="size-4" />
+                  Tài khoản
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="size-4" />
+                Đăng xuất
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
-      <main className="relative z-10 flex w-full min-w-0 flex-1 flex-col items-center px-5 py-8 sm:px-8 sm:py-12">
-        <div className="mb-8 w-full max-w-xl text-center sm:mb-10">
-          <p className="mb-3 text-xs font-medium tracking-[0.22em] text-teal-800/70 uppercase dark:text-teal-300/70">
-            Workspace
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight text-balance text-foreground sm:text-4xl md:text-[2.75rem] md:leading-tight">
-            Chọn tính năng muốn truy cập
-          </h1>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Mỗi tính năng có menu riêng. Quay lại đây bất cứ lúc nào để đổi
-            không gian làm việc.
-          </p>
-        </div>
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl min-w-0 flex-1 flex-col gap-8 px-4 pb-10 sm:px-8 sm:pb-14">
+        <section className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 relative overflow-hidden rounded-3xl border border-white/60 bg-gradient-to-br from-white/90 via-sky-50/80 to-sky-100/60 p-6 shadow-sm motion-safe:duration-500 dark:border-border dark:from-card dark:via-card dark:to-sky-950/30 sm:p-8">
+          <div className="grid items-center gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="min-w-0">
+              <p className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl md:text-4xl">
+                Xin chào, {displayName}
+              </p>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+                Quản lý tài chính cá nhân, tài sản và các khoản vay của bạn một
+                cách dễ dàng và hiệu quả.
+              </p>
+            </div>
+            <div className="relative mx-auto flex w-full max-w-sm items-center justify-center lg:mx-0 lg:justify-end">
+              <div
+                aria-hidden
+                className="absolute inset-6 rounded-full bg-sky-200/50 blur-2xl dark:bg-sky-500/20"
+              />
+              <img
+                src={APP_BRAND_LOGO_SRC}
+                alt=""
+                className="relative z-1 size-36 object-contain drop-shadow-md sm:size-44"
+              />
+              <p className="absolute right-0 bottom-2 z-1 hidden max-w-44 -rotate-6 text-right font-serif text-sm leading-snug text-sky-900/70 italic sm:block dark:text-sky-200/70">
+                Tài chính vững vàng — Tương lai an tâm
+              </p>
+            </div>
+          </div>
+        </section>
 
-        <div
-          className={cn(
-            "grid w-full gap-4",
-            "max-w-5xl",
-            "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+        <section className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:fill-mode-both motion-safe:duration-500 motion-safe:delay-100">
+          <div className="mb-4 flex items-start gap-3">
+            <div className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
+              <LayoutGrid className="size-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                Ứng dụng của bạn
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Chọn ứng dụng để bắt đầu quản lý và theo dõi.
+              </p>
+            </div>
+          </div>
+
+          {gridFeatures.length === 0 && !adminFeature ? (
+            <p className="rounded-2xl border border-dashed border-border bg-card/60 px-4 py-10 text-center text-sm text-muted-foreground">
+              Không tìm thấy ứng dụng phù hợp với “{query.trim()}”.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4">
+              {gridFeatures.map((feature, i) => (
+                <div
+                  key={feature.id}
+                  className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:fill-mode-both motion-safe:duration-500"
+                  style={{ animationDelay: `${Math.min(i, 5) * 40}ms` }}
+                >
+                  <AppFeatureCard
+                    feature={feature}
+                    badge={badges[feature.id]}
+                  />
+                </div>
+              ))}
+            </div>
           )}
-        >
-          {visibleFeatures.map((feature) => {
-            const Icon = feature.icon;
-            const accent = FEATURE_ACCENT[feature.id];
-            return (
+        </section>
+
+        {(adminFeature || showGoals) && (
+          <section
+            className={cn(
+              "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:fill-mode-both motion-safe:duration-500 motion-safe:delay-150 grid gap-3",
+              adminFeature && showGoals
+                ? "lg:grid-cols-[1.6fr_1fr]"
+                : "grid-cols-1",
+            )}
+          >
+            {adminFeature && (
+              <AppFeatureCard
+                feature={adminFeature}
+                badge={badges.accessAdmin}
+                className="min-h-22 sm:p-5"
+              />
+            )}
+            {showGoals && (
               <Link
-                key={feature.id}
-                to={feature.href}
-                onPointerDown={() => prefetchFeatureRoute(feature.href)}
+                to="/assets/gold-plan"
+                onPointerDown={() => prefetchFeatureRoute("/assets/gold-plan")}
                 className={cn(
-                  "group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 text-left shadow-sm",
-                  "transition-colors duration-150",
-                  "active:bg-muted/60",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600/40",
-                  "md:transition-shadow md:duration-300 md:ease-out md:hover:shadow-lg",
-                  accent.ring,
+                  "group relative flex min-w-0 items-center gap-4 overflow-hidden rounded-2xl border border-border/80 bg-card/90 p-4 shadow-sm backdrop-blur-sm sm:p-5",
+                  "transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md",
+                  "hover:border-teal-300/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/35",
+                  "dark:hover:border-teal-700/50",
                 )}
               >
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-teal-700 transition-transform duration-200 group-hover:scale-105 dark:bg-teal-900/50 dark:text-teal-300">
+                  <Target className="size-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base font-semibold tracking-tight text-foreground">
+                    Mục tiêu tài chính
+                  </h2>
+                  <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
+                    Cùng bạn xây dựng kế hoạch, hiện thực hóa ước mơ!
+                  </p>
+                </div>
                 <div
                   aria-hidden
-                  className={cn(
-                    "pointer-events-none absolute inset-0 hidden bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-100 md:block",
-                    accent.glow,
-                  )}
-                />
-                <div className="relative min-w-0">
-                  <div
-                    className={cn(
-                      "flex size-12 items-center justify-center rounded-2xl shadow-sm transition-colors duration-300",
-                      accent.icon,
-                    )}
-                  >
-                    <Icon className="size-5" />
-                  </div>
-                  <h2 className="mt-5 text-lg font-semibold tracking-tight text-foreground">
-                    {feature.title}
-                  </h2>
-                  <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
-                    {feature.description}
-                  </p>
-                  <span className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-teal-700 dark:text-teal-300">
-                    Vào tính năng
-                    <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
-                  </span>
+                  className="hidden h-10 w-16 items-end gap-0.5 opacity-60 sm:flex"
+                >
+                  <span className="h-3 w-2 rounded-sm bg-teal-300/80 dark:bg-teal-600/60" />
+                  <span className="h-5 w-2 rounded-sm bg-teal-400/80 dark:bg-teal-500/60" />
+                  <span className="h-7 w-2 rounded-sm bg-teal-500/80 dark:bg-teal-400/60" />
+                  <span className="h-4 w-2 rounded-sm bg-teal-300/80 dark:bg-teal-600/60" />
+                  <span className="h-9 w-2 rounded-sm bg-teal-600/80 dark:bg-teal-300/60" />
                 </div>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5" />
               </Link>
-            );
-          })}
-        </div>
+            )}
+          </section>
+        )}
       </main>
     </div>
   );
