@@ -160,6 +160,11 @@ const AssetsGoldPlanPage = lazy(() =>
     default: m.AssetsGoldPlanPage,
   })),
 );
+const AssetsGoldPricesPage = lazy(() =>
+  import("@/features/assets/assets-gold-prices-page").then((m) => ({
+    default: m.AssetsGoldPricesPage,
+  })),
+);
 const AccessControlLayout = lazy(() =>
   import("@/features/access-control/components/access-control-layout").then(
     (m) => ({ default: m.AccessControlLayout }),
@@ -896,6 +901,14 @@ export const router = createBrowserRouter([
                         element: (
                           <ModuleRoute module="gold">
                             <AssetsGoldPage />
+                          </ModuleRoute>
+                        ),
+                      },
+                      {
+                        path: "gold-prices",
+                        element: (
+                          <ModuleRoute module="gold">
+                            <AssetsGoldPricesPage />
                           </ModuleRoute>
                         ),
                       },

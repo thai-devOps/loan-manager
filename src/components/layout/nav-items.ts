@@ -17,6 +17,7 @@ import {
   Coins,
   List,
   CalendarCheck,
+  LineChart,
   Shield,
   type LucideIcon,
 } from "lucide-react";
@@ -116,6 +117,12 @@ export const APP_FEATURES: AppFeature[] = [
         title: "Giao dịch vàng",
         href: "/assets/gold",
         icon: Coins,
+        accessModule: "gold",
+      },
+      {
+        title: "Bảng giá PNJ",
+        href: "/assets/gold-prices",
+        icon: LineChart,
         accessModule: "gold",
       },
       {
