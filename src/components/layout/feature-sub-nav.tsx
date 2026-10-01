@@ -27,7 +27,7 @@ export function FeatureSubNav({ items, className }: FeatureSubNavProps) {
         className,
       )}
     >
-      <div className="flex gap-1 overflow-x-auto px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-4 py-2 sm:px-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {visible.map((item) => {
           const Icon = item.icon;
           return (

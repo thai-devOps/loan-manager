@@ -5,34 +5,92 @@ import { phanToChi } from "@/features/assets/lib/gold-units";
 
 export type GoldPriceMap = AssetSettings["goldReferencePricePerChi"];
 
+export type ResolvedReferencePrice = {
+  pricePerChi: number;
+  marketPrice: GoldMarketPrice | null;
+  fromMarket: boolean;
+  /** Which PNJ side was used when fromMarket */
+  side: "buy" | "sell" | null;
+};
+
+function findMarketRow(
+  market: GoldPricesLatestResponse | null | undefined,
+  goldType: GoldType | null | undefined,
+  referenceSourceCode?: string | null,
+): GoldMarketPrice | undefined {
+  const code =
+    referenceSourceCode?.trim() ||
+    defaultReferenceSourceCode(goldType ?? null);
+  if (!code) return undefined;
+  return market?.prices.find(
+    (p) => p.sourceCode.toUpperCase() === code.toUpperCase(),
+  );
+}
+
+/** Shop buy-in price — use for holding valuation / lãi tạm. */
 export function resolveReferenceBuyPrice(params: {
   goldType: GoldType | null | undefined;
   referenceSourceCode?: string | null;
   market: GoldPricesLatestResponse | null | undefined;
   fallbackPricePerChi: number;
-}): {
-  pricePerChi: number;
-  marketPrice: GoldMarketPrice | null;
-  fromMarket: boolean;
-} {
-  const code =
-    params.referenceSourceCode?.trim() ||
-    defaultReferenceSourceCode(params.goldType ?? null);
-  const prices = params.market?.prices ?? [];
-  const hit = code
-    ? prices.find((p) => p.sourceCode.toUpperCase() === code.toUpperCase())
-    : undefined;
+}): ResolvedReferencePrice {
+  const hit = findMarketRow(
+    params.market,
+    params.goldType,
+    params.referenceSourceCode,
+  );
   if (hit?.buyPricePerChi != null && hit.buyPricePerChi > 0) {
     return {
       pricePerChi: hit.buyPricePerChi,
       marketPrice: hit,
       fromMarket: true,
+      side: "buy",
     };
   }
   return {
     pricePerChi: params.fallbackPricePerChi > 0 ? params.fallbackPricePerChi : 0,
     marketPrice: hit ?? null,
     fromMarket: false,
+    side: null,
+  };
+}
+
+/**
+ * Shop sell-out price — what the user pays when buying gold.
+ * Prefer sell; if missing, fall back to buy then settings.
+ */
+export function resolveReferenceSellPrice(params: {
+  goldType: GoldType | null | undefined;
+  referenceSourceCode?: string | null;
+  market: GoldPricesLatestResponse | null | undefined;
+  fallbackPricePerChi: number;
+}): ResolvedReferencePrice {
+  const hit = findMarketRow(
+    params.market,
+    params.goldType,
+    params.referenceSourceCode,
+  );
+  if (hit?.sellPricePerChi != null && hit.sellPricePerChi > 0) {
+    return {
+      pricePerChi: hit.sellPricePerChi,
+      marketPrice: hit,
+      fromMarket: true,
+      side: "sell",
+    };
+  }
+  if (hit?.buyPricePerChi != null && hit.buyPricePerChi > 0) {
+    return {
+      pricePerChi: hit.buyPricePerChi,
+      marketPrice: hit,
+      fromMarket: true,
+      side: "buy",
+    };
+  }
+  return {
+    pricePerChi: params.fallbackPricePerChi > 0 ? params.fallbackPricePerChi : 0,
+    marketPrice: hit ?? null,
+    fromMarket: false,
+    side: null,
   };
 }
 

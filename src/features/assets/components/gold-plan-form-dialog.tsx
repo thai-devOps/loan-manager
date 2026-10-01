@@ -37,7 +37,7 @@ import {
   computeGoldPlanMetrics,
   draftPlanFromForm,
 } from "@/features/assets/lib/gold-plan-metrics";
-import { resolveReferenceBuyPrice } from "@/features/assets/lib/resolve-reference-price";
+import { resolveReferenceSellPrice } from "@/features/assets/lib/resolve-reference-price";
 
 const selectClass =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm";
@@ -169,7 +169,7 @@ function GoldPlanFormFields({
     : 0;
 
   const fallbackPrice = priceService.getCurrentGoldPrice(goldType);
-  const resolved = resolveReferenceBuyPrice({
+  const resolved = resolveReferenceSellPrice({
     goldType,
     referenceSourceCode,
     market: marketQ.data,
@@ -364,16 +364,22 @@ function GoldPlanFormFields({
                 {marketOptions.map((p) => (
                   <option key={p.sourceCode} value={p.sourceCode}>
                     {p.sourceCode} · {p.sourceName}
-                    {p.buyPricePerChi != null
-                      ? ` · ${formatCurrency(p.buyPricePerChi)}/chỉ`
-                      : ""}
+                    {p.sellPricePerChi != null
+                      ? ` · bán ${formatCurrency(p.sellPricePerChi)}/chỉ`
+                      : p.buyPricePerChi != null
+                        ? ` · mua ${formatCurrency(p.buyPricePerChi)}/chỉ`
+                        : ""}
                   </option>
                 ))}
               </select>
               <p className="text-xs text-muted-foreground">
-                Giá mua vào đang dùng:{" "}
+                Giá bán ra (bạn trả khi mua):{" "}
                 {pricePerChi > 0 ? formatCurrency(pricePerChi) : "—"}/chỉ
-                {resolved.fromMarket ? " (PNJ)" : " (thủ công)"}
+                {resolved.fromMarket
+                  ? resolved.side === "sell"
+                    ? " (PNJ bán ra)"
+                    : " (PNJ mua vào — thiếu giá bán)"
+                  : " (thủ công)"}
               </p>
             </div>
           )}

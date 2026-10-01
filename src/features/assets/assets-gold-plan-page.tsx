@@ -21,7 +21,7 @@ import {
   formatGoldQuantity,
 } from "@/features/assets/lib/gold-units";
 import { createGoldPriceService } from "@/features/assets/lib/gold-price-service";
-import { resolveReferenceBuyPrice, buildGoldPriceMapFromMarket, estimatePurchasesMarketValue, formatBranchLabel } from "@/features/assets/lib/resolve-reference-price";
+import { resolveReferenceSellPrice, buildGoldPriceMapFromMarket, estimatePurchasesMarketValue, formatBranchLabel } from "@/features/assets/lib/resolve-reference-price";
 import { EMPTY_ARRAY } from "@/lib/empty";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +47,7 @@ export function AssetsGoldPlanPage() {
     const fallback = goldType
       ? priceService.getCurrentGoldPrice(goldType)
       : 0;
-    const { pricePerChi } = resolveReferenceBuyPrice({
+    const { pricePerChi } = resolveReferenceSellPrice({
       goldType,
       referenceSourceCode: plan.referenceSourceCode,
       market: pricesQ.data,
@@ -175,12 +175,11 @@ export function AssetsGoldPlanPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Định giá vàng</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Tách biệt với tiến độ kế hoạch — tiến độ dựa trên số lượng, định
-              giá theo giá mua PNJ
+              Tiến độ theo số lượng. Định giá / lãi tạm theo giá mua vào PNJ
               {valuation.anyFromMarket && pricesQ.data?.branch
                 ? ` · ${formatBranchLabel(pricesQ.data.branch)}`
-                : " (hoặc giá thủ công nếu chưa có PNJ)"}
-              .
+                : " (hoặc giá thủ công)"}
+              . Ngân sách kế hoạch dùng giá bán ra.
             </p>
           </CardHeader>
           <CardContent>

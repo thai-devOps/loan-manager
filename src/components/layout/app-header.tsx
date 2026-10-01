@@ -24,58 +24,60 @@ export function AppHeader({ title, description, actions }: AppHeaderProps) {
   const username = useAuthStore((s) => s.session?.username);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      {onProfile ? (
-        <Button variant="ghost" size="sm" className="shrink-0 gap-1.5 px-2" asChild>
-          <Link to="/apps" aria-label="Quay lại menu chính">
-            <LayoutGrid className="size-4" />
-            <span className="hidden sm:inline">Ứng dụng</span>
-          </Link>
-        </Button>
-      ) : (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="hidden md:inline-flex"
-          onClick={toggleSidebar}
-          aria-label="Thu gọn sidebar"
-        >
-          {sidebarCollapsed ? (
-            <PanelLeft className="size-5" />
-          ) : (
-            <PanelLeftClose className="size-5" />
+    <header className="sticky top-0 z-30 shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="mx-auto flex h-14 w-full max-w-6xl min-w-0 items-center gap-3 px-4 sm:px-8">
+        {onProfile ? (
+          <Button variant="ghost" size="sm" className="shrink-0 gap-1.5 px-2" asChild>
+            <Link to="/apps" aria-label="Quay lại menu chính">
+              <LayoutGrid className="size-4" />
+              <span className="hidden sm:inline">Ứng dụng</span>
+            </Link>
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:inline-flex"
+            onClick={toggleSidebar}
+            aria-label="Thu gọn sidebar"
+          >
+            {sidebarCollapsed ? (
+              <PanelLeft className="size-5" />
+            ) : (
+              <PanelLeftClose className="size-5" />
+            )}
+          </Button>
+        )}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-base font-semibold md:text-lg">
+            {title}
+          </h1>
+          {description && (
+            <p className="truncate text-xs text-muted-foreground md:text-sm">
+              {description}
+            </p>
           )}
-        </Button>
-      )}
-      <div className="min-w-0 flex-1">
-        <h1 className="truncate text-base font-semibold md:text-lg">
-          {title}
-        </h1>
-        {description && (
-          <p className="truncate text-xs text-muted-foreground md:text-sm">
-            {description}
-          </p>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {actions}
-        {/* Profile section already has tabs + account entry — keep header lean */}
-        {!onProfile && (
-          <>
-            <SyncStatusIndicator />
-            <ThemeToggle />
-            <Button variant="outline" size="icon" asChild>
-              <Link
-                to="/profile"
-                aria-label="Tài khoản"
-                title={username ? `Tài khoản · ${username}` : "Tài khoản"}
-              >
-                <UserRound className="size-4" />
-              </Link>
-            </Button>
-          </>
-        )}
-        {onProfile && <ThemeToggle />}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {actions}
+          {/* Profile section already has tabs + account entry — keep header lean */}
+          {!onProfile && (
+            <>
+              <SyncStatusIndicator />
+              <ThemeToggle />
+              <Button variant="outline" size="icon" asChild>
+                <Link
+                  to="/profile"
+                  aria-label="Tài khoản"
+                  title={username ? `Tài khoản · ${username}` : "Tài khoản"}
+                >
+                  <UserRound className="size-4" />
+                </Link>
+              </Button>
+            </>
+          )}
+          {onProfile && <ThemeToggle />}
+        </div>
       </div>
     </header>
   );

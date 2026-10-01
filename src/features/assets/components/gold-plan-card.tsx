@@ -19,7 +19,7 @@ import {
 import { useGoldPricesLatestQuery } from "@/api/queries";
 import {
   formatBranchLabel,
-  resolveReferenceBuyPrice,
+  resolveReferenceSellPrice,
 } from "@/features/assets/lib/resolve-reference-price";
 import { createGoldPriceService } from "@/features/assets/lib/gold-price-service";
 import type { AssetSummary, GoldPlan, GoldPurchase } from "@/types/assets";
@@ -101,7 +101,7 @@ export function GoldPlanCard({
     summary.settings.goldReferencePricePerChi,
   );
   const fallback = goldType ? priceService.getCurrentGoldPrice(goldType) : 0;
-  const resolved = resolveReferenceBuyPrice({
+  const resolved = resolveReferenceSellPrice({
     goldType,
     referenceSourceCode: normalized.referenceSourceCode,
     market: pricesQ.data,
@@ -265,7 +265,7 @@ export function GoldPlanCard({
                   value={`${formatCurrency(metrics.monthlyBudget)} / tháng`}
                 />
                 <Metric
-                  label="Giá tham chiếu (mua vào)"
+                  label="Giá tham chiếu (bán ra)"
                   value={
                     pricePerChi > 0
                       ? `${formatCurrency(pricePerChi)} / chỉ`
