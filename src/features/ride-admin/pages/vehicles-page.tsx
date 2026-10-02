@@ -8,7 +8,7 @@ import { Can } from "@/features/auth/can";
 import { PERMISSIONS } from "@/config/permissions";
 import { ConfirmDeleteDialog } from "@/features/ride-admin/components/confirm-delete-dialog";
 import { vehicleAdminService } from "@/features/ride-admin/services/admin-api";
-import { VEHICLE_STATUS_LABEL } from "@/features/ride-admin/pages/vehicle-form-fields";
+import { VEHICLE_STATUS_LABEL } from "@/features/ride-admin/pages/vehicle-form-state";
 import type { Vehicle, VehicleStatus } from "@/features/ride/types/ride";
 import { ApiError } from "@/api/client";
 import { getCloudinaryImageUrl } from "@/lib/cloudinary";

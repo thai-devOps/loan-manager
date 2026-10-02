@@ -1,10 +1,27 @@
 import type { SuitableFor } from "./ride-types.js";
-import type { RideVehicle } from "./ride-types.js";
+import type { RideVehicle, VehiclePricingConfig } from "./ride-types.js";
 import { DEFAULT_VEHICLE_PRICING } from "../../shared/ride/vehicle-pricing.js";
 
-const pricingFor = (
-  overrides?: Partial<typeof DEFAULT_VEHICLE_PRICING>,
-) => ({ ...DEFAULT_VEHICLE_PRICING, ...overrides });
+function pricingFor(
+  overrides: Partial<VehiclePricingConfig> & {
+    fuelType: NonNullable<VehiclePricingConfig["fuelType"]>;
+    city: number;
+    highway: number;
+    mixed: number;
+  },
+): VehiclePricingConfig {
+  const { city, highway, mixed, ...rest } = overrides;
+  return {
+    ...DEFAULT_VEHICLE_PRICING,
+    ...rest,
+    fuelConsumption: { city, highway, mixed },
+    defaultConsumption: rest.defaultConsumption ?? mixed,
+    fuelConsumptionPer100Km: rest.defaultConsumption ?? mixed,
+    consumptionSource: rest.consumptionSource ?? "estimated",
+    consumptionUpdatedAt: new Date().toISOString(),
+    fuelPricePerLiter: 0,
+  };
+}
 
 /** Seed fleet when collection is empty — mirrors customer mock catalog. */
 export const SEED_VEHICLES: Omit<RideVehicle, "_id" | "createdAt" | "updatedAt">[] =
@@ -24,8 +41,10 @@ export const SEED_VEHICLES: Omit<RideVehicle, "_id" | "createdAt" | "updatedAt">
       features: ["Điều hòa", "Camera lùi", "Xe riêng + tài xế"],
       suitableFor: ["airport", "business", "medical", "travel"] as SuitableFor[],
       pricing: pricingFor({
-        fuelType: "Xăng",
-        fuelConsumptionPer100Km: 7,
+        fuelType: "E10_RON95_III",
+        city: 8.5,
+        highway: 6,
+        mixed: 7,
         baseFare: 180_000,
         pricePerKm: 11_000,
         dailyRate: 1_200_000,
@@ -54,8 +73,10 @@ export const SEED_VEHICLES: Omit<RideVehicle, "_id" | "createdAt" | "updatedAt">
         "family",
       ] as SuitableFor[],
       pricing: pricingFor({
-        fuelType: "Xăng",
-        fuelConsumptionPer100Km: 7.5,
+        fuelType: "E5_RON92_II",
+        city: 9,
+        highway: 6.5,
+        mixed: 7.5,
         baseFare: 190_000,
         dailyRate: 1_300_000,
       }),
@@ -89,9 +110,10 @@ export const SEED_VEHICLES: Omit<RideVehicle, "_id" | "createdAt" | "updatedAt">
         "airport",
       ] as SuitableFor[],
       pricing: pricingFor({
-        fuelType: "Máy dầu",
-        fuelConsumptionPer100Km: 9,
-        fuelPricePerLiter: 21_000,
+        fuelType: "DO_005S_II",
+        city: 12.5,
+        highway: 8.5,
+        mixed: 10.5,
         baseFare: 280_000,
         pricePerKm: 15_000,
         dailyRate: 2_000_000,
@@ -121,8 +143,10 @@ export const SEED_VEHICLES: Omit<RideVehicle, "_id" | "createdAt" | "updatedAt">
         "custom",
       ] as SuitableFor[],
       pricing: pricingFor({
-        fuelType: "Xăng",
-        fuelConsumptionPer100Km: 9,
+        fuelType: "E10_RON95_III",
+        city: 11,
+        highway: 7.5,
+        mixed: 9,
         baseFare: 250_000,
         pricePerKm: 14_000,
         dailyRate: 1_800_000,
@@ -143,9 +167,10 @@ export const SEED_VEHICLES: Omit<RideVehicle, "_id" | "createdAt" | "updatedAt">
       features: ["Đoàn lớn", "Hành lý nhiều", "Xe riêng + tài xế"],
       suitableFor: ["pilgrimage", "travel", "custom", "family"] as SuitableFor[],
       pricing: pricingFor({
-        fuelType: "Máy dầu",
-        fuelConsumptionPer100Km: 12,
-        fuelPricePerLiter: 21_000,
+        fuelType: "DO_0001S_V",
+        city: 14,
+        highway: 10,
+        mixed: 12,
         driverRate: 200_000,
         baseFare: 400_000,
         pricePerKm: 18_000,

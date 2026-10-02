@@ -25,6 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const body = readJsonBody<{
         bookingAntiSpamEnabled?: boolean | null;
+        operationalDistanceFactor?: number | null;
       }>(req);
 
       if (
@@ -36,10 +37,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      const updated = await updateRideSettings({
-        bookingAntiSpamEnabled: body.bookingAntiSpamEnabled,
-      });
-      res.status(200).json(updated);
+      if (
+        body.operationalDistanceFactor !== undefined &&
+        body.operationalDistanceFactor !== null
+      ) {
+        const f = Number(body.operationalDistanceFactor);
+        if (!Number.isFinite(f) || f < 1) {
+          res.status(400).json({
+            error: "Hệ số quãng đường vận hành phải là số ≥ 1.",
+          });
+          return;
+        }
+      }
+
+      try {
+        const updated = await updateRideSettings({
+          bookingAntiSpamEnabled: body.bookingAntiSpamEnabled,
+          operationalDistanceFactor:
+            body.operationalDistanceFactor === undefined
+              ? undefined
+              : body.operationalDistanceFactor == null
+                ? null
+                : Number(body.operationalDistanceFactor),
+        });
+        res.status(200).json(updated);
+      } catch (e) {
+        res.status(400).json({
+          error: e instanceof Error ? e.message : "Không lưu được cài đặt",
+        });
+      }
       return;
     }
 

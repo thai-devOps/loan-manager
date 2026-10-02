@@ -1,4 +1,5 @@
 import { ApiError } from "@/api/client";
+import { getSession } from "@/lib/auth";
 import { MOCK_PRICING } from "@/features/ride/data/mock-pricing";
 import type {
   BookingQuoteSnapshot,
@@ -17,6 +18,10 @@ async function publicFetch<T>(
   const headers = new Headers(options.headers);
   if (!headers.has("Content-Type") && options.body !== undefined) {
     headers.set("Content-Type", "application/json");
+  }
+  const session = getSession();
+  if (session?.token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${session.token}`);
   }
   let res: Response;
   try {
@@ -58,6 +63,8 @@ export type QuoteRequest = {
   waitingFee?: number;
   serviceType?: string;
   date?: string;
+  time?: string;
+  routeCondition?: "city" | "highway" | "mixed";
 };
 
 function normalizePlace(place: Place): Place {
@@ -79,6 +86,65 @@ function normalizePlace(place: Place): Place {
     address: place.address,
     latitude: usable ? lat : null,
     longitude: usable ? lng : null,
+  };
+}
+
+const FUEL_QUOTE_ERROR_MESSAGES: Record<string, string> = {
+  VEHICLE_NOT_FOUND: "Không tìm thấy xe.",
+  VEHICLE_FUEL_CONFIG_MISSING:
+    "Xe chưa cấu hình nhiên liệu. Vui lòng liên hệ để được báo giá.",
+  FUEL_PRICE_NOT_FOUND:
+    "Chưa có giá nhiên liệu cho ngày chuyến. Vui lòng liên hệ để được báo giá.",
+  FUEL_CONSUMPTION_INVALID: "Mức tiêu hao nhiên liệu không hợp lệ.",
+  DISTANCE_INVALID: "Quãng đường không hợp lệ.",
+  QUOTATION_CALCULATION_FAILED: "Không tính được báo giá lúc này.",
+};
+
+function mapQuoteError(
+  code: string | undefined,
+  fallback: string,
+  status: number,
+): { display: string; errorCode: PriceQuote["errorCode"]; errorMessage: string } {
+  if (code && FUEL_QUOTE_ERROR_MESSAGES[code]) {
+    return {
+      display: "Liên hệ báo giá",
+      errorCode: code as PriceQuote["errorCode"],
+      errorMessage: FUEL_QUOTE_ERROR_MESSAGES[code],
+    };
+  }
+  if (code === "NO_ROUTE") {
+    return {
+      display: "Liên hệ báo giá",
+      errorCode: "NO_ROUTE",
+      errorMessage:
+        "Không thể xác định tuyến đường. Vui lòng kiểm tra lại địa chỉ.",
+    };
+  }
+  if (code === "TIMEOUT" || code === "UPSTREAM" || status === 502) {
+    return {
+      display: "Liên hệ báo giá",
+      errorCode: code === "TIMEOUT" ? "TIMEOUT" : "UPSTREAM",
+      errorMessage: "Không thể tính khoảng cách lúc này.",
+    };
+  }
+  if (code === "MISSING_KEY") {
+    return {
+      display: "Liên hệ báo giá",
+      errorCode: "MISSING_KEY",
+      errorMessage: fallback || "Không thể tính khoảng cách lúc này.",
+    };
+  }
+  if (code === "NO_PRICING_RULE_FOUND") {
+    return {
+      display: "Liên hệ báo giá",
+      errorCode: "NO_PRICING_RULE_FOUND",
+      errorMessage: fallback || "Chưa có bảng giá phù hợp.",
+    };
+  }
+  return {
+    display: "Liên hệ báo giá",
+    errorCode: "UPSTREAM",
+    errorMessage: fallback || "Không thể tính khoảng cách lúc này.",
   };
 }
 
@@ -107,46 +173,35 @@ export const pricingService = {
       };
     }
 
+    const body = {
+      tripType: params.tripType,
+      vehicleId: params.vehicleId,
+      pickup,
+      destination,
+      tollFee: params.tollFee ?? 0,
+      parkingFee: params.parkingFee ?? 0,
+      waitingFee: params.waitingFee ?? 0,
+      serviceType: params.serviceType,
+      date: params.date,
+      time: params.time,
+      routeCondition: params.routeCondition,
+    };
+
     try {
-      return await publicFetch<PriceQuote & { snapshot?: BookingQuoteSnapshot }>(
-        "/api/ride/quote",
-        {
-          method: "POST",
-          body: {
-            tripType: params.tripType,
-            vehicleId: params.vehicleId,
-            pickup,
-            destination,
-            tollFee: params.tollFee ?? 0,
-            parkingFee: params.parkingFee ?? 0,
-            waitingFee: params.waitingFee ?? 0,
-            serviceType: params.serviceType,
-            date: params.date,
-          },
-        },
-      );
+      // Attaches Bearer when logged in so admin receives internal breakdown.
+      return await publicFetch<
+        PriceQuote & { snapshot?: BookingQuoteSnapshot }
+      >("/api/ride/quote", { method: "POST", body });
     } catch (e) {
       if (e instanceof ApiError) {
         const code = (e as ApiError & { code?: string }).code;
-        const mapped =
-          code === "NO_ROUTE"
-            ? "Không thể xác định tuyến đường. Vui lòng kiểm tra lại địa chỉ."
-            : code === "TIMEOUT" || code === "UPSTREAM" || e.status === 502
-              ? "Không thể tính khoảng cách lúc này."
-              : e.message;
+        const mapped = mapQuoteError(code, e.message, e.status);
         return {
-          display: "Liên hệ báo giá",
+          display: mapped.display,
           amount: null,
           autoQuote: false,
-          errorCode:
-            code === "NO_ROUTE" ||
-            code === "TIMEOUT" ||
-            code === "UPSTREAM" ||
-            code === "MISSING_KEY" ||
-            code === "NO_PRICING_RULE_FOUND"
-              ? code
-              : "UPSTREAM",
-          errorMessage: mapped,
+          errorCode: mapped.errorCode,
+          errorMessage: mapped.errorMessage,
         };
       }
       return {

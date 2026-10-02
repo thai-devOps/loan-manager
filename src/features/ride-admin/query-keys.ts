@@ -36,4 +36,7 @@ export const rideAdminQueryKeys = {
     [...rideAdminQueryKeys.all, "price-trip-types"] as const,
   priceCells: (routeId?: string) =>
     [...rideAdminQueryKeys.all, "price-cells", routeId ?? "all"] as const,
+  fuelCurrent: () => [...rideAdminQueryKeys.all, "fuel-current"] as const,
+  fuelHistory: (page: number) =>
+    [...rideAdminQueryKeys.all, "fuel-history", page] as const,
 };

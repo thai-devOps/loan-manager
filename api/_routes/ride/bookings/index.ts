@@ -44,6 +44,106 @@ const SERVICE_TYPES = new Set([
 ]);
 const TRIP_TYPES = new Set(["ONE_WAY", "ROUND_TRIP", "DAILY", "CUSTOM"]);
 
+/** Freeze quote from /api/ride/quote — ignore client markup/fuel overrides. */
+function parseClientQuoteSnapshot(
+  raw: unknown,
+): RideBooking["quoteSnapshot"] {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw as Record<string, unknown>;
+  const totalPrice = Number(s.totalPrice);
+  if (!(totalPrice > 0) || !Number.isFinite(totalPrice)) return null;
+  const fuelSnap =
+    s.fuelSnapshot && typeof s.fuelSnapshot === "object"
+      ? (s.fuelSnapshot as Record<string, unknown>)
+      : null;
+  if (
+    !fuelSnap ||
+    typeof fuelSnap.fuelType !== "string" ||
+    !(Number(fuelSnap.estimatedFuelCost) >= 0) ||
+    !(Number(fuelSnap.fuelPrice) > 0)
+  ) {
+    return null;
+  }
+  return {
+    distanceKm: Math.max(0, Number(s.distanceKm) || 0),
+    durationMinutes: Math.max(0, Number(s.durationMinutes) || 0),
+    billableDistanceKm:
+      s.billableDistanceKm != null
+        ? Math.max(0, Number(s.billableDistanceKm) || 0)
+        : undefined,
+    operationalDistanceKm:
+      s.operationalDistanceKm != null
+        ? Math.max(0, Number(s.operationalDistanceKm) || 0)
+        : undefined,
+    operationalDistanceFactor:
+      s.operationalDistanceFactor != null
+        ? Number(s.operationalDistanceFactor)
+        : undefined,
+    fuelPricePerLiter: Math.max(0, Number(s.fuelPricePerLiter) || 0),
+    fuelConsumptionPer100Km: Math.max(
+      0,
+      Number(s.fuelConsumptionPer100Km) || 0,
+    ),
+    fuelLiters: Math.max(0, Number(s.fuelLiters) || 0),
+    fuelCost: Math.max(0, Math.round(Number(s.fuelCost) || 0)),
+    driverFee: Math.max(0, Math.round(Number(s.driverFee) || 0)),
+    tollFee: Math.max(0, Math.round(Number(s.tollFee) || 0)),
+    parkingFee: Math.max(0, Math.round(Number(s.parkingFee) || 0)),
+    waitingFee: Math.max(0, Math.round(Number(s.waitingFee) || 0)),
+    additionalFee: Math.max(0, Math.round(Number(s.additionalFee) || 0)),
+    operatingCost: Math.max(0, Math.round(Number(s.operatingCost) || 0)),
+    subtotal: Math.round(totalPrice),
+    totalPrice: Math.round(totalPrice),
+    breakdown: Array.isArray(s.breakdown)
+      ? s.breakdown
+          .filter(
+            (line): line is { label: string; amount: number } =>
+              !!line &&
+              typeof line === "object" &&
+              typeof (line as { label?: unknown }).label === "string" &&
+              typeof (line as { amount?: unknown }).amount === "number",
+          )
+          .map((line) => ({
+            label: line.label,
+            amount: Math.round(line.amount),
+          }))
+      : [],
+    provider: typeof s.provider === "string" ? s.provider : undefined,
+    quotedAt:
+      typeof s.quotedAt === "string" && s.quotedAt
+        ? s.quotedAt
+        : new Date().toISOString(),
+    fuelSnapshot: {
+      vehicleId: String(fuelSnap.vehicleId ?? ""),
+      fuelType: String(fuelSnap.fuelType),
+      fuelPrice: Math.round(Number(fuelSnap.fuelPrice)),
+      fuelPriceEffectiveAt: String(fuelSnap.fuelPriceEffectiveAt ?? ""),
+      billableDistanceKm: Math.max(
+        0,
+        Number(fuelSnap.billableDistanceKm) || 0,
+      ),
+      operationalDistanceKm: Math.max(
+        0,
+        Number(fuelSnap.operationalDistanceKm) || 0,
+      ),
+      operationalDistanceFactor: Math.max(
+        1,
+        Number(fuelSnap.operationalDistanceFactor) || 1,
+      ),
+      routeCondition:
+        fuelSnap.routeCondition === "city" ||
+        fuelSnap.routeCondition === "highway" ||
+        fuelSnap.routeCondition === "mixed"
+          ? fuelSnap.routeCondition
+          : "default",
+      consumptionLPer100Km: Number(fuelSnap.consumptionLPer100Km) || 0,
+      estimatedLiters: Number(fuelSnap.estimatedLiters) || 0,
+      estimatedFuelCost: Math.round(Number(fuelSnap.estimatedFuelCost) || 0),
+      source: "PVOIL",
+    },
+  };
+}
+
 function parsePlace(raw?: {
   address?: string;
   latitude?: number | null;
@@ -122,6 +222,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         clientId?: string;
         website?: string;
         pricingRuleId?: string;
+        quoteSnapshot?: RideBooking["quoteSnapshot"];
+        pricingSnapshot?: RideBooking["pricingSnapshot"];
+        quotedPrice?: number | null;
       }>(req);
 
       const serviceType = (body.serviceType ?? "").trim();
@@ -239,42 +342,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const id = randomUUID();
       const bookingCode = await generateBookingCode();
 
-      // Attach fixed-route quote when an ACTIVE ROUTE/AIRPORT rule matches
-      // (no distance needed). Per-km rules stay null — admin auto-quotes with routing.
+      // Prefer frozen vehicle/fuel quote from /api/ride/quote; else fixed-route matrix.
       let quotedPrice: number | null = null;
+      let quoteSnapshot: RideBooking["quoteSnapshot"] = null;
       let pricingSnapshot: RideBooking["pricingSnapshot"] = null;
+
+      const incomingSnap = parseClientQuoteSnapshot(body.quoteSnapshot);
+      if (incomingSnap) {
+        quoteSnapshot = incomingSnap;
+        quotedPrice =
+          typeof body.quotedPrice === "number" &&
+          Number.isFinite(body.quotedPrice) &&
+          body.quotedPrice > 0
+            ? Math.round(body.quotedPrice)
+            : incomingSnap.totalPrice;
+        if (
+          body.pricingSnapshot &&
+          typeof body.pricingSnapshot === "object" &&
+          typeof (body.pricingSnapshot as { total?: unknown }).total ===
+            "number"
+        ) {
+          pricingSnapshot = body.pricingSnapshot;
+        }
+      }
+
       const pricingRuleId =
         typeof body.pricingRuleId === "string" ? body.pricingRuleId.trim() : "";
-      try {
-        let originKey = pickup.address;
-        let destinationKey = destination.address;
-        if (pricingRuleId) {
-          const pinned = await getPricingRule(pricingRuleId);
-          if (pinned?.status === "ACTIVE") {
-            originKey = pinned.originKey || pinned.origin || originKey;
-            destinationKey =
-              pinned.destinationKey || pinned.destination || destinationKey;
+      if (!quoteSnapshot) {
+        try {
+          let originKey = pickup.address;
+          let destinationKey = destination.address;
+          if (pricingRuleId) {
+            const pinned = await getPricingRule(pricingRuleId);
+            if (pinned?.status === "ACTIVE") {
+              originKey = pinned.originKey || pinned.origin || originKey;
+              destinationKey =
+                pinned.destinationKey || pinned.destination || destinationKey;
+            }
           }
-        }
-        const calc = await runPricingCalculate({
-          serviceType: serviceType as ServiceType,
-          vehicleCategory: seatsToVehicleCategory(passengers),
-          originKey,
-          destinationKey,
-          distanceKm: 0,
-          roundTrip: tripType === "ROUND_TRIP",
-          date: pickupDate,
-        });
-        if (calc.ok && calc.snapshot) {
-          const matched = await getPricingRule(calc.matchedRuleId);
-          const perKm = Number(matched?.pricingConfig?.pricePerKm) || 0;
-          if (perKm <= 0) {
-            quotedPrice = calc.breakdown.total;
-            pricingSnapshot = calc.snapshot;
+          const calc = await runPricingCalculate({
+            serviceType: serviceType as ServiceType,
+            vehicleCategory: seatsToVehicleCategory(passengers),
+            originKey,
+            destinationKey,
+            distanceKm: 0,
+            roundTrip: tripType === "ROUND_TRIP",
+            date: pickupDate,
+          });
+          if (calc.ok && calc.snapshot) {
+            const matched = await getPricingRule(calc.matchedRuleId);
+            const perKm = Number(matched?.pricingConfig?.pricePerKm) || 0;
+            if (perKm <= 0) {
+              quotedPrice = calc.breakdown.total;
+              pricingSnapshot = calc.snapshot;
+            }
           }
+        } catch (err) {
+          console.warn("[Booking] Could not attach public pricing quote", err);
         }
-      } catch (err) {
-        console.warn("[Booking] Could not attach public pricing quote", err);
       }
 
       const booking: RideBooking = {
@@ -297,7 +422,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
         note: body.note?.trim() || undefined,
         quotedPrice,
-        quoteSnapshot: null,
+        quoteSnapshot,
         pricingSnapshot,
         deposit: 0,
         paidAmount: 0,

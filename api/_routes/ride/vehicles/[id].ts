@@ -11,6 +11,7 @@ import type {
 } from "../../../_lib/ride-types.js";
 import { rideVehiclesCol, stripDoc } from "../../../_lib/mongo.js";
 import { resolveVehiclePricing } from "../../../../shared/ride/vehicle-pricing.js";
+import { validateVehicleFuelPricingInput } from "../../../../shared/ride/vehicle-fuel-validate.js";
 
 function newId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -139,6 +140,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
+      const pricingInput =
+        (body.pricing as Partial<VehiclePricingConfig> | undefined) ??
+        current.pricing;
+      const fuelCheck = validateVehicleFuelPricingInput(pricingInput);
+      if (!fuelCheck.ok) {
+        res.status(400).json({ error: fuelCheck.error });
+        return;
+      }
+      const pricing = resolveVehiclePricing(pricingInput);
+      if (body.pricing) {
+        pricing.consumptionUpdatedAt = now;
+      }
+
       const result = await col.findOneAndUpdate(
         { id },
         {
@@ -170,11 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             suitableFor: (Array.isArray(body.suitableFor)
               ? body.suitableFor
               : (current.suitableFor ?? [])) as SuitableFor[],
-            pricing: resolveVehiclePricing(
-              (body.pricing as Partial<VehiclePricingConfig> | undefined) ??
-                current.pricing,
-              String(body.fuel ?? current.fuel ?? "Xăng").trim(),
-            ),
+            pricing,
             active:
               body.active !== undefined
                 ? body.active !== false

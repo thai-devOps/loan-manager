@@ -31,6 +31,7 @@ import {
   TRIP_TYPE_LABELS,
 } from "@/features/ride/lib/labels";
 import { useRidePageMeta } from "@/features/ride/lib/use-ride-page-meta";
+import { pricingService } from "@/features/ride/services/pricingService";
 import { tripService } from "@/features/ride/services/tripService";
 import { vehicleService } from "@/features/ride/services/vehicleService";
 import {
@@ -38,11 +39,16 @@ import {
 } from "@/features/ride/lib/ride-analytics";
 import type {
   Place,
+  PriceQuote,
   ServiceType,
   TripType,
   Vehicle,
 } from "@/features/ride/types/ride";
 import { cn } from "@/lib/utils";
+
+function formatVnd(amount: number): string {
+  return `${amount.toLocaleString("vi-VN")} đ`;
+}
 
 const SERVICE_OPTIONS = Object.keys(SERVICE_TYPE_LABELS) as ServiceType[];
 const TRIP_OPTIONS: TripType[] = ["ONE_WAY", "ROUND_TRIP", "DAILY", "CUSTOM"];
@@ -76,6 +82,8 @@ export function RideBookingPage() {
   const [suitable, setSuitable] = useState<Vehicle[] | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [quote, setQuote] = useState<PriceQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const idempotencyKeyRef = useRef(newIdempotencyKey());
   const honeypotRef = useRef<HTMLInputElement | null>(null);
   const [pickupPlace, setPickupPlace] = useState<Place>({
@@ -161,6 +169,53 @@ export function RideBookingPage() {
   }, [passengers, serviceType, form]);
 
   const selectedVehicle = suitable?.find((v) => v.id === vehicleId) ?? null;
+  const pickupDate = form.watch("pickupDate");
+  const pickupTime = form.watch("pickupTime");
+
+  useEffect(() => {
+    if (
+      !vehicleId ||
+      !pickupPlace.address?.trim() ||
+      !destPlace.address?.trim() ||
+      tripType === "CUSTOM"
+    ) {
+      setQuote(null);
+      setQuoteLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setQuoteLoading(true);
+    const timer = window.setTimeout(() => {
+      void pricingService
+        .getQuote({
+          tripType,
+          vehicleId,
+          pickup: pickupPlace,
+          destination: destPlace,
+          serviceType,
+          date: pickupDate,
+          time: pickupTime,
+        })
+        .then((result) => {
+          if (!cancelled) setQuote(result);
+        })
+        .finally(() => {
+          if (!cancelled) setQuoteLoading(false);
+        });
+    }, 450);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    vehicleId,
+    tripType,
+    serviceType,
+    pickupPlace,
+    destPlace,
+    pickupDate,
+    pickupTime,
+  ]);
 
   async function onSubmit(data: TripBookingFormValues) {
     setSubmitError(null);
@@ -189,6 +244,14 @@ export function RideBookingPage() {
           clientId: getBookingClientId(),
           website: honeypotRef.current?.value ?? "",
           pricingRuleId: searchParams.get("pricingRuleId")?.trim() || undefined,
+          quoteSnapshot:
+            quote?.autoQuote && quote.snapshot ? quote.snapshot : undefined,
+          pricingSnapshot:
+            quote?.autoQuote && quote.pricingSnapshot
+              ? quote.pricingSnapshot
+              : undefined,
+          quotedPrice:
+            quote?.autoQuote && quote.amount != null ? quote.amount : undefined,
         },
         { idempotencyKey: idempotencyKeyRef.current },
       );
@@ -485,13 +548,67 @@ export function RideBookingPage() {
             </li>
             <li>{values.passengers || "—"} khách</li>
             <li>{TRIP_TYPE_LABELS[values.tripType]}</li>
-            <li>
-              Giá chuyến: <strong>Liên hệ báo giá</strong>
-            </li>
+            {quoteLoading ? (
+              <li className="text-muted-foreground">Đang tính giá…</li>
+            ) : quote?.autoQuote && quote.amount != null ? (
+              <>
+                {quote.distanceKm != null ? (
+                  <li>
+                    Quãng đường:{" "}
+                    <strong>
+                      {Number(quote.distanceKm).toLocaleString("vi-VN", {
+                        maximumFractionDigits: 1,
+                      })}{" "}
+                      km
+                    </strong>
+                  </li>
+                ) : null}
+                {quote.fuel?.type ? (
+                  <li>
+                    Nhiên liệu: <strong>{quote.fuel.type}</strong>
+                    {quote.fuel.consumption != null
+                      ? ` · ${quote.fuel.consumption} L/100km`
+                      : null}
+                  </li>
+                ) : null}
+                {quote.fuel?.liters != null || quote.fuelLiters != null ? (
+                  <li>
+                    Nhiên liệu dự kiến:{" "}
+                    <strong>
+                      {(quote.fuel?.liters ?? quote.fuelLiters ?? 0).toLocaleString(
+                        "vi-VN",
+                        { maximumFractionDigits: 2 },
+                      )}{" "}
+                      L
+                    </strong>
+                  </li>
+                ) : null}
+                <li>
+                  Giá chuyến:{" "}
+                  <strong className="text-teal-900 dark:text-teal-100">
+                    {formatVnd(quote.amount)}
+                  </strong>
+                </li>
+              </>
+            ) : (
+              <li>
+                Giá chuyến:{" "}
+                <strong>{quote?.display ?? "Liên hệ báo giá"}</strong>
+              </li>
+            )}
           </ul>
-          <p className="text-sm text-muted-foreground">
-            Giá sẽ được nhân viên tính và gửi sau khi kiểm tra lộ trình.
-          </p>
+          {quote?.errorMessage && !quote.autoQuote ? (
+            <p className="text-sm text-muted-foreground">{quote.errorMessage}</p>
+          ) : !quote?.autoQuote ? (
+            <p className="text-sm text-muted-foreground">
+              Giá sẽ được nhân viên tính và gửi sau khi kiểm tra lộ trình.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Giá ước tính theo lộ trình và giá nhiên liệu ngày chuyến — có thể
+              điều chỉnh khi xác nhận.
+            </p>
+          )}
         </section>
 
         {submitError ? (

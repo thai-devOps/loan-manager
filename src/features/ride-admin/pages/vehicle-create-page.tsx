@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { vehicleAdminService } from "@/features/ride-admin/services/admin-api";
+import { VehicleFormFields } from "@/features/ride-admin/pages/vehicle-form-fields";
 import {
   emptyVehicleForm,
   formToVehiclePayload,
-  VehicleFormFields,
   type VehicleFormState,
-} from "@/features/ride-admin/pages/vehicle-form-fields";
+} from "@/features/ride-admin/pages/vehicle-form-state";
 import { ApiError } from "@/api/client";
 
 export function RideAdminVehicleCreatePage() {

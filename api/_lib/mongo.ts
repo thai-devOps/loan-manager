@@ -15,6 +15,7 @@ import type {
   GoldPriceSnapshot,
   GoldTypeCatalogEntry,
 } from "./gold-price/types.js";
+import type { FuelPriceSnapshot } from "./fuel-price/types.js";
 import type {
   RideBooking,
   RideCustomer,
@@ -79,6 +80,10 @@ async function ensureIndexes(db: Db): Promise<void> {
       .createIndex({ source: 1, sourceCode: 1 }, { unique: true }),
     db.collection("gold_types").createIndex({ source: 1, zone: 1 }),
     db.collection("gold_types").createIndex({ lastSeenAt: -1 }),
+    db
+      .collection("fuel_price_snapshots")
+      .createIndex({ source: 1, effectiveAt: 1 }, { unique: true }),
+    db.collection("fuel_price_snapshots").createIndex({ effectiveAt: -1 }),
     db
       .collection("ride_bookings")
       .createIndex({ bookingCode: 1 }, { unique: true }),
@@ -159,6 +164,9 @@ async function ensureIndexes(db: Db): Promise<void> {
         { unique: true },
       ),
     db.collection("ride_price_cells").createIndex({ routeId: 1 }),
+    db.collection("pricing_calculations").createIndex({ bookingId: 1 }),
+    db.collection("pricing_calculations").createIndex({ vehicleId: 1 }),
+    db.collection("pricing_calculations").createIndex({ createdAt: -1 }),
   ]);
   indexesReady = true;
 }
@@ -215,6 +223,31 @@ export async function goldTypesCol(): Promise<
   Collection<GoldTypeCatalogEntry>
 > {
   return (await getDb()).collection<GoldTypeCatalogEntry>("gold_types");
+}
+
+export async function fuelPriceSnapshotsCol(): Promise<
+  Collection<FuelPriceSnapshot>
+> {
+  return (await getDb()).collection<FuelPriceSnapshot>("fuel_price_snapshots");
+}
+
+export type PricingCalculationRecord = {
+  _id?: string;
+  id: string;
+  bookingId?: string | null;
+  vehicleId: string;
+  pricingEngineVersion: "v2";
+  result: unknown;
+  calculationInputs: Record<string, unknown>;
+  createdAt: string;
+};
+
+export async function pricingCalculationsCol(): Promise<
+  Collection<PricingCalculationRecord>
+> {
+  return (await getDb()).collection<PricingCalculationRecord>(
+    "pricing_calculations",
+  );
 }
 
 export async function rideVehiclesCol(): Promise<Collection<RideVehicle>> {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -31,6 +31,8 @@ import {
   availabilityAdminService,
   bookingAdminService,
   driverAdminService,
+  pricingV2AdminService,
+  rideSettingsAdminService,
   tripAdminService,
   vehicleAdminService,
   type AvailabilityOption,
@@ -103,7 +105,6 @@ export function RideAdminBookingDetailPage() {
   const [draftPricingSnapshot, setDraftPricingSnapshot] =
     useState<BookingPricingSnapshot | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const autoQuotedForId = useRef<string | null>(null);
 
   async function load() {
     setError(null);
@@ -141,17 +142,6 @@ export function RideAdminBookingDetailPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-
-  // Auto-quote once when booking has no price yet (e.g. from public pricing table)
-  useEffect(() => {
-    if (!booking) return;
-    if (booking.quotedPrice != null) return;
-    if (booking.tripType === "CUSTOM") return;
-    if (autoQuotedForId.current === booking.id) return;
-    autoQuotedForId.current = booking.id;
-    void calculateAutoQuote({ autoSave: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [booking?.id, booking?.quotedPrice, booking?.tripType]);
 
   async function run(body: Record<string, unknown>) {
     setBusy(true);
@@ -191,7 +181,7 @@ export function RideAdminBookingDetailPage() {
     }
   }
 
-  async function calculateAutoQuote(opts?: { autoSave?: boolean }) {
+  async function calculateAutoQuote() {
     if (!booking) return;
     setCalcBusy(true);
     setError(null);
@@ -235,6 +225,73 @@ export function RideAdminBookingDetailPage() {
         destination.longitude = null;
       }
 
+      const settings = await rideSettingsAdminService.get().catch(() => null);
+      const useV2 = settings?.pricingEngineV2Enabled === true;
+
+      if (useV2) {
+        const tripType =
+          booking.tripType === "DAILY" ? "DAILY_RENTAL" : booking.tripType;
+        const v2 = await pricingV2AdminService.quote({
+          vehicleId: vehicleId || booking.vehicleId,
+          origin: pickup,
+          destination,
+          tripType,
+          travelDate: booking.pickupDate,
+          bookingId: booking.id,
+        });
+        if (!v2.success || v2.amount == null) {
+          setError(v2.error ?? "Không tính được báo giá v2");
+          setDraftQuote(null);
+          setDraftSnapshot(null);
+          return;
+        }
+        const mapped: PriceQuote = {
+          display: v2.display ?? formatCurrency(v2.amount),
+          amount: v2.amount,
+          autoQuote: true,
+          distanceKm: v2.route?.distanceKm,
+          billableDistanceKm: v2.route?.pricingDistanceKm ?? v2.route?.distanceKm,
+          operationalDistanceKm: v2.route?.operationalDistanceKm,
+          durationMinutes: v2.route?.durationMinutes,
+          fuelLiters: v2.fuel?.estimatedLiters,
+          fuelCost: v2.fuel?.fuelCost,
+          driverCost: v2.cost?.driver,
+          tollFee: v2.cost?.toll,
+          waitingFee: v2.cost?.waiting,
+          operatingCost: v2.cost
+            ? v2.cost.fuel +
+              v2.cost.driver +
+              v2.cost.depreciation +
+              v2.cost.operating
+            : undefined,
+          totalPrice: v2.pricing?.finalPrice ?? v2.amount,
+          fuel: {
+            type: v2.fuel?.fuelType,
+            price: v2.fuel?.pricePerLiter ?? undefined,
+            priceEffectiveAt: v2.fuel?.sourceDate ?? undefined,
+            consumption: v2.fuel?.consumptionLPer100Km ?? undefined,
+            liters: v2.fuel?.estimatedLiters,
+            cost: v2.fuel?.fuelCost,
+          },
+          breakdown: v2.snapshot?.breakdown,
+          snapshot: v2.snapshot ?? null,
+          pricing: {
+            totalCost: v2.cost?.total,
+            customerPrice: v2.pricing?.finalPrice ?? v2.amount,
+            expectedProfit: v2.profit,
+            fare: v2.pricing?.basePrice,
+          },
+        };
+        setDraftQuote(mapped);
+        setDraftSnapshot(v2.snapshot ?? null);
+        setQuote(v2.amount);
+        setDraftPricingSnapshot(null);
+        if (v2.warnings?.length) {
+          setError(v2.warnings.join(" · "));
+        }
+        return;
+      }
+
       const result = await pricingService.getQuote({
         tripType: booking.tripType,
         vehicleId: vehicleId || booking.vehicleId,
@@ -242,6 +299,7 @@ export function RideAdminBookingDetailPage() {
         destination,
         serviceType: booking.serviceType,
         date: booking.pickupDate,
+        time: booking.pickupTime,
       });
       setDraftQuote(result);
       if (result.snapshot && result.amount != null) {
@@ -253,27 +311,6 @@ export function RideAdminBookingDetailPage() {
       setDraftPricingSnapshot(result.pricingSnapshot ?? null);
       if (result.errorMessage && !result.autoQuote) {
         setError(result.errorMessage);
-      }
-
-      if (
-        opts?.autoSave &&
-        result.autoQuote &&
-        result.amount != null &&
-        result.amount > 0
-      ) {
-        const ok = await run({
-          action: "quote",
-          quotedPrice: result.amount,
-          deposit,
-          paidAmount: paid,
-          quoteSnapshot: result.snapshot ?? null,
-          pricingSnapshot: result.pricingSnapshot ?? null,
-        });
-        if (ok) {
-          setDraftQuote(null);
-          setDraftSnapshot(null);
-          setDraftPricingSnapshot(null);
-        }
       }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Không tính được báo giá");
@@ -772,10 +809,36 @@ export function RideAdminBookingDetailPage() {
                   </p>
                   <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                     <li>
-                      Quãng đường:{" "}
-                      {"distanceKm" in snapshot && snapshot.distanceKm != null
-                        ? `${snapshot.distanceKm} km`
-                        : "—"}
+                      Km tính cước:{" "}
+                      {(() => {
+                        const billable =
+                          draftQuote?.billableDistanceKm ??
+                          ("billableDistanceKm" in snapshot
+                            ? snapshot.billableDistanceKm
+                            : undefined) ??
+                          ("distanceKm" in snapshot
+                            ? snapshot.distanceKm
+                            : undefined);
+                        return billable != null ? `${billable} km` : "—";
+                      })()}
+                    </li>
+                    <li>
+                      Km vận hành:{" "}
+                      {(() => {
+                        const op =
+                          draftQuote?.operationalDistanceKm ??
+                          ("operationalDistanceKm" in snapshot
+                            ? snapshot.operationalDistanceKm
+                            : undefined);
+                        const factor =
+                          "operationalDistanceFactor" in snapshot
+                            ? snapshot.operationalDistanceFactor
+                            : undefined;
+                        if (op == null) return "—";
+                        return factor != null && factor !== 1
+                          ? `${op} km (×${factor})`
+                          : `${op} km`;
+                      })()}
                     </li>
                     <li>
                       Thời gian:{" "}
@@ -786,11 +849,26 @@ export function RideAdminBookingDetailPage() {
                     </li>
                     <li>
                       Nhiên liệu:{" "}
-                      {draftQuote?.fuelLiters != null
-                        ? `${draftQuote.fuelLiters} L (${formatCurrency(draftQuote.fuelCost ?? 0)})`
-                        : booking.quoteSnapshot
-                          ? `${booking.quoteSnapshot.fuelLiters} L (${formatCurrency(booking.quoteSnapshot.fuelCost)})`
-                          : "—"}
+                      {(() => {
+                        const liters =
+                          draftQuote?.fuelLiters ??
+                          draftQuote?.fuel?.liters ??
+                          booking.quoteSnapshot?.fuelLiters;
+                        const cost =
+                          draftQuote?.fuelCost ??
+                          draftQuote?.fuel?.cost ??
+                          booking.quoteSnapshot?.fuelCost;
+                        const fuelType =
+                          draftQuote?.fuel?.type ??
+                          booking.quoteSnapshot?.fuelSnapshot?.fuelType;
+                        if (liters == null) return "—";
+                        const lit = Number(liters).toLocaleString("vi-VN", {
+                          maximumFractionDigits: 2,
+                        });
+                        return `${fuelType ? `${fuelType} · ` : ""}${lit} L${
+                          cost != null ? ` (${formatCurrency(cost)})` : ""
+                        }`;
+                      })()}
                     </li>
                     <li>
                       Phí tài xế:{" "}
@@ -800,6 +878,33 @@ export function RideAdminBookingDetailPage() {
                           0,
                       )}
                     </li>
+                    {draftQuote?.pricing ? (
+                      <>
+                        <li>
+                          Tổng chi phí:{" "}
+                          {formatCurrency(draftQuote.pricing.totalCost ?? 0)}
+                        </li>
+                        <li>
+                          Giá khách:{" "}
+                          {formatCurrency(
+                            draftQuote.pricing.customerPrice ??
+                              draftQuote.amount ??
+                              0,
+                          )}
+                        </li>
+                        <li>
+                          Lợi nhuận dự kiến:{" "}
+                          {formatCurrency(
+                            draftQuote.pricing.expectedProfit ?? 0,
+                          )}
+                        </li>
+                      </>
+                    ) : booking.quoteSnapshot ? (
+                      <li>
+                        Giá khách:{" "}
+                        {formatCurrency(booking.quoteSnapshot.totalPrice)}
+                      </li>
+                    ) : null}
                   </ul>
                   <ul className="space-y-1 border-t border-emerald-200/80 pt-2 dark:border-emerald-900">
                     {(

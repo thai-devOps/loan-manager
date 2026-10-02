@@ -275,6 +275,16 @@ const RideAdminPricingPage = lazy(() =>
     default: m.RideAdminPricingPage,
   })),
 );
+const RideAdminPricingCalculatorPage = lazy(() =>
+  import("@/features/ride-admin/pages/pricing-calculator-page").then((m) => ({
+    default: m.RideAdminPricingCalculatorPage,
+  })),
+);
+const RideAdminFuelPricePage = lazy(() =>
+  import("@/features/ride-admin/pages/fuel-price-page").then((m) => ({
+    default: m.RideAdminFuelPricePage,
+  })),
+);
 const RideAdminSettingsPage = lazy(() =>
   import("@/features/ride-admin/pages/settings-page").then((m) => ({
     default: m.RideAdminSettingsPage,
@@ -777,6 +787,26 @@ export const router = createBrowserRouter([
                         permission={PERMISSIONS.FLEET_PRICING_VIEW}
                       >
                         <RideAdminPricingPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "pricing-calculator",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_PRICING_VIEW}
+                      >
+                        <RideAdminPricingCalculatorPage />
+                      </PermissionRoute>
+                    ),
+                  },
+                  {
+                    path: "fuel-prices",
+                    element: (
+                      <PermissionRoute
+                        permission={PERMISSIONS.FLEET_PRICING_VIEW}
+                      >
+                        <RideAdminFuelPricePage />
                       </PermissionRoute>
                     ),
                   },

@@ -95,6 +95,10 @@
     {
       "path": "/api/jobs/gold-price-sync",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/jobs/fuel-price-sync",
+      "schedule": "0 3 * * *"
     }
   ]
 }

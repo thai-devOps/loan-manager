@@ -2,6 +2,16 @@ import type { VehiclePricingConfig } from "./vehicle-pricing.js";
 
 export type QuoteTripType = "ONE_WAY" | "ROUND_TRIP" | "DAILY" | "CUSTOM";
 
+export type QuoteFuelOverride = {
+  estimatedLiters: number;
+  fuelCost: number;
+  fuelPricePerLiter: number;
+  consumptionLPer100Km: number;
+  billableDistanceKm: number;
+  operationalDistanceKm: number;
+  operationalDistanceFactor: number;
+};
+
 export type QuoteEngineInput = {
   tripType: QuoteTripType;
   distanceKm: number;
@@ -10,6 +20,8 @@ export type QuoteEngineInput = {
   tollFee?: number;
   parkingFee?: number;
   waitingFee?: number;
+  /** When set, fuel is taken from PVOIL estimate (operational km). */
+  fuelOverride?: QuoteFuelOverride | null;
 };
 
 export type QuoteBreakdownLine = {
@@ -34,8 +46,12 @@ export type QuoteEngineResult = {
   distanceKm: number;
   durationMinutes: number;
   billableKm: number;
+  operationalDistanceKm: number;
+  operationalDistanceFactor: number;
   fuelLiters: number;
   fuelCost: number;
+  fuelPricePerLiter: number;
+  fuelConsumptionPer100Km: number;
   driverCost: number;
   tollFee: number;
   parkingFee: number;
@@ -50,10 +66,6 @@ export type QuoteEngineResult = {
 
 function roundMoney(n: number): number {
   return Math.round(n);
-}
-
-function roundLiters(n: number): number {
-  return Math.round(n * 100) / 100;
 }
 
 function driverHours(durationMinutes: number): number {
@@ -74,8 +86,12 @@ export function calculateTripQuote(input: QuoteEngineInput): QuoteEngineResult {
       distanceKm: Math.max(0, input.distanceKm),
       durationMinutes: Math.max(0, input.durationMinutes),
       billableKm: Math.max(0, input.distanceKm),
+      operationalDistanceKm: Math.max(0, input.distanceKm),
+      operationalDistanceFactor: 1,
       fuelLiters: 0,
       fuelCost: 0,
+      fuelPricePerLiter: 0,
+      fuelConsumptionPer100Km: 0,
       driverCost: 0,
       tollFee,
       parkingFee,
@@ -95,10 +111,26 @@ export function calculateTripQuote(input: QuoteEngineInput): QuoteEngineResult {
   const billableKm = isRound ? oneWayKm * 2 : oneWayKm;
   const durationMinutes = isRound ? oneWayMinutes * 2 : oneWayMinutes;
 
-  const fuelLiters = roundLiters(
-    (billableKm * cfg.fuelConsumptionPer100Km) / 100,
-  );
-  const fuelCost = roundMoney(fuelLiters * cfg.fuelPricePerLiter);
+  const fuelOverride = input.fuelOverride;
+  const fuelLiters = fuelOverride
+    ? fuelOverride.estimatedLiters
+    : (billableKm * (Number(cfg.fuelConsumptionPer100Km) || 0)) / 100;
+  const fuelPricePerLiter = fuelOverride
+    ? fuelOverride.fuelPricePerLiter
+    : Number(cfg.fuelPricePerLiter) || 0;
+  const fuelConsumptionPer100Km = fuelOverride
+    ? fuelOverride.consumptionLPer100Km
+    : Number(cfg.fuelConsumptionPer100Km) || 0;
+  const fuelCost = fuelOverride
+    ? fuelOverride.fuelCost
+    : roundMoney(fuelLiters * fuelPricePerLiter);
+  const operationalDistanceKm = fuelOverride
+    ? fuelOverride.operationalDistanceKm
+    : billableKm;
+  const operationalDistanceFactor = fuelOverride
+    ? fuelOverride.operationalDistanceFactor
+    : 1;
+
   const driverCost = roundMoney(driverHours(durationMinutes) * cfg.driverRate);
   const operatingCost = fuelCost + driverCost;
 
@@ -121,8 +153,12 @@ export function calculateTripQuote(input: QuoteEngineInput): QuoteEngineResult {
       distanceKm: billableKm,
       durationMinutes,
       billableKm,
+      operationalDistanceKm,
+      operationalDistanceFactor,
       fuelLiters,
       fuelCost,
+      fuelPricePerLiter,
+      fuelConsumptionPer100Km,
       driverCost,
       tollFee,
       parkingFee,
@@ -157,8 +193,12 @@ export function calculateTripQuote(input: QuoteEngineInput): QuoteEngineResult {
     distanceKm: billableKm,
     durationMinutes,
     billableKm,
+    operationalDistanceKm,
+    operationalDistanceFactor,
     fuelLiters,
     fuelCost,
+    fuelPricePerLiter,
+    fuelConsumptionPer100Km,
     driverCost,
     tollFee,
     parkingFee,

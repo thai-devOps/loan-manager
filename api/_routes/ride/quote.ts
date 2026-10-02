@@ -14,10 +14,23 @@ import {
 } from "../../_lib/ride-route.js";
 import { calculateTripQuote } from "../../../shared/ride/quote-engine.js";
 import { resolveVehiclePricing } from "../../../shared/ride/vehicle-pricing.js";
+import type { RouteCondition } from "../../../shared/ride/vehicle-pricing.js";
 import type { TripType } from "../../_lib/ride-types.js";
-import { rideVehiclesCol, stripDoc } from "../../_lib/mongo.js";
+import { rideVehiclesCol, stripDoc, usersCol } from "../../_lib/mongo.js";
+import { verifyToken } from "../../_lib/auth.js";
+import {
+  getEffectivePermissions,
+  hasAnyPermission,
+} from "../../_lib/access/permissions-resolve.js";
+import { PERMISSIONS } from "../../_lib/access/catalog.js";
+import {
+  estimateTripFuelCostForVehicle,
+  fuelEstimateErrorToClient,
+} from "../../_lib/fuel-price/estimate-trip.js";
+import { buildFuelSnapshot } from "../../../shared/ride/fuel-estimate.js";
 
 const TRIP_TYPES = new Set(["ONE_WAY", "ROUND_TRIP", "DAILY", "CUSTOM"]);
+const ROUTE_CONDITIONS = new Set(["city", "highway", "mixed"]);
 
 type PlaceBody = {
   address?: string;
@@ -25,7 +38,6 @@ type PlaceBody = {
   longitude?: number | null;
 };
 
-/** Coerce place coords; treat null/undefined/NaN as missing (NOT 0 — Number(null)===0). */
 function parseCoord(raw: unknown): number | null {
   if (raw === null || raw === undefined || raw === "") return null;
   const n = typeof raw === "number" ? raw : Number(raw);
@@ -47,11 +59,6 @@ async function geocodeBest(address: string): Promise<GeocodeResult | null> {
   return hits[0] ?? null;
 }
 
-/**
- * Resolve a place from coords or address. When both ends only have addresses,
- * pick geocode candidates that are farthest apart (avoids both snapping to
- * the same Ambiguous "Châu Thành" / province center).
- */
 async function resolvePlacePair(
   pickup: PlaceBody | undefined,
   destination: PlaceBody | undefined,
@@ -77,7 +84,6 @@ async function resolvePlacePair(
       latitude: dLat as number,
       longitude: dLng as number,
     };
-    // Stored coords that collapse to ~same point are useless — geocode instead
     if (haversineKm(origin, dest) >= 0.2) {
       return { origin, destination: dest };
     }
@@ -135,7 +141,6 @@ async function resolvePlacePair(
       }
     }
   }
-
   if (!best || best.dist < 0.2) return null;
   return { origin: best.origin, destination: best.destination };
 }
@@ -145,20 +150,16 @@ async function routeWithRepair(
   destination: RoutePlace,
   pickupAddr: string,
   destAddr: string,
-): Promise<{ route: RouteResult; origin: RoutePlace; destination: RoutePlace }> {
-  try {
-    const route = await routeService.calculateRoute({ origin, destination });
-    if (route.distanceKm >= 0.2) {
-      return { route, origin, destination };
-    }
-  } catch (e) {
-    if (!(e instanceof RouteServiceError) || e.code === "MISSING_KEY") {
-      // continue to repair below for NO_ROUTE/UPSTREAM; rethrow MISSING only if no repair
-      if (e instanceof RouteServiceError && e.code === "MISSING_KEY") throw e;
-    }
+): Promise<{
+  route: RouteResult;
+  origin: RoutePlace;
+  destination: RoutePlace;
+}> {
+  const first = await routeService.calculateRoute({ origin, destination });
+  if (first.distanceKm >= 0.2) {
+    return { route: first, origin, destination };
   }
 
-  // Re-geocode with expanded queries and pick farthest pair
   const repaired = await resolvePlacePair(
     { address: pickupAddr || origin.address },
     { address: destAddr || destination.address },
@@ -175,6 +176,35 @@ async function routeWithRepair(
     origin: repaired.origin,
     destination: repaired.destination,
   };
+}
+
+function resolveDepartureAt(date?: string, time?: string): string {
+  const d = (date ?? "").trim();
+  const t = (time ?? "").trim();
+  if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const hhmm = t && /^\d{1,2}:\d{2}/.test(t) ? t.slice(0, 5) : "15:00";
+    const [h, m] = hhmm.split(":").map(Number);
+    const iso = `${d}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00+07:00`;
+    const parsed = new Date(iso);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  return new Date().toISOString();
+}
+
+async function canSeeInternalBreakdown(req: VercelRequest): Promise<boolean> {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return false;
+  const token = header.slice("Bearer ".length).trim();
+  const session = await verifyToken(token);
+  if (!session) return false;
+  const col = await usersCol();
+  const user = await col.findOne({ id: session.userId });
+  if (!user || user.status !== "ACTIVE") return false;
+  const { roleCodes, permissions } = await getEffectivePermissions(user);
+  return hasAnyPermission(permissions, roleCodes, [
+    PERMISSIONS.FLEET_BOOKING_VIEW,
+    PERMISSIONS.FLEET_PRICING_VIEW,
+  ]);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -194,7 +224,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       waitingFee?: number;
       serviceType?: string;
       date?: string;
+      time?: string;
+      departureAt?: string;
+      routeCondition?: string;
+      // Ignored — never trust client fuel/cost inputs
+      fuelPrice?: unknown;
+      fuelCost?: unknown;
+      fuelConsumption?: unknown;
+      markup?: unknown;
+      totalCost?: unknown;
     }>(req);
+
+    void body.fuelPrice;
+    void body.fuelCost;
+    void body.fuelConsumption;
+    void body.markup;
+    void body.totalCost;
 
     const tripType = (body.tripType ?? "").trim() as TripType;
     const vehicleId = (body.vehicleId ?? "").trim();
@@ -207,14 +252,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
+    const routeConditionRaw = (body.routeCondition ?? "").trim();
+    const routeCondition = ROUTE_CONDITIONS.has(routeConditionRaw)
+      ? (routeConditionRaw as RouteCondition)
+      : undefined;
+
     const vehicles = await rideVehiclesCol();
     const vehicle = await vehicles.findOne({ id: vehicleId, active: true });
     if (!vehicle) {
-      res.status(400).json({ error: "Xe không còn khả dụng" });
+      res.status(404).json({
+        error: "Không tìm thấy xe.",
+        code: "VEHICLE_NOT_FOUND",
+      });
       return;
     }
 
-    const pricing = resolveVehiclePricing(vehicle.pricing, vehicle.fuel);
+    const pricing = resolveVehiclePricing(vehicle.pricing);
 
     if (tripType === "CUSTOM") {
       const engine = calculateTripQuote({
@@ -231,19 +284,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         amount: null,
         autoQuote: false,
         totalPrice: null,
-        breakdown: engine.breakdown,
         vehicle: stripDoc(vehicle),
         errorCode: "CUSTOM",
         errorMessage:
           "Chuyến tùy chỉnh — vui lòng gửi yêu cầu báo giá thủ công.",
       });
+      void engine;
       return;
     }
 
     try {
       const pair = await resolvePlacePair(body.pickup, body.destination);
       if (!pair) {
-        // Last attempt: geocode each address individually
         const [o, d] = await Promise.all([
           geocodeBest(body.pickup?.address ?? ""),
           geocodeBest(body.destination?.address ?? ""),
@@ -271,6 +323,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           body.destination?.address ?? "",
         );
         return await respondQuote(
+          req,
           res,
           tripType,
           pricing,
@@ -279,6 +332,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           repaired.origin,
           repaired.destination,
           repaired.route,
+          routeCondition,
         );
       }
 
@@ -290,6 +344,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
 
       return await respondQuote(
+        req,
         res,
         tripType,
         pricing,
@@ -298,6 +353,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         repaired.origin,
         repaired.destination,
         repaired.route,
+        routeCondition,
       );
     } catch (e) {
       if (e instanceof RouteServiceError) {
@@ -318,6 +374,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 async function respondQuote(
+  req: VercelRequest,
   res: VercelResponse,
   tripType: TripType,
   pricing: ReturnType<typeof resolveVehiclePricing>,
@@ -330,28 +387,77 @@ async function respondQuote(
     destination?: PlaceBody;
     serviceType?: string;
     date?: string;
+    time?: string;
+    departureAt?: string;
   },
   origin: RoutePlace,
   destination: RoutePlace,
   route: RouteResult,
+  routeCondition?: RouteCondition,
 ) {
-  // Auto-quote from routed distance + vehicle pricing config (base + /km + fuel/driver).
+  const oneWayKm = route.distanceKm;
+  const isRound = tripType === "ROUND_TRIP";
+  const billableKm = isRound ? oneWayKm * 2 : oneWayKm;
+  const departureAt =
+    typeof body.departureAt === "string" && body.departureAt.trim()
+      ? new Date(body.departureAt).toISOString()
+      : resolveDepartureAt(body.date, body.time);
+
+  let fuelEstimate;
+  try {
+    fuelEstimate = await estimateTripFuelCostForVehicle({
+      vehicleId: String(vehicle.id),
+      billableDistanceKm: billableKm,
+      departureAt,
+      routeCondition,
+    });
+  } catch (e) {
+    const client = fuelEstimateErrorToClient(e);
+    if (client.code === "VEHICLE_FUEL_CONFIG_MISSING") {
+      client.code = "VEHICLE_FUEL_CONFIG_MISSING";
+    }
+    res.status(client.status).json({
+      error: client.message,
+      code: client.code === "VEHICLE_FUEL_CONFIG_MISSING" &&
+        client.message.includes("Không tìm thấy xe")
+        ? "VEHICLE_NOT_FOUND"
+        : client.code,
+      display: "Liên hệ báo giá",
+      amount: null,
+      autoQuote: false,
+    });
+    return;
+  }
+
   const engine = calculateTripQuote({
     tripType,
-    distanceKm: route.distanceKm,
+    distanceKm: oneWayKm,
     durationMinutes: route.durationMinutes,
     pricingConfig: pricing,
     tollFee: body.tollFee,
     parkingFee: body.parkingFee,
     waitingFee: body.waitingFee,
+    fuelOverride: {
+      estimatedLiters: fuelEstimate.estimatedLiters,
+      fuelCost: fuelEstimate.estimatedFuelCost,
+      fuelPricePerLiter: fuelEstimate.fuelPrice,
+      consumptionLPer100Km: fuelEstimate.consumptionLPer100Km,
+      billableDistanceKm: fuelEstimate.billableDistanceKm,
+      operationalDistanceKm: fuelEstimate.operationalDistanceKm,
+      operationalDistanceFactor: fuelEstimate.operationalDistanceFactor,
+    },
   });
 
   const quotedAt = new Date().toISOString();
+  const fuelSnapshot = buildFuelSnapshot(fuelEstimate);
   const snapshot = {
     distanceKm: engine.distanceKm,
     durationMinutes: engine.durationMinutes,
-    fuelPricePerLiter: pricing.fuelPricePerLiter,
-    fuelConsumptionPer100Km: pricing.fuelConsumptionPer100Km,
+    billableDistanceKm: engine.billableKm,
+    operationalDistanceKm: engine.operationalDistanceKm,
+    operationalDistanceFactor: engine.operationalDistanceFactor,
+    fuelPricePerLiter: engine.fuelPricePerLiter,
+    fuelConsumptionPer100Km: engine.fuelConsumptionPer100Km,
     fuelLiters: engine.fuelLiters,
     fuelCost: engine.fuelCost,
     driverFee: engine.driverCost,
@@ -365,6 +471,7 @@ async function respondQuote(
     breakdown: engine.breakdown,
     provider: route.provider,
     quotedAt,
+    fuelSnapshot,
   };
 
   const pricingSnapshot =
@@ -387,7 +494,43 @@ async function respondQuote(
         }
       : null;
 
-  res.status(200).json({
+  const internal = await canSeeInternalBreakdown(req);
+  const totalCost =
+    engine.fuelCost +
+    engine.driverCost +
+    engine.tollFee +
+    engine.parkingFee +
+    engine.waitingFee;
+  const customerPrice = engine.totalPrice;
+  const expectedProfit =
+    customerPrice != null ? customerPrice - totalCost : null;
+
+  /** Customer-safe snapshot: freeze fuel + price; omit internal cost lines. */
+  const publicSnapshot = {
+    distanceKm: snapshot.distanceKm,
+    durationMinutes: snapshot.durationMinutes,
+    billableDistanceKm: snapshot.billableDistanceKm,
+    operationalDistanceKm: snapshot.operationalDistanceKm,
+    operationalDistanceFactor: snapshot.operationalDistanceFactor,
+    fuelPricePerLiter: snapshot.fuelPricePerLiter,
+    fuelConsumptionPer100Km: snapshot.fuelConsumptionPer100Km,
+    fuelLiters: snapshot.fuelLiters,
+    fuelCost: snapshot.fuelCost,
+    driverFee: 0,
+    tollFee: snapshot.tollFee,
+    parkingFee: snapshot.parkingFee,
+    waitingFee: snapshot.waitingFee,
+    additionalFee: snapshot.additionalFee,
+    operatingCost: 0,
+    subtotal: snapshot.totalPrice,
+    totalPrice: snapshot.totalPrice,
+    breakdown: [] as typeof snapshot.breakdown,
+    provider: snapshot.provider,
+    quotedAt: snapshot.quotedAt,
+    fuelSnapshot: snapshot.fuelSnapshot,
+  };
+
+  const publicBody = {
     display:
       engine.totalPrice != null
         ? `${engine.totalPrice.toLocaleString("vi-VN")} đ`
@@ -395,21 +538,32 @@ async function respondQuote(
     amount: engine.totalPrice,
     autoQuote: engine.autoQuote,
     distanceKm: engine.distanceKm,
+    billableDistanceKm: engine.billableKm,
     durationMinutes: engine.durationMinutes,
+    fuel: {
+      type: fuelEstimate.fuelType,
+      consumption: fuelEstimate.consumptionLPer100Km,
+      liters: fuelEstimate.estimatedLiters,
+    },
     fuelLiters: engine.fuelLiters,
-    fuelCost: engine.fuelCost,
-    driverCost: engine.driverCost,
-    tollFee: engine.tollFee,
-    parkingFee: engine.parkingFee,
-    waitingFee: engine.waitingFee,
-    additionalFee: engine.additionalFee,
-    operatingCost: engine.operatingCost,
-    subtotal: engine.subtotal,
     totalPrice: engine.totalPrice,
-    breakdown: engine.breakdown,
     provider: route.provider,
-    snapshot,
-    pricingSnapshot,
+    snapshot: publicSnapshot,
+    pricingSnapshot: pricingSnapshot
+      ? {
+          pricingRuleId: pricingSnapshot.pricingRuleId,
+          version: pricingSnapshot.version,
+          calculatedAt: pricingSnapshot.calculatedAt,
+          basePrice: pricingSnapshot.basePrice,
+          distanceKm: pricingSnapshot.distanceKm,
+          distancePrice: pricingSnapshot.distancePrice,
+          surcharges: 0,
+          total: pricingSnapshot.total,
+          originKey: pricingSnapshot.originKey,
+          destinationKey: pricingSnapshot.destinationKey,
+          roundTrip: pricingSnapshot.roundTrip,
+        }
+      : null,
     resolvedPickup: {
       address: origin.address ?? body.pickup?.address ?? "",
       latitude: origin.latitude,
@@ -420,6 +574,46 @@ async function respondQuote(
       latitude: destination.latitude,
       longitude: destination.longitude,
     },
-    vehicle: stripDoc(vehicle as { _id?: unknown }),
-  });
+    vehicle: {
+      id: String(vehicle.id),
+      name: vehicle.name ?? undefined,
+      seats: vehicle.seats ?? undefined,
+    },
+  };
+
+  if (internal) {
+    res.status(200).json({
+      ...publicBody,
+      operationalDistanceKm: engine.operationalDistanceKm,
+      fuel: {
+        type: fuelEstimate.fuelType,
+        price: fuelEstimate.fuelPrice,
+        priceEffectiveAt: fuelEstimate.fuelPriceEffectiveAt,
+        consumption: fuelEstimate.consumptionLPer100Km,
+        liters: fuelEstimate.estimatedLiters,
+        cost: fuelEstimate.estimatedFuelCost,
+      },
+      snapshot,
+      pricingSnapshot,
+      fuelCost: engine.fuelCost,
+      driverCost: engine.driverCost,
+      tollFee: engine.tollFee,
+      parkingFee: engine.parkingFee,
+      waitingFee: engine.waitingFee,
+      additionalFee: engine.additionalFee,
+      operatingCost: engine.operatingCost,
+      subtotal: engine.subtotal,
+      breakdown: engine.breakdown,
+      pricing: {
+        totalCost,
+        customerPrice,
+        expectedProfit,
+        fare: engine.fare,
+      },
+      vehicle: stripDoc(vehicle as { _id?: unknown }),
+    });
+    return;
+  }
+
+  res.status(200).json(publicBody);
 }

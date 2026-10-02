@@ -127,6 +127,25 @@ export const API_ROUTES: ApiRoute[] = [
     load: () => import("../_routes/jobs/gold-price-sync.js"),
   },
   {
+    pattern: /^\/api\/jobs\/fuel-price-sync\/?$/,
+    load: () => import("../_routes/jobs/fuel-price-sync.js"),
+  },
+  {
+    method: "GET",
+    pattern: /^\/api\/fuel\/current\/?$/,
+    load: () => import("../_routes/fuel/current.js"),
+  },
+  {
+    method: "GET",
+    pattern: /^\/api\/fuel\/history\/?$/,
+    load: () => import("../_routes/fuel/history.js"),
+  },
+  {
+    method: "POST",
+    pattern: /^\/api\/admin\/fuel\/sync\/?$/,
+    load: () => import("../_routes/admin/fuel-sync.js"),
+  },
+  {
     pattern: /^\/api\/stats\/?$/,
     load: () => import("../_routes/stats/index.js"),
   },
@@ -168,6 +187,11 @@ export const API_ROUTES: ApiRoute[] = [
     pattern: /^\/api\/ride\/pricing\/calculate\/?$/,
     method: "POST",
     load: () => import("../_routes/ride/pricing/calculate.js"),
+  },
+  {
+    pattern: /^\/api\/ride\/pricing\/quote\/?$/,
+    method: "POST",
+    load: () => import("../_routes/ride/pricing/quote.js"),
   },
   {
     pattern: /^\/api\/ride\/pricing\/matrix\/?$/,

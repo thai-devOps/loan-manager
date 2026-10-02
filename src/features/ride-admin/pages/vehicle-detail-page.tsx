@@ -10,13 +10,13 @@ import { Can } from "@/features/auth/can";
 import { PERMISSIONS } from "@/config/permissions";
 import { ConfirmDeleteDialog } from "@/features/ride-admin/components/confirm-delete-dialog";
 import { vehicleAdminService } from "@/features/ride-admin/services/admin-api";
+import { VehicleFormFields } from "@/features/ride-admin/pages/vehicle-form-fields";
 import {
   formToVehiclePayload,
   vehicleToForm,
-  VehicleFormFields,
   VEHICLE_STATUS_LABEL,
   type VehicleFormState,
-} from "@/features/ride-admin/pages/vehicle-form-fields";
+} from "@/features/ride-admin/pages/vehicle-form-state";
 import { SUITABLE_FOR_LABELS } from "@/features/ride/lib/labels";
 import type { SuitableFor, Vehicle, VehicleStatus } from "@/features/ride/types/ride";
 import { formatCurrency } from "@/lib/currency";
@@ -698,12 +698,25 @@ export function RideAdminVehicleDetailPage() {
             </h2>
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
               <Field
-                label="Tiêu hao"
-                value={`${pricing.fuelConsumptionPer100Km} L/100km`}
+                label="Loại nhiên liệu"
+                value={String(pricing.fuelType ?? "—")}
+              />
+              <Field
+                label="Tiêu hao (hỗn hợp)"
+                value={
+                  pricing.fuelConsumption?.mixed != null
+                    ? `${pricing.fuelConsumption.mixed} L/100km`
+                    : pricing.defaultConsumption != null &&
+                        pricing.defaultConsumption > 0
+                      ? `${pricing.defaultConsumption} L/100km`
+                      : pricing.fuelConsumptionPer100Km > 0
+                        ? `${pricing.fuelConsumptionPer100Km} L/100km`
+                        : "Chưa cấu hình"
+                }
               />
               <Field
                 label="Giá nhiên liệu"
-                value={formatCurrency(pricing.fuelPricePerLiter)}
+                value="Theo PVOIL (ngày chuyến)"
               />
               <Field
                 label="Phí tài xế / giờ"

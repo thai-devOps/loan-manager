@@ -7,6 +7,7 @@ import type { RideVehicle, SuitableFor, VehicleStatus } from "../../../_lib/ride
 import { rideVehiclesCol, stripDoc } from "../../../_lib/mongo.js";
 import { SEED_VEHICLES } from "../../../_lib/ride-seed.js";
 import { resolveVehiclePricing } from "../../../../shared/ride/vehicle-pricing.js";
+import { validateVehicleFuelPricingInput } from "../../../../shared/ride/vehicle-fuel-validate.js";
 
 async function ensureSeed(): Promise<void> {
   const col = await rideVehiclesCol();
@@ -47,8 +48,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(400).json({ error: "Vui lòng nhập tên xe" });
         return;
       }
+      const fuelCheck = validateVehicleFuelPricingInput(body.pricing);
+      if (!fuelCheck.ok) {
+        res.status(400).json({ error: fuelCheck.error });
+        return;
+      }
       const now = new Date().toISOString();
       const id = randomUUID();
+      const pricing = resolveVehiclePricing(body.pricing);
+      if (pricing.fuelType || pricing.fuelConsumption) {
+        pricing.consumptionUpdatedAt = now;
+      }
       const vehicle: RideVehicle = {
         _id: id,
         id,
@@ -68,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         suitableFor: (Array.isArray(body.suitableFor)
           ? body.suitableFor
           : ["travel"]) as SuitableFor[],
-        pricing: resolveVehiclePricing(body.pricing, (body.fuel ?? "Xăng").trim()),
+        pricing,
         active: body.active !== false,
         status: (body.status as VehicleStatus) || "AVAILABLE",
         createdAt: now,

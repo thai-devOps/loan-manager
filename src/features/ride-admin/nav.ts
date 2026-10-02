@@ -1,8 +1,10 @@
 import {
   BarChart3,
+  Calculator,
   CalendarRange,
   CarFront,
   ClipboardList,
+  Fuel,
   LayoutDashboard,
   Receipt,
   Route,
@@ -33,6 +35,8 @@ export const RIDE_ADMIN_NAV: RideAdminNavItem[] = [
   { title: "Doanh thu", href: "/admin/revenue", icon: Wallet, stub: true },
   { title: "Chi phí", href: "/admin/expenses", icon: Receipt, stub: true },
   { title: "Bảng giá", href: "/admin/pricing", icon: Tags },
+  { title: "Máy tính giá", href: "/admin/pricing-calculator", icon: Calculator },
+  { title: "Giá xăng dầu", href: "/admin/fuel-prices", icon: Fuel },
   { title: "Báo cáo", href: "/admin/reports", icon: BarChart3, stub: true },
   { title: "Cài đặt", href: "/admin/settings", icon: Settings },
 ];

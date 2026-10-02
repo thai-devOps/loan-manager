@@ -8,130 +8,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ImageUploader } from "@/components/common/image-uploader";
-import type { Vehicle, VehicleStatus } from "@/features/ride/types/ride";
-import { DEFAULT_VEHICLE_PRICING } from "@shared/ride/vehicle-pricing";
-
-export const VEHICLE_STATUS_LABEL: Record<VehicleStatus, string> = {
-  AVAILABLE: "Sẵn sàng",
-  ON_TRIP: "Đang chạy",
-  MAINTENANCE: "Bảo dưỡng",
-  INACTIVE: "Ngưng",
-};
-
-export type VehicleFormState = {
-  name: string;
-  brand: string;
-  model: string;
-  licensePlate: string;
-  seats: string;
-  transmission: string;
-  fuel: string;
-  status: VehicleStatus;
-  active: boolean;
-  imageUrl: string;
-  imagePublicId: string;
-  features: string;
-  suitableFor: string;
-  fuelConsumptionPer100Km: string;
-  fuelPricePerLiter: string;
-  driverRate: string;
-  baseFare: string;
-  pricePerKm: string;
-  dailyRate: string;
-  includedKm: string;
-  extraKmRate: string;
-};
-
-export const emptyVehicleForm = (): VehicleFormState => ({
-  name: "",
-  brand: "",
-  model: "",
-  licensePlate: "",
-  seats: "7",
-  transmission: "Số tự động",
-  fuel: "Xăng",
-  status: "AVAILABLE",
-  active: true,
-  imageUrl: "",
-  imagePublicId: "",
-  features: "Xe riêng + tài xế",
-  suitableFor: "travel",
-  fuelConsumptionPer100Km: String(DEFAULT_VEHICLE_PRICING.fuelConsumptionPer100Km),
-  fuelPricePerLiter: String(DEFAULT_VEHICLE_PRICING.fuelPricePerLiter),
-  driverRate: String(DEFAULT_VEHICLE_PRICING.driverRate),
-  baseFare: String(DEFAULT_VEHICLE_PRICING.baseFare),
-  pricePerKm: String(DEFAULT_VEHICLE_PRICING.pricePerKm),
-  dailyRate: String(DEFAULT_VEHICLE_PRICING.dailyRate),
-  includedKm: String(DEFAULT_VEHICLE_PRICING.includedKm),
-  extraKmRate: String(DEFAULT_VEHICLE_PRICING.extraKmRate),
-});
-
-export function vehicleToForm(v: Vehicle): VehicleFormState {
-  const p = v.pricing ?? DEFAULT_VEHICLE_PRICING;
-  return {
-    name: v.name,
-    brand: v.brand,
-    model: v.model,
-    licensePlate: v.licensePlate ?? "",
-    seats: String(v.seats),
-    transmission: v.transmission,
-    fuel: v.fuel,
-    status: (v.status as VehicleStatus) || "AVAILABLE",
-    active: v.active,
-    imageUrl: v.images[0] ?? "",
-    imagePublicId: v.imagePublicIds?.[0] ?? "",
-    features: (v.features ?? []).join(", "),
-    suitableFor: (v.suitableFor ?? []).join(", "),
-    fuelConsumptionPer100Km: String(p.fuelConsumptionPer100Km),
-    fuelPricePerLiter: String(p.fuelPricePerLiter),
-    driverRate: String(p.driverRate),
-    baseFare: String(p.baseFare),
-    pricePerKm: String(p.pricePerKm),
-    dailyRate: String(p.dailyRate),
-    includedKm: String(p.includedKm),
-    extraKmRate: String(p.extraKmRate),
-  };
-}
-
-export function formToVehiclePayload(form: VehicleFormState): Partial<Vehicle> {
-  const imageUrl = form.imageUrl.trim();
-  const imagePublicId = form.imagePublicId.trim();
-  const features = form.features
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const suitableFor = form.suitableFor
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean) as Vehicle["suitableFor"];
-
-  return {
-    name: form.name.trim(),
-    brand: form.brand.trim(),
-    model: form.model.trim(),
-    licensePlate: form.licensePlate.trim(),
-    seats: Number(form.seats) || 4,
-    transmission: form.transmission.trim(),
-    fuel: form.fuel.trim(),
-    status: form.status,
-    active: form.active,
-    images: imageUrl ? [imageUrl] : [],
-    imagePublicIds: imagePublicId ? [imagePublicId] : [],
-    features: features.length > 0 ? features : ["Xe riêng + tài xế"],
-    suitableFor: suitableFor.length > 0 ? suitableFor : ["travel"],
-    pricing: {
-      fuelType: form.fuel.trim(),
-      fuelConsumptionPer100Km: Number(form.fuelConsumptionPer100Km) || 0,
-      fuelPricePerLiter: Number(form.fuelPricePerLiter) || 0,
-      driverRate: Number(form.driverRate) || 0,
-      baseFare: Number(form.baseFare) || 0,
-      pricePerKm: Number(form.pricePerKm) || 0,
-      dailyRate: Number(form.dailyRate) || 0,
-      includedKm: Number(form.includedKm) || 0,
-      extraKmRate: Number(form.extraKmRate) || 0,
-    },
-  };
-}
+import type {
+  ConsumptionSource,
+  PricingStrategy,
+  VehicleFuelType,
+  VehicleStatus,
+} from "@/features/ride/types/ride";
+import {
+  CONSUMPTION_SOURCE_LABELS,
+  CONSUMPTION_SOURCES,
+  FUEL_TYPE_LABELS,
+  PRICE_ROUNDING_UNITS,
+  PRICING_STRATEGIES,
+  PRICING_STRATEGY_LABELS,
+  VEHICLE_FUEL_TYPES,
+} from "@shared/ride/vehicle-pricing";
+import {
+  VEHICLE_STATUS_LABEL,
+  type VehicleFormState,
+} from "@/features/ride-admin/pages/vehicle-form-state";
 
 export function VehicleFormFields({
   form,
@@ -140,7 +35,10 @@ export function VehicleFormFields({
   form: VehicleFormState;
   onChange: (next: VehicleFormState) => void;
 }) {
-  function set<K extends keyof VehicleFormState>(key: K, value: VehicleFormState[K]) {
+  function set<K extends keyof VehicleFormState>(
+    key: K,
+    value: VehicleFormState[K],
+  ) {
     onChange({ ...form, [key]: value });
   }
 
@@ -154,7 +52,7 @@ export function VehicleFormFields({
           ["licensePlate", "Biển số"],
           ["seats", "Số chỗ"],
           ["transmission", "Hộp số"],
-          ["fuel", "Nhiên liệu"],
+          ["fuel", "Nhãn nhiên liệu (hiển thị)"],
         ] as const
       ).map(([key, label]) => (
         <div key={key} className="space-y-1.5">
@@ -228,19 +126,57 @@ export function VehicleFormFields({
       </div>
 
       <p className="sm:col-span-2 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        Cấu hình giá / nhiên liệu
+        Nhiên liệu
       </p>
+      <p className="sm:col-span-2 -mt-2 text-xs text-muted-foreground">
+        Giá xăng lấy từ PVOIL theo ngày chuyến (không nhập tay). Đơn vị tiêu hao:
+        L/100km.
+      </p>
+
+      <div className="space-y-1.5">
+        <Label>Loại nhiên liệu</Label>
+        <Select
+          value={form.fuelType || undefined}
+          onValueChange={(v) => set("fuelType", v as VehicleFuelType)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Chọn loại PVOIL" />
+          </SelectTrigger>
+          <SelectContent>
+            {VEHICLE_FUEL_TYPES.map((code) => (
+              <SelectItem key={code} value={code}>
+                {FUEL_TYPE_LABELS[code]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Nguồn tiêu hao</Label>
+        <Select
+          value={form.consumptionSource || undefined}
+          onValueChange={(v) => set("consumptionSource", v as ConsumptionSource)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Chọn nguồn" />
+          </SelectTrigger>
+          <SelectContent>
+            {CONSUMPTION_SOURCES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {CONSUMPTION_SOURCE_LABELS[s]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {(
         [
-          ["fuelConsumptionPer100Km", "Tiêu hao (L/100km)"],
-          ["fuelPricePerLiter", "Giá nhiên liệu (đ/L)"],
-          ["driverRate", "Phí tài xế / giờ"],
-          ["baseFare", "Cước cơ bản"],
-          ["pricePerKm", "Giá / km"],
-          ["dailyRate", "Giá theo ngày"],
-          ["includedKm", "Km định mức / ngày"],
-          ["extraKmRate", "Giá km vượt"],
+          ["consumptionCity", "Đô thị (L/100km)"],
+          ["consumptionHighway", "Đường trường (L/100km)"],
+          ["consumptionMixed", "Hỗn hợp (L/100km)"],
+          ["defaultConsumption", "Mặc định (L/100km)"],
         ] as const
       ).map(([key, label]) => (
         <div key={key} className="space-y-1.5">
@@ -253,6 +189,121 @@ export function VehicleFormFields({
           />
         </div>
       ))}
+
+      <p className="sm:col-span-2 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        Chi phí xe
+      </p>
+      <p className="sm:col-span-2 -mt-2 text-xs text-muted-foreground">
+        Dùng cho Pricing Engine v2 (giá vốn). Không ảnh hưởng bảng giá công khai
+        cũ.
+      </p>
+
+      {(
+        [
+          ["depreciationPerKm", "Khấu hao / km (đ)", "Chi phí hao mòn xe theo km vận hành"],
+          [
+            "operatingCostPerKm",
+            "Vận hành / km (đ)",
+            "Bảo dưỡng, lốp, dầu, bảo hiểm… gộp / km",
+          ],
+          [
+            "waitingHourlyRate",
+            "Phí chờ / giờ (đ)",
+            "Khi khách yêu cầu chờ thêm ngoài thời gian lái",
+          ],
+        ] as const
+      ).map(([key, label, tip]) => (
+        <div key={key} className="space-y-1.5">
+          <Label htmlFor={`vehicle-${key}`} title={tip}>
+            {label}
+          </Label>
+          <Input
+            id={`vehicle-${key}`}
+            inputMode="decimal"
+            value={form[key]}
+            onChange={(e) => set(key, e.target.value)}
+          />
+        </div>
+      ))}
+
+      <p className="sm:col-span-2 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        Giá bán
+      </p>
+
+      {(
+        [
+          ["baseFare", "Phí khởi hành / cước cơ bản (đ)"],
+          ["pricePerKm", "Giá / km (đ)"],
+          ["driverRate", "Phí tài xế / giờ (đ)"],
+          ["dailyRate", "Giá theo ngày (đ)"],
+          ["includedKm", "Km định mức / ngày"],
+          ["extraKmRate", "Giá km vượt (đ)"],
+          ["minimumTripPrice", "Giá tối thiểu chuyến (đ)"],
+        ] as const
+      ).map(([key, label]) => (
+        <div key={key} className="space-y-1.5">
+          <Label htmlFor={`vehicle-${key}`}>{label}</Label>
+          <Input
+            id={`vehicle-${key}`}
+            inputMode="decimal"
+            value={form[key]}
+            onChange={(e) => set(key, e.target.value)}
+          />
+        </div>
+      ))}
+
+      <div className="space-y-1.5">
+        <Label
+          htmlFor="vehicle-targetMarginPercent"
+          title="Margin trên giá bán, ví dụ 30 = 30%. Công thức: giá = vốn / (1 − margin)"
+        >
+          Target margin (%)
+        </Label>
+        <Input
+          id="vehicle-targetMarginPercent"
+          inputMode="decimal"
+          value={form.targetMarginPercent}
+          onChange={(e) => set("targetMarginPercent", e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Làm tròn giá bán</Label>
+        <Select
+          value={form.priceRoundingUnit || undefined}
+          onValueChange={(v) => set("priceRoundingUnit", v)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Đơn vị làm tròn" />
+          </SelectTrigger>
+          <SelectContent>
+            {PRICE_ROUNDING_UNITS.map((u) => (
+              <SelectItem key={u} value={String(u)}>
+                {u.toLocaleString("vi-VN")} đ
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Chiến lược giá mặc định</Label>
+        <Select
+          value={form.pricingStrategy || undefined}
+          onValueChange={(v) => set("pricingStrategy", v as PricingStrategy)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Chiến lược" />
+          </SelectTrigger>
+          <SelectContent>
+            {PRICING_STRATEGIES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {PRICING_STRATEGY_LABELS[s]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

@@ -60,9 +60,32 @@ export type TripDriverSnapshot = {
   vehiclePlate: string;
 };
 
+export type VehicleFuelType =
+  | "E10_RON95_III"
+  | "E5_RON92_II"
+  | "DO_005S_II"
+  | "DO_0001S_V";
+
+export type ConsumptionSource =
+  | "manufacturer"
+  | "manual"
+  | "estimated"
+  | "actual";
+
+export type FuelConsumptionRates = {
+  city: number;
+  highway: number;
+  mixed: number;
+};
+
 export type VehiclePricingConfig = {
-  fuelType?: string;
+  fuelType?: VehicleFuelType | string;
+  fuelConsumption?: FuelConsumptionRates;
+  defaultConsumption?: number;
+  consumptionSource?: ConsumptionSource;
+  consumptionUpdatedAt?: string;
   fuelConsumptionPer100Km: number;
+  /** Deprecated for quotation; PVOIL is source of truth. */
   fuelPricePerLiter: number;
   driverRate: number;
   baseFare: number;
@@ -70,6 +93,21 @@ export type VehiclePricingConfig = {
   dailyRate: number;
   includedKm: number;
   extraKmRate: number;
+};
+
+export type BookingFuelSnapshot = {
+  vehicleId: string;
+  fuelType: string;
+  fuelPrice: number;
+  fuelPriceEffectiveAt: string;
+  billableDistanceKm: number;
+  operationalDistanceKm: number;
+  operationalDistanceFactor: number;
+  routeCondition: "city" | "highway" | "mixed" | "default";
+  consumptionLPer100Km: number;
+  estimatedLiters: number;
+  estimatedFuelCost: number;
+  source: "PVOIL";
 };
 
 export type QuoteBreakdownLine = {
@@ -80,6 +118,9 @@ export type QuoteBreakdownLine = {
 export type BookingQuoteSnapshot = {
   distanceKm: number;
   durationMinutes: number;
+  billableDistanceKm?: number;
+  operationalDistanceKm?: number;
+  operationalDistanceFactor?: number;
   fuelPricePerLiter: number;
   fuelConsumptionPer100Km: number;
   fuelLiters: number;
@@ -95,6 +136,7 @@ export type BookingQuoteSnapshot = {
   breakdown: QuoteBreakdownLine[];
   provider?: string;
   quotedAt: string;
+  fuelSnapshot?: BookingFuelSnapshot | null;
 };
 
 export type PricingRuleType =
@@ -204,6 +246,10 @@ export type TripActualCosts = {
   fuelPricePerLiter?: number | null;
   fuelAmount?: number | null;
   driverFee?: number | null;
+  /** Prepared for future actual consumption tracking. */
+  odoStart?: number | null;
+  odoEnd?: number | null;
+  actualDistanceKm?: number | null;
   items: TripActualCostItem[];
 };
 

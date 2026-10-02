@@ -324,6 +324,91 @@ export type RideSettingsResponse = {
   bookingAntiSpamEnabled: boolean;
   bookingAntiSpamSource: "mongo" | "env";
   envDefault: boolean;
+  operationalDistanceFactor: number;
+  pricingEngineV2Enabled?: boolean;
+};
+
+export type PricingV2QuoteRequest = {
+  vehicleId: string;
+  origin: { address: string; latitude?: number | null; longitude?: number | null };
+  destination: {
+    address: string;
+    latitude?: number | null;
+    longitude?: number | null;
+  };
+  tripType: string;
+  routeType?: string;
+  waitingHours?: number;
+  tolls?: { name: string; amount: number }[];
+  otherCosts?: number;
+  travelDate: string;
+  bookingId?: string;
+  distanceKm?: number;
+  durationMinutes?: number;
+};
+
+export type PricingV2QuoteResponse = {
+  success: boolean;
+  pricingEngineVersion?: string;
+  calculationId?: string;
+  display?: string;
+  amount?: number | null;
+  autoQuote?: boolean;
+  route?: {
+    distanceKm: number;
+    oneWayDistanceKm?: number;
+    pricingDistanceKm?: number;
+    durationMinutes: number;
+    routeType: string;
+    operationalDistanceKm?: number;
+    operationalDistanceFactor?: number;
+    source?: string;
+    provider?: string;
+  };
+  fuel?: {
+    fuelType: string;
+    pricePerLiter: number | null;
+    source: string;
+    sourceDate: string | null;
+    fuelPriceStatus: string;
+    consumptionLPer100Km: number | null;
+    consumptionSource?: string;
+    estimatedLiters: number;
+    fuelCost: number;
+  };
+  cost?: {
+    fuel: number;
+    driver: number;
+    waiting: number;
+    toll: number;
+    depreciation: number;
+    operating: number;
+    other: number;
+    total: number;
+  };
+  pricing?: {
+    strategy?: string;
+    basePrice: number;
+    costPlusPrice?: number;
+    recommendedPrice: number;
+    recommendedPriceBeforeRound?: number;
+    finalPrice: number;
+    minimumTripPrice?: number;
+    targetMargin?: number;
+  };
+  profit?: number;
+  margin?: number;
+  marginPercent?: number;
+  warnings?: string[];
+  snapshot?: import("@/features/ride/types/ride").BookingQuoteSnapshot | null;
+  error?: string;
+  code?: string;
+};
+
+export const pricingV2AdminService = {
+  quote(body: PricingV2QuoteRequest): Promise<PricingV2QuoteResponse> {
+    return apiFetch("/api/ride/pricing/quote", { method: "POST", body });
+  },
 };
 
 export const rideSettingsAdminService = {
@@ -332,6 +417,7 @@ export const rideSettingsAdminService = {
   },
   update(body: {
     bookingAntiSpamEnabled?: boolean | null;
+    operationalDistanceFactor?: number | null;
   }): Promise<RideSettingsResponse> {
     return apiFetch("/api/ride/settings", { method: "PATCH", body });
   },
@@ -346,6 +432,71 @@ export type AvailabilityOption = {
   seats?: number;
   phone?: string;
   status?: string;
+};
+
+export type FuelPriceProductDto = {
+  code: string;
+  name: string;
+  price: number;
+  change: number | null;
+  unit: "VND/L";
+};
+
+export type FuelPriceCurrentDto = {
+  source: "PVOIL";
+  effectiveAt: string;
+  effectiveDateRaw: string;
+  crawledAt: string;
+  products: FuelPriceProductDto[];
+};
+
+export type FuelPriceHistoryDto = {
+  items: Array<
+    FuelPriceCurrentDto & {
+      id: string;
+      createdAt: string;
+      updatedAt: string;
+      sourceUrl?: string;
+    }
+  >;
+  page: number;
+  limit: number;
+  total: number;
+};
+
+export type FuelSyncResultDto = {
+  ok: true;
+  status: "synced" | "already_synced" | "failed";
+  source: "PVOIL";
+  effectiveAt?: string;
+  effectiveDateRaw?: string;
+  productCount?: number;
+  products?: FuelPriceProductDto[];
+  crawledAt?: string;
+};
+
+export const fuelPriceAdminService = {
+  current(): Promise<FuelPriceCurrentDto> {
+    return apiFetch("/api/fuel/current");
+  },
+
+  history(params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<FuelPriceHistoryDto> {
+    const qs = new URLSearchParams();
+    if (params?.page != null) qs.set("page", String(params.page));
+    if (params?.limit != null) qs.set("limit", String(params.limit));
+    const q = qs.toString();
+    return apiFetch(`/api/fuel/history${q ? `?${q}` : ""}`);
+  },
+
+  sync(body?: { date?: string }): Promise<FuelSyncResultDto> {
+    return apiFetch("/api/admin/fuel/sync", {
+      method: "POST",
+      body: body ?? {},
+    });
+  },
 };
 
 export const availabilityAdminService = {

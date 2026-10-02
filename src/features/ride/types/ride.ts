@@ -49,16 +49,64 @@ export type Place = {
   longitude?: number | null;
 };
 
+export type VehicleFuelType =
+  | "E10_RON95_III"
+  | "E5_RON92_II"
+  | "DO_005S_II"
+  | "DO_0001S_V";
+
+export type ConsumptionSource =
+  | "manufacturer"
+  | "manual"
+  | "estimated"
+  | "actual";
+
+export type FuelConsumptionRates = {
+  city: number;
+  highway: number;
+  mixed: number;
+};
+
+export type PricingStrategy = "PER_KM" | "DAILY" | "COST_PLUS";
+
 export type VehiclePricingConfig = {
-  fuelType?: string;
+  fuelType?: VehicleFuelType | string;
+  fuelConsumption?: FuelConsumptionRates;
+  defaultConsumption?: number;
+  consumptionSource?: ConsumptionSource;
+  consumptionUpdatedAt?: string;
   fuelConsumptionPer100Km: number;
   fuelPricePerLiter: number;
   driverRate: number;
   baseFare: number;
+  startupFee?: number;
   pricePerKm: number;
   dailyRate: number;
   includedKm: number;
+  dailyIncludedKm?: number;
   extraKmRate: number;
+  waitingHourlyRate?: number;
+  depreciationPerKm?: number;
+  operatingCostPerKm?: number;
+  minimumTripPrice?: number;
+  targetMargin?: number;
+  priceRoundingUnit?: number;
+  pricingStrategy?: PricingStrategy;
+};
+
+export type BookingFuelSnapshot = {
+  vehicleId: string;
+  fuelType: string;
+  fuelPrice: number;
+  fuelPriceEffectiveAt: string;
+  billableDistanceKm: number;
+  operationalDistanceKm: number;
+  operationalDistanceFactor: number;
+  routeCondition: "city" | "highway" | "mixed" | "default";
+  consumptionLPer100Km: number;
+  estimatedLiters: number;
+  estimatedFuelCost: number;
+  source: "PVOIL";
 };
 
 export type VehicleInsurance = {
@@ -90,6 +138,9 @@ export type QuoteBreakdownLine = {
 export type BookingQuoteSnapshot = {
   distanceKm: number;
   durationMinutes: number;
+  billableDistanceKm?: number;
+  operationalDistanceKm?: number;
+  operationalDistanceFactor?: number;
   fuelPricePerLiter: number;
   fuelConsumptionPer100Km: number;
   fuelLiters: number;
@@ -105,6 +156,7 @@ export type BookingQuoteSnapshot = {
   breakdown: QuoteBreakdownLine[];
   provider?: string;
   quotedAt: string;
+  fuelSnapshot?: BookingFuelSnapshot | null;
 };
 
 export type PricingRuleType =
@@ -457,6 +509,9 @@ export type TripActualCosts = {
   fuelPricePerLiter?: number | null;
   fuelAmount?: number | null;
   driverFee?: number | null;
+  odoStart?: number | null;
+  odoEnd?: number | null;
+  actualDistanceKm?: number | null;
   items: TripActualCostItem[];
 };
 
@@ -519,6 +574,8 @@ export type PriceQuote = {
   amount: number | null;
   autoQuote?: boolean;
   distanceKm?: number;
+  billableDistanceKm?: number;
+  operationalDistanceKm?: number;
   durationMinutes?: number;
   fuelLiters?: number;
   fuelCost?: number;
@@ -530,10 +587,24 @@ export type PriceQuote = {
   operatingCost?: number;
   subtotal?: number;
   totalPrice?: number | null;
+  fuel?: {
+    type?: string;
+    price?: number;
+    priceEffectiveAt?: string;
+    consumption?: number;
+    liters?: number;
+    cost?: number;
+  };
   breakdown?: QuoteBreakdownLine[];
   provider?: string;
   snapshot?: BookingQuoteSnapshot | null;
   pricingSnapshot?: BookingPricingSnapshot | null;
+  pricing?: {
+    totalCost?: number;
+    customerPrice?: number | null;
+    expectedProfit?: number | null;
+    fare?: number;
+  };
   matchedRuleId?: string;
   pricingVersion?: number;
   errorCode?:
@@ -542,7 +613,13 @@ export type PriceQuote = {
     | "UPSTREAM"
     | "MISSING_KEY"
     | "CUSTOM"
-    | "NO_PRICING_RULE_FOUND";
+    | "NO_PRICING_RULE_FOUND"
+    | "VEHICLE_NOT_FOUND"
+    | "VEHICLE_FUEL_CONFIG_MISSING"
+    | "FUEL_PRICE_NOT_FOUND"
+    | "FUEL_CONSUMPTION_INVALID"
+    | "DISTANCE_INVALID"
+    | "QUOTATION_CALCULATION_FAILED";
   errorMessage?: string;
 };
 
@@ -565,6 +642,7 @@ export type CreateTripInput = {
   note?: string;
   quoteSnapshot?: BookingQuoteSnapshot | null;
   pricingSnapshot?: BookingPricingSnapshot | null;
+  quotedPrice?: number | null;
   /** Anti-spam: stable browser client id */
   clientId?: string;
   /** Honeypot — must stay empty */

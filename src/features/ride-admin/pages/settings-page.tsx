@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Can } from "@/features/auth/can";
@@ -14,10 +15,18 @@ import { cn } from "@/lib/utils";
 export function RideAdminSettingsPage() {
   const queryClient = useQueryClient();
   const [confirmDisable, setConfirmDisable] = useState(false);
+  const [factorDraft, setFactorDraft] = useState<string | null>(null);
   const settingsQ = useQuery({
     queryKey: ["ride-admin", "settings"],
     queryFn: () => rideSettingsAdminService.get(),
   });
+
+  const serverFactor = settingsQ.data?.operationalDistanceFactor;
+  const factorInput =
+    factorDraft ??
+    (serverFactor != null && Number.isFinite(serverFactor)
+      ? String(serverFactor)
+      : "1");
 
   const saveMut = useMutation({
     mutationFn: (bookingAntiSpamEnabled: boolean) =>
@@ -26,10 +35,25 @@ export function RideAdminSettingsPage() {
       await queryClient.invalidateQueries({
         queryKey: ["ride-admin", "settings"],
       });
-      toast.success(
-        enabled ? "Đã bật chặn spam" : "Đã tắt chặn spam",
-      );
+      toast.success(enabled ? "Đã bật chặn spam" : "Đã tắt chặn spam");
       setConfirmDisable(false);
+    },
+  });
+
+  const factorMut = useMutation({
+    mutationFn: (operationalDistanceFactor: number) =>
+      rideSettingsAdminService.update({ operationalDistanceFactor }),
+    onSuccess: async () => {
+      setFactorDraft(null);
+      await queryClient.invalidateQueries({
+        queryKey: ["ride-admin", "settings"],
+      });
+      toast.success("Đã lưu hệ số quãng đường vận hành");
+    },
+    onError: (err) => {
+      toast.error(
+        err instanceof ApiError ? err.message : "Không lưu được hệ số",
+      );
     },
   });
 
@@ -48,11 +72,53 @@ export function RideAdminSettingsPage() {
           Cài đặt vận hành
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Cấu hình bảo vệ form đặt chuyến công khai.
+          Bảo vệ form đặt chuyến và hệ số tính nhiên liệu.
         </p>
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      <section className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-6">
+        <div className="space-y-1">
+          <h2 className="font-semibold">Quãng đường vận hành</h2>
+          <p className="text-sm text-muted-foreground">
+            Chi phí nhiên liệu = quãng đường tính tiền × hệ số này. Mặc định 1.0
+            (không cộng thêm). Ví dụ 1.15 ≈ thêm 15% km vận hành.
+          </p>
+        </div>
+        {settingsQ.isLoading ? (
+          <Skeleton className="h-12 w-full rounded-xl" />
+        ) : (
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="ops-factor">Hệ số (≥ 1)</Label>
+              <Input
+                id="ops-factor"
+                className="w-32"
+                inputMode="decimal"
+                value={factorInput}
+                onChange={(e) => setFactorDraft(e.target.value)}
+              />
+            </div>
+            <Can permission={PERMISSIONS.FLEET_BOOKING_UPDATE}>
+              <Button
+                type="button"
+                disabled={factorMut.isPending}
+                onClick={() => {
+                  const n = Number(factorInput);
+                  if (!Number.isFinite(n) || n < 1) {
+                    toast.error("Hệ số phải ≥ 1");
+                    return;
+                  }
+                  factorMut.mutate(n);
+                }}
+              >
+                Lưu hệ số
+              </Button>
+            </Can>
+          </div>
+        )}
+      </section>
 
       <section className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-6">
         <div className="space-y-1">
