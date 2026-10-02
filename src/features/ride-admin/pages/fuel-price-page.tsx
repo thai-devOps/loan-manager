@@ -33,6 +33,11 @@ function changeClass(change: number | null | undefined): string {
   return "text-muted-foreground";
 }
 
+function regionLabel(region?: string): string {
+  if (region === "REGION_2") return "Vùng 2";
+  return "Vùng 1";
+}
+
 export function RideAdminFuelPricePage() {
   const queryClient = useQueryClient();
 
@@ -58,21 +63,23 @@ export function RideAdminFuelPricePage() {
           queryKey: [...rideAdminQueryKeys.all, "fuel-history"],
         }),
       ]);
-      if (data.status === "already_synced") {
+      if (data.status === "already_synced" || data.changed === false) {
         toast.message("Đã đồng bộ trước đó", {
           description: data.effectiveAt
             ? `Hiệu lực: ${formatDateTime(data.effectiveAt)}`
-            : undefined,
+            : data.message,
         });
         return;
       }
-      toast.success("Đã đồng bộ giá xăng dầu từ PVOIL");
+      toast.success(
+        data.message ?? "Đồng bộ giá xăng Petrolimex thành công",
+      );
     },
     onError: (err) => {
       const msg =
         err instanceof ApiError
           ? err.message
-          : "Không thể đồng bộ giá xăng dầu từ PVOIL.";
+          : "Không thể lấy dữ liệu giá xăng Petrolimex.";
       toast.error(msg);
     },
   });
@@ -87,6 +94,11 @@ export function RideAdminFuelPricePage() {
       ? currentQ.error.message
       : "Không tải được giá xăng dầu.";
   const historyItems = historyQ.data?.items ?? [];
+  const freshness =
+    data == null ? null : data.isStale ? "Stale" : "Fresh";
+  const showRegions = data?.products.some(
+    (p) => p.region1Price != null || p.region2Price != null,
+  );
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -96,7 +108,8 @@ export function RideAdminFuelPricePage() {
             Giá xăng dầu
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Bảng giá PVOIL (server sync). Không gọi PVOIL từ trình duyệt.
+            Bảng giá Petrolimex (server sync). Không gọi nguồn giá từ trình
+            duyệt.
           </p>
         </div>
         <Can permission={PERMISSIONS.FLEET_PRICING_UPDATE}>
@@ -116,18 +129,44 @@ export function RideAdminFuelPricePage() {
 
       <section className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-6">
         <div className="space-y-1">
-          <h2 className="font-semibold">Giá hiện tại (PVOIL)</h2>
+          <h2 className="font-semibold">Giá hiện tại (Petrolimex)</h2>
           {currentQ.isLoading && <Skeleton className="h-4 w-64" />}
           {!currentQ.isLoading && data && (
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>Nguồn: {data.source}</span>
+              <span>Nhà cung cấp: {data.provider ?? data.source}</span>
+              <span>Region: {regionLabel(data.region)}</span>
+              <span
+                className={cn(
+                  "font-medium",
+                  freshness === "Fresh"
+                    ? "text-emerald-700 dark:text-emerald-400"
+                    : "text-amber-700 dark:text-amber-400",
+                )}
+              >
+                {freshness}
+                {data.isStale && data.staleHours != null
+                  ? ` (${data.staleHours}h)`
+                  : ""}
+              </span>
               <span>Cập nhật: {formatDateTime(data.effectiveAt)}</span>
-              <span>Đồng bộ lúc: {formatDateTime(data.crawledAt)}</span>
+              <span>Lần crawl: {formatDateTime(data.crawledAt)}</span>
+              {data.status ? <span>Trạng thái: {data.status}</span> : null}
+              {data.sourceUrl ? (
+                <a
+                  href={data.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  Nguồn Petrolimex
+                </a>
+              ) : null}
             </div>
           )}
           {!currentQ.isLoading && !data && missing && (
             <p className="text-sm text-muted-foreground">
-              Chưa có dữ liệu giá xăng dầu. Bấm Đồng bộ ngay để lấy từ PVOIL.
+              Chưa có dữ liệu giá xăng dầu. Bấm Đồng bộ ngay để lấy từ
+              Petrolimex.
             </p>
           )}
           {!currentQ.isLoading && !data && !missing && (
@@ -147,8 +186,15 @@ export function RideAdminFuelPricePage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Mặt hàng</TableHead>
-                  <TableHead className="text-right">Giá</TableHead>
-                  <TableHead className="text-right">Chênh</TableHead>
+                  <TableHead className="text-right">Giá dùng</TableHead>
+                  {showRegions ? (
+                    <>
+                      <TableHead className="text-right">Vùng 1</TableHead>
+                      <TableHead className="text-right">Vùng 2</TableHead>
+                    </>
+                  ) : (
+                    <TableHead className="text-right">Chênh</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -158,19 +204,35 @@ export function RideAdminFuelPricePage() {
                       <p className="font-medium">{p.name}</p>
                       <p className="text-xs text-muted-foreground tabular-nums">
                         {p.code}
+                        {p.grade ? ` · ${p.grade}` : ""}
                       </p>
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-semibold">
                       {formatCurrency(p.price)}/L
                     </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right tabular-nums",
-                        changeClass(p.change),
-                      )}
-                    >
-                      {formatChange(p.change)}
-                    </TableCell>
+                    {showRegions ? (
+                      <>
+                        <TableCell className="text-right tabular-nums">
+                          {p.region1Price != null
+                            ? `${formatCurrency(p.region1Price)}/L`
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {p.region2Price != null
+                            ? `${formatCurrency(p.region2Price)}/L`
+                            : "—"}
+                        </TableCell>
+                      </>
+                    ) : (
+                      <TableCell
+                        className={cn(
+                          "text-right tabular-nums",
+                          changeClass(p.change),
+                        )}
+                      >
+                        {formatChange(p.change)}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

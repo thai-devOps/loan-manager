@@ -31,7 +31,7 @@ export const PRICE_ROUNDING_UNITS = [1_000, 5_000, 10_000, 50_000] as const;
 export type PriceRoundingUnit = (typeof PRICE_ROUNDING_UNITS)[number];
 
 export type VehiclePricingConfig = {
-  /** PVOIL product code used for quotation fuel price lookup. */
+  /** Petrolimex product code used for quotation fuel price lookup. */
   fuelType?: VehicleFuelType | string;
   /** L/100km by route condition. */
   fuelConsumption?: FuelConsumptionRates;
@@ -45,7 +45,7 @@ export type VehiclePricingConfig = {
    */
   fuelConsumptionPer100Km: number;
   /**
-   * Deprecated for quotation (PVOIL is source of truth).
+   * Deprecated for quotation (Petrolimex snapshot is source of truth).
    * Still allowed for trip actual-cost entry.
    */
   fuelPricePerLiter: number;
@@ -283,7 +283,7 @@ export function requireVehicleFuelConfig(
   if (!isVehicleFuelType(pricing.fuelType)) {
     throw new VehicleFuelConfigError(
       "VEHICLE_FUEL_CONFIG_MISSING",
-      "Xe chưa chọn loại nhiên liệu (PVOIL).",
+      "Xe chưa chọn loại nhiên liệu (Petrolimex).",
     );
   }
   const rates = parseConsumptionRates(pricing.fuelConsumption);

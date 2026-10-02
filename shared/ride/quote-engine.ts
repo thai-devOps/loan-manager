@@ -20,7 +20,7 @@ export type QuoteEngineInput = {
   tollFee?: number;
   parkingFee?: number;
   waitingFee?: number;
-  /** When set, fuel is taken from PVOIL estimate (operational km). */
+  /** When set, fuel is taken from Petrolimex estimate (operational km). */
   fuelOverride?: QuoteFuelOverride | null;
 };
 

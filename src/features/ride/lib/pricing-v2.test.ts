@@ -39,7 +39,7 @@ function fuelOk(price = 25_000, consumption = 11.5) {
   return {
     fuelType: "E10_RON95_III",
     pricePerLiter: price,
-    priceSource: "PVOIL" as const,
+    priceSource: "PETROLIMEX" as const,
     priceDate: "2026-10-01T08:00:00.000Z",
     status: "ok" as const,
     consumptionLPer100Km: consumption,
@@ -202,7 +202,7 @@ describe("PricingEngineV2 scenarios (1, 3, 4, 10, 11, 13, 15, 18–20)", () => {
     });
     expect(r.fuel.fuelPriceStatus).toBe("missing");
     expect(r.fuel.fuelCost).toBe(0);
-    expect(r.warnings.some((w) => w.includes("PVOIL"))).toBe(true);
+    expect(r.warnings.some((w) => w.includes("giá nhiên liệu"))).toBe(true);
     expect(r.pricing.finalPrice).toBeGreaterThan(0);
   });
 
@@ -216,7 +216,7 @@ describe("PricingEngineV2 scenarios (1, 3, 4, 10, 11, 13, 15, 18–20)", () => {
       fuel: {
         fuelType: "",
         pricePerLiter: 25_000,
-        priceSource: "PVOIL",
+        priceSource: "PETROLIMEX",
         priceDate: "2026-10-01T00:00:00.000Z",
         status: "ok",
         consumptionLPer100Km: null,
@@ -272,7 +272,7 @@ describe("PricingEngineV2 scenarios (1, 3, 4, 10, 11, 13, 15, 18–20)", () => {
     ).toBe(true);
   });
 
-  it("18: PVOIL snapshot fields preserved on result", () => {
+  it("18: Petrolimex snapshot fields preserved on result", () => {
     const r = calculatePricingV2({
       vehicleId: "v1",
       tripType: "ONE_WAY",
@@ -281,7 +281,7 @@ describe("PricingEngineV2 scenarios (1, 3, 4, 10, 11, 13, 15, 18–20)", () => {
       vehiclePricing: baseCfg,
       fuel: fuelOk(25_630, 11.5),
     });
-    expect(r.fuel.priceSource).toBe("PVOIL");
+    expect(r.fuel.priceSource).toBe("PETROLIMEX");
     expect(r.fuel.priceDate).toBe("2026-10-01T08:00:00.000Z");
     expect(r.fuel.pricePerLiter).toBe(25_630);
   });

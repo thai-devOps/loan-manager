@@ -72,6 +72,7 @@ export async function estimateTripFuelCostForVehicle(
     defaultConsumption: fuelConfig.defaultConsumption,
     fuelPrice: price.fuelPrice,
     fuelPriceEffectiveAt: price.fuelPriceEffectiveAt,
+    fuelPriceSource: price.fuelPriceSource,
   });
 }
 
@@ -104,7 +105,7 @@ export function fuelEstimateErrorToClient(e: unknown): {
         code,
         message:
           code === "FUEL_PRICE_NOT_FOUND"
-            ? "Chưa có giá nhiên liệu PVOIL cho ngày chuyến. Vui lòng đồng bộ giá xăng dầu."
+            ? "Chưa có giá nhiên liệu cho ngày chuyến. Vui lòng đồng bộ giá xăng dầu."
             : "Quãng đường không hợp lệ.",
         status: 422,
       };

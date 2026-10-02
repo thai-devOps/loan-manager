@@ -85,7 +85,7 @@ export type VehiclePricingConfig = {
   consumptionSource?: ConsumptionSource;
   consumptionUpdatedAt?: string;
   fuelConsumptionPer100Km: number;
-  /** Deprecated for quotation; PVOIL is source of truth. */
+  /** Deprecated for quotation; Petrolimex snapshot is source of truth. */
   fuelPricePerLiter: number;
   driverRate: number;
   baseFare: number;
@@ -107,7 +107,7 @@ export type BookingFuelSnapshot = {
   consumptionLPer100Km: number;
   estimatedLiters: number;
   estimatedFuelCost: number;
-  source: "PVOIL";
+  source: "PETROLIMEX" | "PVOIL";
 };
 
 export type QuoteBreakdownLine = {

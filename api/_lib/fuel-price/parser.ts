@@ -1,3 +1,7 @@
+/**
+ * @deprecated PVOIL HTML parser — ingest replaced by Petrolimex.
+ * Kept for tests / emergency rollback only.
+ */
 import * as cheerio from "cheerio";
 import { FuelPriceError } from "./errors.js";
 import {

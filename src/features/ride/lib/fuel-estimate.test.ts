@@ -46,7 +46,7 @@ describe("fuel estimate (cases 1–4, 11–13, 19–20)", () => {
     expect(est.estimatedFuelCost).toBe(
       Math.round(est.estimatedLiters * 20_000),
     );
-    expect(est.source).toBe("PVOIL");
+    expect(est.source).toBe("PETROLIMEX");
   });
 
   it("11: picks city consumption", () => {
@@ -63,7 +63,7 @@ describe("fuel estimate (cases 1–4, 11–13, 19–20)", () => {
     expect(pickConsumption(rates, 9, undefined).routeCondition).toBe("default");
   });
 
-  it("19: supports multiple PVOIL fuel types in estimate", () => {
+  it("19: supports multiple Petrolimex fuel types in estimate", () => {
     for (const fuelType of [
       "E10_RON95_III",
       "E5_RON92_II",

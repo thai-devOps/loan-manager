@@ -1,6 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { fuelPriceSnapshotsCol } from "../mongo.js";
-import { FuelPriceError, fuelPriceErrorToClient } from "./errors.js";
+import {
+  computeStale,
+  getFuelPriceRegion,
+  getFuelSource,
+  isFuelSyncEnabled,
+} from "./config.js";
+import {
+  FuelPriceError,
+  fuelPriceErrorToClient,
+  mapFuelSourceError,
+} from "./errors.js";
+import { computeFuelPriceRawHash } from "./hash.js";
+import { REQUIRED_FUEL_CODES } from "./normalize.js";
+import { fetchPetrolimexFuelPrices } from "./sources/petrolimex/petrolimex.client.js";
+import { FuelSourceError } from "./sources/petrolimex/petrolimex.types.js";
 import {
   discoverAvailableDates,
   fetchPriceView,
@@ -10,38 +24,66 @@ import { parsePvoilEffectiveDate } from "./normalize.js";
 import { validateFuelProducts } from "./validate.js";
 import type {
   FuelPriceSnapshot,
+  FuelPriceSource,
   FuelPriceTripSnapshot,
   FuelSyncResult,
+  FuelSyncTrigger,
 } from "./types.js";
+
+const PARSER_VERSION = "petrolimex-v1";
+
+function assessPetrolimexProducts(products: FuelPriceSnapshot["products"]): {
+  ok: boolean;
+  warnings: string[];
+} {
+  const warnings: string[] = [];
+  for (const required of REQUIRED_FUEL_CODES) {
+    if (!products.some((p) => p.code === required && !p.unknown && p.price > 0)) {
+      warnings.push(`Thiếu sản phẩm bắt buộc: ${required}`);
+    }
+  }
+  return { ok: warnings.length === 0, warnings };
+}
 
 export async function findSnapshotByEffectiveAt(
   effectiveAt: string,
+  source: FuelPriceSource = getFuelSource(),
 ): Promise<FuelPriceSnapshot | null> {
   const col = await fuelPriceSnapshotsCol();
-  const doc = await col.findOne({ source: "PVOIL", effectiveAt });
+  const doc = await col.findOne({ source, effectiveAt });
   return doc ?? null;
 }
 
-export async function findLatestFuelPriceSnapshot(): Promise<FuelPriceSnapshot | null> {
+export async function findLatestFuelPriceSnapshot(
+  source: FuelPriceSource = getFuelSource(),
+): Promise<FuelPriceSnapshot | null> {
   const col = await fuelPriceSnapshotsCol();
   const docs = await col
-    .find({ source: "PVOIL" })
-    .sort({ effectiveAt: -1 })
+    .find({
+      source,
+      $or: [{ status: "SUCCESS" }, { status: { $exists: false } }],
+    })
+    .sort({ effectiveAt: -1, updatedAt: -1 })
     .limit(1)
     .toArray();
   return docs[0] ?? null;
 }
 
 async function persistSnapshot(params: {
+  source: FuelPriceSource;
   effectiveAt: string;
   effectiveDateRaw: string;
   products: FuelPriceSnapshot["products"];
   sourceUrl: string;
-}): Promise<FuelPriceSnapshot> {
+  effectiveTimeSource?: FuelPriceSnapshot["effectiveTimeSource"];
+  parserVersion?: string;
+  rawHash?: string;
+  region?: FuelPriceSnapshot["region"];
+}): Promise<{ snapshot: FuelPriceSnapshot; inserted: boolean }> {
   const now = new Date().toISOString();
   const doc: FuelPriceSnapshot = {
     id: randomUUID(),
-    source: "PVOIL",
+    source: params.source,
     effectiveAt: params.effectiveAt,
     effectiveDateRaw: params.effectiveDateRaw,
     products: params.products,
@@ -49,44 +91,206 @@ async function persistSnapshot(params: {
     crawledAt: now,
     createdAt: now,
     updatedAt: now,
+    effectiveTimeSource: params.effectiveTimeSource,
+    parserVersion: params.parserVersion,
+    rawHash: params.rawHash,
+    status: "SUCCESS",
+    lastCheckedAt: now,
+    region: params.region,
   };
   const col = await fuelPriceSnapshotsCol();
+  const existing = await findSnapshotByEffectiveAt(
+    params.effectiveAt,
+    params.source,
+  );
   try {
     await col.updateOne(
-      { source: "PVOIL", effectiveAt: params.effectiveAt },
+      { source: params.source, effectiveAt: params.effectiveAt },
       {
         $setOnInsert: {
           id: doc.id,
           source: doc.source,
           effectiveAt: doc.effectiveAt,
-          effectiveDateRaw: doc.effectiveDateRaw,
           createdAt: doc.createdAt,
         },
         $set: {
+          effectiveDateRaw: doc.effectiveDateRaw,
           products: doc.products,
           sourceUrl: doc.sourceUrl,
           crawledAt: doc.crawledAt,
           updatedAt: doc.updatedAt,
+          effectiveTimeSource: doc.effectiveTimeSource,
+          parserVersion: doc.parserVersion,
+          rawHash: doc.rawHash,
+          status: doc.status,
+          lastCheckedAt: doc.lastCheckedAt,
+          region: doc.region,
         },
       },
       { upsert: true },
     );
   } catch (e) {
-    // Race on unique index — treat as already synced
     const msg = e instanceof Error ? e.message : String(e);
     if (/duplicate|E11000/i.test(msg)) {
-      const existing = await findSnapshotByEffectiveAt(params.effectiveAt);
-      if (existing) return existing;
+      const again = await findSnapshotByEffectiveAt(
+        params.effectiveAt,
+        params.source,
+      );
+      if (again) return { snapshot: again, inserted: false };
     }
     throw new FuelPriceError(
-      "MONGODB_ERROR",
+      "FUEL_SOURCE_DATABASE_ERROR",
       e instanceof Error ? e.message : String(e),
     );
   }
-  const saved = await findSnapshotByEffectiveAt(params.effectiveAt);
-  return saved ?? doc;
+  const saved = await findSnapshotByEffectiveAt(
+    params.effectiveAt,
+    params.source,
+  );
+  return { snapshot: saved ?? doc, inserted: !existing };
 }
 
+/**
+ * Primary sync entry: Petrolimex when FUEL_PRICE_PROVIDER=PETROLIMEX.
+ */
+export async function syncLatestFuelPrice(params?: {
+  trigger?: FuelSyncTrigger;
+}): Promise<FuelSyncResult> {
+  if (!isFuelSyncEnabled()) {
+    throw new FuelPriceError("FUEL_SYNC_DISABLED");
+  }
+
+  const source = getFuelSource();
+  const trigger = params?.trigger ?? "ADMIN";
+
+  if (source === "PVOIL") {
+    /** @deprecated path — only if FUEL_PRICE_PROVIDER=PVOIL */
+    return syncLatestPvoilFuelPrice();
+  }
+
+  const started = Date.now();
+  const region = getFuelPriceRegion();
+
+  try {
+    const parsed = await fetchPetrolimexFuelPrices();
+    const assessment = assessPetrolimexProducts(parsed.products);
+    const warnings = [...parsed.warnings, ...assessment.warnings];
+
+    if (!assessment.ok) {
+      console.error("[FUEL_PRICE]", {
+        provider: "PETROLIMEX",
+        status: "FAILED",
+        reason: "missing_required_products",
+        warnings,
+      });
+      throw new FuelPriceError(
+        "FUEL_SOURCE_INVALID_DATA",
+        warnings.join("; ") || "Thiếu sản phẩm bắt buộc",
+      );
+    }
+
+    const rawHash = computeFuelPriceRawHash({
+      provider: "PETROLIMEX",
+      effectiveAt: parsed.effectiveAt,
+      products: parsed.products,
+    });
+
+    const latest = await findLatestFuelPriceSnapshot("PETROLIMEX");
+    if (latest?.rawHash === rawHash) {
+      const now = new Date().toISOString();
+      const col = await fuelPriceSnapshotsCol();
+      await col.updateOne(
+        { id: latest.id },
+        { $set: { lastCheckedAt: now, updatedAt: now } },
+      );
+      const stale = computeStale(latest.crawledAt);
+      console.info("[FUEL_PRICE]", {
+        provider: "PETROLIMEX",
+        status: "SUCCESS",
+        products: latest.products.length,
+        effectiveAt: latest.effectiveAt,
+        changed: false,
+        durationMs: Date.now() - started,
+        trigger,
+      });
+      return {
+        success: true,
+        status: "already_synced",
+        source: "PETROLIMEX",
+        provider: "PETROLIMEX",
+        effectiveAt: latest.effectiveAt,
+        effectiveDateRaw: latest.effectiveDateRaw,
+        productCount: latest.products.length,
+        products: latest.products,
+        crawledAt: latest.crawledAt,
+        changed: false,
+        warnings,
+        isStale: stale.isStale,
+        staleHours: stale.staleHours,
+        region,
+        message: "Giá Petrolimex chưa đổi — bỏ qua ghi lịch sử mới",
+      };
+    }
+
+    const { snapshot, inserted } = await persistSnapshot({
+      source: "PETROLIMEX",
+      effectiveAt: parsed.effectiveAt,
+      effectiveDateRaw: parsed.effectiveDateRaw,
+      products: parsed.products,
+      sourceUrl: parsed.sourceUrl,
+      effectiveTimeSource: parsed.effectiveTimeSource,
+      parserVersion: PARSER_VERSION,
+      rawHash,
+      region,
+    });
+
+    const stale = computeStale(snapshot.crawledAt);
+    console.info("[FUEL_PRICE]", {
+      provider: "PETROLIMEX",
+      status: "SUCCESS",
+      products: snapshot.products.length,
+      effectiveAt: snapshot.effectiveAt,
+      changed: inserted,
+      durationMs: Date.now() - started,
+      trigger,
+    });
+
+    return {
+      success: true,
+      status: inserted ? "synced" : "already_synced",
+      source: "PETROLIMEX",
+      provider: "PETROLIMEX",
+      effectiveAt: snapshot.effectiveAt,
+      effectiveDateRaw: snapshot.effectiveDateRaw,
+      productCount: snapshot.products.length,
+      products: snapshot.products,
+      crawledAt: snapshot.crawledAt,
+      changed: inserted,
+      warnings,
+      isStale: stale.isStale,
+      staleHours: stale.staleHours,
+      region,
+      message: inserted
+        ? "Đồng bộ giá xăng Petrolimex thành công"
+        : "Đã cập nhật metadata snapshot Petrolimex",
+    };
+  } catch (e) {
+    const client = fuelPriceErrorToClient(e);
+    console.error("[FUEL_PRICE]", {
+      provider: "PETROLIMEX",
+      status: "FAILED",
+      reason: client.code,
+      error: e instanceof Error ? e.message : String(e),
+      durationMs: Date.now() - started,
+      trigger,
+    });
+    if (e instanceof FuelSourceError) throw mapFuelSourceError(e);
+    if (e instanceof FuelPriceError) throw e;
+    throw new FuelPriceError("SOURCE_UNAVAILABLE", client.message);
+  }
+}
+
+/** @deprecated Use syncLatestFuelPrice */
 export async function syncPvoilDate(rawDate: string): Promise<FuelSyncResult> {
   const started = Date.now();
   const effectiveAt = parsePvoilEffectiveDate(rawDate);
@@ -97,35 +301,28 @@ export async function syncPvoilDate(rawDate: string): Promise<FuelSyncResult> {
     );
   }
 
-  const existing = await findSnapshotByEffectiveAt(effectiveAt);
+  const existing = await findSnapshotByEffectiveAt(effectiveAt, "PVOIL");
   if (existing) {
-    console.info("[fuel-price] pvoil_sync_already_exists", {
-      event: "pvoil_sync_already_exists",
-      effectiveAt,
-      at: new Date().toISOString(),
-    });
     return {
+      success: true,
       status: "already_synced",
       source: "PVOIL",
+      provider: "PVOIL",
       effectiveAt: existing.effectiveAt,
       effectiveDateRaw: existing.effectiveDateRaw,
       productCount: existing.products.length,
       products: existing.products,
       crawledAt: existing.crawledAt,
+      changed: false,
     };
   }
 
   const { html, sourceUrl } = await fetchPriceView(rawDate);
   const products = parsePvoilFuelPriceHtml(html, effectiveAt);
-  console.info("[fuel-price] pvoil_price_parsed", {
-    event: "pvoil_price_parsed",
-    effectiveAt,
-    productCount: products.length,
-    at: new Date().toISOString(),
-  });
   validateFuelProducts(products, effectiveAt);
 
-  const saved = await persistSnapshot({
+  const { snapshot } = await persistSnapshot({
+    source: "PVOIL",
     effectiveAt,
     effectiveDateRaw: rawDate.trim(),
     products,
@@ -133,24 +330,25 @@ export async function syncPvoilDate(rawDate: string): Promise<FuelSyncResult> {
   });
 
   console.info("[fuel-price] pvoil_sync_success", {
-    event: "pvoil_sync_success",
-    effectiveAt: saved.effectiveAt,
-    productCount: saved.products.length,
+    effectiveAt: snapshot.effectiveAt,
     durationMs: Date.now() - started,
-    at: new Date().toISOString(),
   });
 
   return {
+    success: true,
     status: "synced",
     source: "PVOIL",
-    effectiveAt: saved.effectiveAt,
-    effectiveDateRaw: saved.effectiveDateRaw,
-    productCount: saved.products.length,
-    products: saved.products,
-    crawledAt: saved.crawledAt,
+    provider: "PVOIL",
+    effectiveAt: snapshot.effectiveAt,
+    effectiveDateRaw: snapshot.effectiveDateRaw,
+    productCount: snapshot.products.length,
+    products: snapshot.products,
+    crawledAt: snapshot.crawledAt,
+    changed: true,
   };
 }
 
+/** @deprecated Use syncLatestFuelPrice */
 export async function syncLatestPvoilFuelPrice(): Promise<FuelSyncResult> {
   try {
     const dates = await discoverAvailableDates();
@@ -161,12 +359,6 @@ export async function syncLatestPvoilFuelPrice(): Promise<FuelSyncResult> {
     return await syncPvoilDate(latest.rawDate);
   } catch (e) {
     const client = fuelPriceErrorToClient(e);
-    console.error("[fuel-price] pvoil_sync_failed", {
-      event: "pvoil_sync_failed",
-      code: client.code,
-      error: e instanceof Error ? e.message : String(e),
-      at: new Date().toISOString(),
-    });
     if (e instanceof FuelPriceError) throw e;
     throw new FuelPriceError("PVOIL_FETCH_FAILED", client.message);
   }
@@ -185,7 +377,8 @@ export async function listFuelPriceHistory(params: {
 }> {
   const page = Math.max(1, Math.floor(params.page ?? 1));
   const limit = Math.min(100, Math.max(1, Math.floor(params.limit ?? 20)));
-  const filter: Record<string, unknown> = { source: "PVOIL" };
+  const source = getFuelSource();
+  const filter: Record<string, unknown> = { source };
   if (params.from || params.to) {
     const range: Record<string, string> = {};
     if (params.from) range.$gte = params.from;
@@ -203,7 +396,6 @@ export async function listFuelPriceHistory(params: {
   return { items, page, limit, total };
 }
 
-/** Latest snapshot product price (not date-aware). Prefer getFuelPriceForDate for quotes. */
 export async function getFuelPriceSnapshot(
   code: string,
 ): Promise<FuelPriceTripSnapshot | null> {
@@ -216,14 +408,14 @@ export async function getFuelPriceSnapshot(
   return {
     fuelType: String(product.code),
     fuelPrice: product.price,
-    fuelPriceSource: "PVOIL",
+    fuelPriceSource: latest.source,
     fuelPriceEffectiveAt: latest.effectiveAt,
   };
 }
 
 /**
- * Historical PVOIL price: latest snapshot with effectiveAt <= departureAt.
- * Does not crawl PVOIL and does not fall back to "current" if none found.
+ * As-of price from Mongo for configured FUEL_PRICE_PROVIDER.
+ * Never crawls.
  */
 export async function getFuelPriceForDate(
   fuelType: string,
@@ -232,10 +424,15 @@ export async function getFuelPriceForDate(
   const asOf = new Date(departureAt);
   if (Number.isNaN(asOf.getTime())) return null;
   const asOfIso = asOf.toISOString();
+  const source = getFuelSource();
   const col = await fuelPriceSnapshotsCol();
   const docs = await col
-    .find({ source: "PVOIL", effectiveAt: { $lte: asOfIso } })
-    .sort({ effectiveAt: -1 })
+    .find({
+      source,
+      effectiveAt: { $lte: asOfIso },
+      $or: [{ status: "SUCCESS" }, { status: { $exists: false } }],
+    })
+    .sort({ effectiveAt: -1, updatedAt: -1 })
     .limit(1)
     .toArray();
   const snap = docs[0];
@@ -247,23 +444,34 @@ export async function getFuelPriceForDate(
   return {
     fuelType: String(product.code),
     fuelPrice: product.price,
-    fuelPriceSource: "PVOIL",
+    fuelPriceSource: snap.source,
     fuelPriceEffectiveAt: snap.effectiveAt,
   };
 }
 
 export function toPublicFuelSnapshot(doc: FuelPriceSnapshot) {
+  const stale = computeStale(doc.crawledAt);
   return {
     source: doc.source,
+    provider: doc.source,
     effectiveAt: doc.effectiveAt,
     effectiveDateRaw: doc.effectiveDateRaw,
     crawledAt: doc.crawledAt,
+    sourceUrl: doc.sourceUrl,
+    region: doc.region ?? getFuelPriceRegion(),
+    status: doc.status ?? "SUCCESS",
+    effectiveTimeSource: doc.effectiveTimeSource,
+    isStale: stale.isStale,
+    staleHours: stale.staleHours,
     products: doc.products.map((p) => ({
       code: p.code,
       name: p.name,
       price: p.price,
       change: p.change,
       unit: p.unit,
+      grade: p.grade,
+      region1Price: p.region1Price,
+      region2Price: p.region2Price,
     })),
   };
 }

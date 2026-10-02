@@ -139,7 +139,10 @@ function parseClientQuoteSnapshot(
       consumptionLPer100Km: Number(fuelSnap.consumptionLPer100Km) || 0,
       estimatedLiters: Number(fuelSnap.estimatedLiters) || 0,
       estimatedFuelCost: Math.round(Number(fuelSnap.estimatedFuelCost) || 0),
-      source: "PVOIL",
+      source:
+        fuelSnap.source === "PVOIL" || fuelSnap.source === "PETROLIMEX"
+          ? fuelSnap.source
+          : "PETROLIMEX",
     },
   };
 }

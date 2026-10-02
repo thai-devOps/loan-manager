@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { methodNotAllowed, withHandler } from "../../_lib/http.js";
 import { fuelPriceErrorToClient } from "../../_lib/fuel-price/errors.js";
-import { syncLatestPvoilFuelPrice } from "../../_lib/fuel-price/sync-service.js";
+import { syncLatestFuelPrice } from "../../_lib/fuel-price/sync-service.js";
 
 function authorizeSync(req: VercelRequest): boolean {
   const secret =
@@ -37,14 +37,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-      const result = await syncLatestPvoilFuelPrice();
+      const result = await syncLatestFuelPrice({ trigger: "CRON" });
       res.status(200).json({
         ok: true,
+        success: result.success,
         status: result.status,
         source: result.source,
+        provider: result.provider ?? result.source,
         effectiveAt: result.effectiveAt,
         productCount: result.productCount,
         crawledAt: result.crawledAt,
+        changed: result.changed,
+        region: result.region,
       });
     } catch (e) {
       const client = fuelPriceErrorToClient(e);
@@ -53,7 +57,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         error: e instanceof Error ? e.message : String(e),
         at: new Date().toISOString(),
       });
-      res.status(503).json({ error: client.message, code: client.code });
+      res.status(503).json({
+        success: false,
+        provider: "PETROLIMEX",
+        error: client.message,
+        code: client.code,
+        errorCode: client.code,
+      });
     }
   });
 }

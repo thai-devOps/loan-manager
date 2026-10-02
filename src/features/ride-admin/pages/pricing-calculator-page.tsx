@@ -111,8 +111,8 @@ export function RideAdminPricingCalculatorPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Báo giá chuyến</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pricing Engine v2 — giá vốn, giá đề xuất, lợi nhuận (ORS + PVOIL + cấu
-          hình xe).
+          Pricing Engine v2 — giá vốn, giá đề xuất, lợi nhuận (ORS + Petrolimex
+          + cấu hình xe).
         </p>
       </div>
 
@@ -223,7 +223,7 @@ export function RideAdminPricingCalculatorPage() {
 
           <ResultPanel title="Nhiên liệu">
             <Row
-              label="PVOIL"
+              label={fuelSourceLabel(result.fuel?.source)}
               value={
                 result.fuel?.pricePerLiter != null
                   ? `${formatCurrency(result.fuel.pricePerLiter)}/L`
@@ -292,7 +292,7 @@ export function RideAdminPricingCalculatorPage() {
           </ResultPanel>
 
           <ul className="space-y-1 text-xs text-muted-foreground">
-            <li>✓ Giá xăng lấy từ PVOIL</li>
+            <li>✓ Giá xăng lấy từ Petrolimex (snapshot server)</li>
             <li>✓ Route lấy từ ORS</li>
             <li>✓ Tiêu hao lấy từ cấu hình xe</li>
             <li>✓ Chi phí đã bao gồm khấu hao</li>
@@ -319,6 +319,12 @@ function routeTypeLabel(t: string): string {
   if (t === "city") return "Đô thị";
   if (t === "highway") return "Đường trường";
   return "Đường hỗn hợp";
+}
+
+function fuelSourceLabel(source?: string): string {
+  if (source === "PVOIL") return "PVOIL";
+  if (source === "NONE") return "Giá nhiên liệu";
+  return "Petrolimex";
 }
 
 function ResultPanel({

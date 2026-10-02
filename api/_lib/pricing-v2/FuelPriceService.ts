@@ -1,3 +1,4 @@
+import { computeStale } from "../fuel-price/config.js";
 import {
   findLatestFuelPriceSnapshot,
   getFuelPriceForDate,
@@ -7,14 +8,18 @@ import type { FuelPriceStatus } from "../../../shared/ride/pricing-v2/pricing.ty
 export type FuelPriceLookupResult = {
   pricePerLiter: number | null;
   fuelType: string;
-  source: "PVOIL" | "NONE";
+  source: "PETROLIMEX" | "PVOIL" | "NONE";
   sourceDate: string | null;
   status: FuelPriceStatus;
+  isStale?: boolean;
+  staleHours?: number;
+  isFallback?: boolean;
+  fallbackReason?: string;
 };
 
 /**
- * As-of PVOIL price for travelDate; fallback to latest snapshot with warning status.
- * Never silently hard-codes a price.
+ * As-of fuel price for travelDate; fallback to latest snapshot with warning status.
+ * Never crawls. Stale/fallback flags are informational only.
  */
 export async function getFuelPriceForPricingV2(params: {
   fuelType: string;
@@ -28,17 +33,22 @@ export async function getFuelPriceForPricingV2(params: {
       source: "NONE",
       sourceDate: null,
       status: "missing",
+      isFallback: false,
     };
   }
 
   const asOf = await getFuelPriceForDate(fuelType, params.date);
   if (asOf) {
+    const stale = computeStale(asOf.fuelPriceEffectiveAt);
     return {
       pricePerLiter: asOf.fuelPrice,
       fuelType: asOf.fuelType,
-      source: "PVOIL",
+      source: asOf.fuelPriceSource,
       sourceDate: asOf.fuelPriceEffectiveAt,
       status: "ok",
+      isStale: stale.isStale,
+      staleHours: stale.staleHours,
+      isFallback: false,
     };
   }
 
@@ -48,12 +58,17 @@ export async function getFuelPriceForPricingV2(params: {
       (p) => p.code.toUpperCase() === fuelType.toUpperCase(),
     );
     if (product && product.price > 0 && !product.unknown) {
+      const stale = computeStale(latest.effectiveAt);
       return {
         pricePerLiter: product.price,
         fuelType: String(product.code),
-        source: "PVOIL",
+        source: latest.source,
         sourceDate: latest.effectiveAt,
         status: "fallback_latest",
+        isStale: stale.isStale,
+        staleHours: stale.staleHours,
+        isFallback: true,
+        fallbackReason: "NO_AS_OF_SNAPSHOT",
       };
     }
   }
@@ -64,5 +79,7 @@ export async function getFuelPriceForPricingV2(params: {
     source: "NONE",
     sourceDate: null,
     status: "missing",
+    isFallback: true,
+    fallbackReason: "FUEL_PRICE_UNAVAILABLE",
   };
 }

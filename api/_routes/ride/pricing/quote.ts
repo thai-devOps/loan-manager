@@ -181,7 +181,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   consumptionLPer100Km: r.fuel.consumptionLPer100Km ?? 0,
                   estimatedLiters: r.fuel.estimatedLiters,
                   estimatedFuelCost: r.fuel.fuelCost,
-                  source: "PVOIL" as const,
+                  source:
+                    r.fuel.priceSource === "PVOIL" ? "PVOIL" : "PETROLIMEX",
                 }
               : null,
         },

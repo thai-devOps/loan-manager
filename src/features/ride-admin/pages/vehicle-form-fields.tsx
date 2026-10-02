@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,6 +29,10 @@ import {
   VEHICLE_STATUS_LABEL,
   type VehicleFormState,
 } from "@/features/ride-admin/pages/vehicle-form-state";
+import { fuelPriceAdminService } from "@/features/ride-admin/services/admin-api";
+import { rideAdminQueryKeys } from "@/features/ride-admin/query-keys";
+import { formatCurrency } from "@/lib/currency";
+import { formatDateTime } from "@/lib/date";
 
 export function VehicleFormFields({
   form,
@@ -35,6 +41,20 @@ export function VehicleFormFields({
   form: VehicleFormState;
   onChange: (next: VehicleFormState) => void;
 }) {
+  const fuelQ = useQuery({
+    queryKey: rideAdminQueryKeys.fuelCurrent(),
+    queryFn: () => fuelPriceAdminService.current(),
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const priceByCode = new Map(
+    (fuelQ.data?.products ?? []).map((p) => [p.code.toUpperCase(), p]),
+  );
+  const selectedFuel = form.fuelType
+    ? priceByCode.get(form.fuelType.toUpperCase())
+    : undefined;
+
   function set<K extends keyof VehicleFormState>(
     key: K,
     value: VehicleFormState[K],
@@ -42,8 +62,17 @@ export function VehicleFormFields({
     onChange({ ...form, [key]: value });
   }
 
+  function fuelOptionLabel(code: VehicleFuelType): string {
+    const base = FUEL_TYPE_LABELS[code];
+    const hit = priceByCode.get(code.toUpperCase());
+    if (hit && hit.price > 0) {
+      return `${base} · ${formatCurrency(hit.price)}/L`;
+    }
+    return base;
+  }
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {(
         [
           ["name", "Tên xe"],
@@ -84,7 +113,7 @@ export function VehicleFormFields({
         </Select>
       </div>
 
-      <div className="space-y-1.5 sm:col-span-2">
+      <div className="space-y-1.5 sm:col-span-2 xl:col-span-3">
         <Label>Ảnh xe</Label>
         <ImageUploader
           folder="sitha-trip/rides"
@@ -105,7 +134,7 @@ export function VehicleFormFields({
         />
       </div>
 
-      <div className="space-y-1.5 sm:col-span-2">
+      <div className="space-y-1.5 sm:col-span-2 xl:col-span-3">
         <Label htmlFor="vehicle-features">Tiện nghi (cách nhau bởi dấu phẩy)</Label>
         <Input
           id="vehicle-features"
@@ -114,7 +143,7 @@ export function VehicleFormFields({
         />
       </div>
 
-      <div className="space-y-1.5 sm:col-span-2">
+      <div className="space-y-1.5 sm:col-span-2 xl:col-span-3">
         <Label htmlFor="vehicle-suitableFor">
           Phù hợp (travel, medical, airport, … — cách nhau bởi dấu phẩy)
         </Label>
@@ -125,31 +154,68 @@ export function VehicleFormFields({
         />
       </div>
 
-      <p className="sm:col-span-2 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <p className="sm:col-span-2 xl:col-span-3 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
         Nhiên liệu
       </p>
-      <p className="sm:col-span-2 -mt-2 text-xs text-muted-foreground">
-        Giá xăng lấy từ PVOIL theo ngày chuyến (không nhập tay). Đơn vị tiêu hao:
-        L/100km.
+      <p className="sm:col-span-2 xl:col-span-3 -mt-2 text-xs text-muted-foreground">
+        Giá lấy từ Petrolimex (snapshot server) theo ngày chuyến — không nhập
+        tay. Đơn vị tiêu hao: L/100km.
       </p>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 sm:col-span-2 xl:col-span-2">
         <Label>Loại nhiên liệu</Label>
         <Select
           value={form.fuelType || undefined}
           onValueChange={(v) => set("fuelType", v as VehicleFuelType)}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Chọn loại PVOIL" />
+            <SelectValue placeholder="Chọn loại nhiên liệu" />
           </SelectTrigger>
           <SelectContent>
             {VEHICLE_FUEL_TYPES.map((code) => (
               <SelectItem key={code} value={code}>
-                {FUEL_TYPE_LABELS[code]}
+                {fuelOptionLabel(code)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {fuelQ.isLoading ? (
+          <p className="text-xs text-muted-foreground">
+            Đang tải giá Petrolimex…
+          </p>
+        ) : null}
+        {fuelQ.isError ? (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            Chưa có giá hiện tại.{" "}
+            <Link
+              to="/admin/fuel-prices"
+              className="underline underline-offset-2"
+            >
+              Đồng bộ giá xăng dầu
+            </Link>{" "}
+            rồi chọn lại.
+          </p>
+        ) : null}
+        {fuelQ.data && selectedFuel ? (
+          <p className="text-xs text-muted-foreground">
+            Giá đang dùng:{" "}
+            <span className="font-medium text-foreground tabular-nums">
+              {formatCurrency(selectedFuel.price)}/L
+            </span>
+            {selectedFuel.name ? ` · ${selectedFuel.name}` : ""}
+            {" · "}
+            {fuelQ.data.provider ?? fuelQ.data.source}
+            {" · hiệu lực "}
+            {formatDateTime(fuelQ.data.effectiveAt)}
+            {fuelQ.data.isStale ? " · Stale" : ""}
+          </p>
+        ) : null}
+        {fuelQ.data && form.fuelType && !selectedFuel ? (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            Snapshot hiện tại chưa có mã {form.fuelType}. Vẫn có thể lưu — báo
+            giá sẽ dùng giá as-of khi có.
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-1.5">
@@ -190,10 +256,10 @@ export function VehicleFormFields({
         </div>
       ))}
 
-      <p className="sm:col-span-2 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <p className="sm:col-span-2 xl:col-span-3 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
         Chi phí xe
       </p>
-      <p className="sm:col-span-2 -mt-2 text-xs text-muted-foreground">
+      <p className="sm:col-span-2 xl:col-span-3 -mt-2 text-xs text-muted-foreground">
         Dùng cho Pricing Engine v2 (giá vốn). Không ảnh hưởng bảng giá công khai
         cũ.
       </p>
@@ -226,7 +292,7 @@ export function VehicleFormFields({
         </div>
       ))}
 
-      <p className="sm:col-span-2 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <p className="sm:col-span-2 xl:col-span-3 pt-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
         Giá bán
       </p>
 

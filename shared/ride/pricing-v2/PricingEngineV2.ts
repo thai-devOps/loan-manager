@@ -55,11 +55,11 @@ export function calculatePricingV2(
 
   if (input.fuel.status === "missing") {
     warnings.push(
-      "Không tìm thấy giá PVOIL cho ngày chuyến — chi phí nhiên liệu = 0.",
+      "Không tìm thấy giá nhiên liệu cho ngày chuyến — chi phí nhiên liệu = 0.",
     );
   } else if (input.fuel.status === "fallback_latest") {
     warnings.push(
-      "Không tìm thấy giá PVOIL đúng ngày chuyến, sử dụng giá gần nhất.",
+      "Không tìm thấy giá nhiên liệu đúng ngày chuyến, sử dụng giá gần nhất.",
     );
   }
   if (input.fuel.consumptionSource === "MISSING") {

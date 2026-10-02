@@ -1,3 +1,7 @@
+/**
+ * @deprecated PVOIL ingest replaced by Petrolimex (`sources/petrolimex`).
+ * Kept for emergency rollback if FUEL_PRICE_PROVIDER=PVOIL — cron/admin default to Petrolimex.
+ */
 import https from "node:https";
 import { FuelPriceError } from "./errors.js";
 import { parsePvoilAvailableDates } from "./parser.js";

@@ -16,7 +16,7 @@ export function validateVehicleFuelPricingInput(
     if (!isVehicleFuelType(String(pricing.fuelType).trim())) {
       return {
         ok: false,
-        error: "Loại nhiên liệu không hợp lệ (chọn mã PVOIL).",
+        error: "Loại nhiên liệu không hợp lệ (chọn mã Petrolimex).",
       };
     }
   }

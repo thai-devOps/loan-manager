@@ -106,7 +106,7 @@ export type BookingFuelSnapshot = {
   consumptionLPer100Km: number;
   estimatedLiters: number;
   estimatedFuelCost: number;
-  source: "PVOIL";
+  source: "PETROLIMEX" | "PVOIL";
 };
 
 export type VehicleInsurance = {

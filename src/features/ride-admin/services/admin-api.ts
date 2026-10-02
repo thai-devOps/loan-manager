@@ -440,13 +440,22 @@ export type FuelPriceProductDto = {
   price: number;
   change: number | null;
   unit: "VND/L";
+  grade?: string;
+  region1Price?: number;
+  region2Price?: number;
 };
 
 export type FuelPriceCurrentDto = {
-  source: "PVOIL";
+  source: "PETROLIMEX" | "PVOIL";
+  provider?: "PETROLIMEX" | "PVOIL";
   effectiveAt: string;
   effectiveDateRaw: string;
   crawledAt: string;
+  sourceUrl?: string;
+  region?: "REGION_1" | "REGION_2";
+  status?: string;
+  isStale?: boolean;
+  staleHours?: number;
   products: FuelPriceProductDto[];
 };
 
@@ -466,13 +475,20 @@ export type FuelPriceHistoryDto = {
 
 export type FuelSyncResultDto = {
   ok: true;
+  success: boolean;
   status: "synced" | "already_synced" | "failed";
-  source: "PVOIL";
+  source: "PETROLIMEX" | "PVOIL";
+  provider?: "PETROLIMEX" | "PVOIL";
   effectiveAt?: string;
   effectiveDateRaw?: string;
   productCount?: number;
   products?: FuelPriceProductDto[];
   crawledAt?: string;
+  changed?: boolean;
+  region?: "REGION_1" | "REGION_2";
+  message?: string;
+  isStale?: boolean;
+  staleHours?: number;
 };
 
 export const fuelPriceAdminService = {

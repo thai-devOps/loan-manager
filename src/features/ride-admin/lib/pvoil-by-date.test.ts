@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const find = vi.fn();
 const toArray = vi.fn();
@@ -23,12 +23,17 @@ describe("getFuelPriceForDate (cases 5–6)", () => {
     vi.resetModules();
     find.mockReset();
     toArray.mockReset();
+    process.env.FUEL_PRICE_PROVIDER = "PETROLIMEX";
+  });
+
+  afterEach(() => {
+    delete process.env.FUEL_PRICE_PROVIDER;
   });
 
   it("5: picks latest snapshot with effectiveAt <= departureAt", async () => {
     toArray.mockResolvedValue([
       {
-        source: "PVOIL",
+        source: "PETROLIMEX",
         effectiveAt: "2026-09-15T08:00:00.000Z",
         products: [
           {
@@ -39,6 +44,7 @@ describe("getFuelPriceForDate (cases 5–6)", () => {
             unit: "VND/L",
           },
         ],
+        status: "SUCCESS",
       },
     ]);
 
@@ -52,19 +58,21 @@ describe("getFuelPriceForDate (cases 5–6)", () => {
     expect(price).toMatchObject({
       fuelType: "E10_RON95_III",
       fuelPrice: 22_500,
-      fuelPriceSource: "PVOIL",
+      fuelPriceSource: "PETROLIMEX",
       fuelPriceEffectiveAt: "2026-09-15T08:00:00.000Z",
     });
-    expect(find).toHaveBeenCalledWith({
-      source: "PVOIL",
-      effectiveAt: { $lte: "2026-09-20T10:00:00.000Z" },
-    });
+    expect(find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "PETROLIMEX",
+        effectiveAt: { $lte: "2026-09-20T10:00:00.000Z" },
+      }),
+    );
   });
 
   it("6: returns null when product missing (no HTTP crawl)", async () => {
     toArray.mockResolvedValue([
       {
-        source: "PVOIL",
+        source: "PETROLIMEX",
         effectiveAt: "2026-09-15T08:00:00.000Z",
         products: [
           {

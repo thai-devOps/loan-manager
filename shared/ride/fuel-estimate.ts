@@ -14,6 +14,7 @@ export type TripFuelEstimateInput = {
   defaultConsumption: number;
   fuelPrice: number;
   fuelPriceEffectiveAt: string;
+  fuelPriceSource?: "PETROLIMEX" | "PVOIL";
 };
 
 export type TripFuelEstimate = {
@@ -28,7 +29,7 @@ export type TripFuelEstimate = {
   consumptionLPer100Km: number;
   estimatedLiters: number;
   estimatedFuelCost: number;
-  source: "PVOIL";
+  source: "PETROLIMEX" | "PVOIL";
 };
 
 export type BookingFuelSnapshot = TripFuelEstimate;
@@ -125,7 +126,7 @@ export function estimateTripFuelCost(
     consumptionLPer100Km: picked.consumptionLPer100Km,
     estimatedLiters,
     estimatedFuelCost,
-    source: "PVOIL",
+    source: input.fuelPriceSource ?? "PETROLIMEX",
   };
 }
 

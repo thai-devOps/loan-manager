@@ -40,7 +40,7 @@ export type PricingV2EngineInput = {
   fuel: {
     fuelType: string;
     pricePerLiter: number | null;
-    priceSource: "PVOIL" | "NONE";
+    priceSource: "PETROLIMEX" | "PVOIL" | "NONE";
     priceDate: string | null;
     status: FuelPriceStatus;
     consumptionLPer100Km: number | null;
@@ -80,7 +80,7 @@ export type PricingV2EngineResult = {
   fuel: {
     fuelType: string;
     pricePerLiter: number | null;
-    priceSource: "PVOIL" | "NONE";
+    priceSource: "PETROLIMEX" | "PVOIL" | "NONE";
     priceDate: string | null;
     fuelPriceStatus: FuelPriceStatus;
     consumptionLPer100Km: number | null;
