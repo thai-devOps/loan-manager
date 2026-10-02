@@ -10,8 +10,23 @@ export const PVOIL_LOAD_VIEW_URL = `https://${PVOIL_HOST}/api/oilprice/load-view
 /** Cloudflare sits in front of DNS — hit origin IP with Host/SNI instead. */
 const DEFAULT_ORIGIN_IPS = ["103.21.120.100"];
 
-const DEFAULT_TIMEOUT_MS = 10_000;
-const MAX_RETRIES = 2;
+/**
+ * DNS/fetch timeout. Origin IP uses a shorter budget so Vercel (US/EU) can
+ * fail over instead of burning the whole serverless window.
+ */
+function dnsTimeoutMs(): number {
+  const n = Number(process.env.PVOIL_TIMEOUT_MS);
+  if (Number.isFinite(n) && n >= 3_000 && n <= 55_000) return Math.round(n);
+  return 12_000;
+}
+
+function originTimeoutMs(): number {
+  const n = Number(process.env.PVOIL_ORIGIN_TIMEOUT_MS);
+  if (Number.isFinite(n) && n >= 2_000 && n <= 30_000) return Math.round(n);
+  return 5_000;
+}
+
+const MAX_RETRIES = 1;
 const MAX_BODY_BYTES = 2_000_000;
 
 function userAgent(): string {
@@ -68,7 +83,7 @@ function fetchViaOriginIp(pathWithQuery: string, ip: string): Promise<string> {
         method: "GET",
         headers: browserHeaders(true),
         servername: PVOIL_HOST,
-        timeout: DEFAULT_TIMEOUT_MS,
+        timeout: originTimeoutMs(),
       },
       (res) => {
         const chunks: Buffer[] = [];
@@ -132,7 +147,7 @@ function fetchViaOriginIp(pathWithQuery: string, ip: string): Promise<string> {
 
 async function fetchViaDns(url: string): Promise<string> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), dnsTimeoutMs());
   try {
     const res = await fetch(url, {
       method: "GET",
@@ -141,7 +156,12 @@ async function fetchViaDns(url: string): Promise<string> {
       redirect: "follow",
     });
     if (!res.ok) {
-      throw new FuelPriceError("PVOIL_FETCH_FAILED", `HTTP ${res.status}`);
+      throw new FuelPriceError(
+        "PVOIL_FETCH_FAILED",
+        res.status === 403
+          ? "HTTP 403 (Cloudflare chặn IP máy chủ)"
+          : `HTTP ${res.status}`,
+      );
     }
     const buf = await res.arrayBuffer();
     if (buf.byteLength === 0) {
@@ -196,8 +216,23 @@ async function fetchTextOnce(url: string): Promise<string> {
   try {
     return await fetchViaDns(url);
   } catch (e) {
+    // Prefer the most actionable error for operators on Vercel.
+    const dnsMsg = e instanceof Error ? e.message : String(e);
+    const originMsg =
+      lastError instanceof Error ? lastError.message : String(lastError ?? "");
+    if (
+      lastError instanceof FuelPriceError &&
+      lastError.code === "PVOIL_TIMEOUT"
+    ) {
+      throw new FuelPriceError(
+        "PVOIL_TIMEOUT",
+        `Máy chủ không tới origin PVOIL trong ${originTimeoutMs()}ms; DNS: ${dnsMsg}`,
+      );
+    }
     if (lastError instanceof FuelPriceError) throw lastError;
-    throw e;
+    throw e instanceof FuelPriceError
+      ? e
+      : new FuelPriceError("PVOIL_FETCH_FAILED", `${originMsg || dnsMsg}`);
   }
 }
 

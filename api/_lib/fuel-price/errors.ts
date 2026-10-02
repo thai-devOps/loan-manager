@@ -11,7 +11,8 @@ export type FuelPriceErrorCode =
 
 const VI_MESSAGES: Record<FuelPriceErrorCode, string> = {
   PVOIL_FETCH_FAILED: "Không thể kết nối đến PVOIL.",
-  PVOIL_TIMEOUT: "Hết thời gian chờ khi kết nối PVOIL.",
+  PVOIL_TIMEOUT:
+    "Hết thời gian chờ khi kết nối PVOIL (máy chủ Vercel thường ở ngoài VN; origin IP chậm/bị chặn). Thử lại hoặc tăng PVOIL_ORIGIN_TIMEOUT_MS / maxDuration.",
   PVOIL_INVALID_RESPONSE: "Dữ liệu giá xăng dầu từ PVOIL không hợp lệ.",
   PVOIL_NO_AVAILABLE_DATES: "PVOIL không có ngày giá hiệu lực.",
   PVOIL_PARSE_FAILED: "Không đọc được bảng giá từ PVOIL.",
@@ -40,7 +41,11 @@ export function fuelPriceErrorToClient(e: unknown): {
   message: string;
 } {
   if (e instanceof FuelPriceError) {
-    return { code: e.code, message: e.toClientMessage() };
+    // Prefer full message (includes diagnostic detail after the VI prefix).
+    return {
+      code: e.code,
+      message: e.message?.trim() || e.toClientMessage(),
+    };
   }
   return {
     code: "PVOIL_FETCH_FAILED",
