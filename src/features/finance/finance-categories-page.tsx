@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MoreHorizontal, Plus, Search } from "lucide-react";
+import { Filter, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { CATEGORY_COLORS } from "@shared/finance/category-catalog";
 import {
@@ -23,14 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -102,6 +95,9 @@ export function FinanceCategoriesPage() {
   const [editing, setEditing] = useState<FinanceCategoryRecord | null>(null);
   const [iconQuery, setIconQuery] = useState("");
   const [pendingDelete, setPendingDelete] = useState<FinanceCategoryRecord | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<StatusFilter>("all");
+  const [draftSort, setDraftSort] = useState<SortKey>("default");
 
   const usage = useMemo(() => {
     const map = new Map<string, { count: number; amount: number }>();
@@ -195,40 +191,46 @@ export function FinanceCategoriesPage() {
         </Can>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-full border bg-muted/40 p-1">
-          {(
-            [
-              ["expense", "Chi tiêu"],
-              ["income", "Thu nhập"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={cn(
-                "rounded-full px-4 py-1.5 text-sm",
-                type === value && "bg-background shadow-sm",
-              )}
-              onClick={() => {
-                setType(value);
-                setPage(0);
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      <div className="inline-flex rounded-full border bg-muted/40 p-1">
+        {(
+          [
+            ["expense", "Chi tiêu"],
+            ["income", "Thu nhập"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            className={cn(
+              "rounded-full px-4 py-1.5 text-sm",
+              type === value && "bg-background shadow-sm",
+            )}
+            onClick={() => {
+              setType(value);
+              setPage(0);
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 md:gap-3">
         <StatCard label="Tổng danh mục" value={stats.total} hint={`${stats.totalTx} giao dịch`} />
-        <StatCard label="Đang hoạt động" value={stats.active} hint={`${stats.activeTx} giao dịch`} />
-        <StatCard label="Tạm dừng" value={stats.paused} hint={`${stats.pausedTx} giao dịch`} />
+        <StatCard
+          label="Đang hoạt động"
+          value={stats.active}
+          hint={txShare(stats.activeTx, stats.totalTx)}
+        />
+        <StatCard
+          label="Tạm dừng"
+          value={stats.paused}
+          hint={txShare(stats.pausedTx, stats.totalTx)}
+        />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <div className="relative min-w-[220px] flex-1">
+      <div className="flex gap-2">
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute top-2.5 left-3 size-4 text-muted-foreground" />
           <Input
             className="pl-9"
@@ -240,33 +242,31 @@ export function FinanceCategoriesPage() {
             }}
           />
         </div>
-        <Select
-          value={status}
-          onValueChange={(value) => {
-            setStatus(value as StatusFilter);
-            setPage(0);
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="md:hidden"
+          aria-label="Bộ lọc"
+          onClick={() => {
+            setDraftStatus(status);
+            setDraftSort(sort);
+            setFilterOpen(true);
           }}
         >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tất cả trạng thái</SelectItem>
-            <SelectItem value="active">Đang hoạt động</SelectItem>
-            <SelectItem value="paused">Tạm dừng</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={sort} onValueChange={(value) => setSort(value as SortKey)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="default">Mặc định</SelectItem>
-            <SelectItem value="name">Tên</SelectItem>
-            <SelectItem value="count">Số giao dịch</SelectItem>
-            <SelectItem value="amount">Tổng tiền</SelectItem>
-          </SelectContent>
-        </Select>
+          <Filter className="size-4" />
+        </Button>
+        <div className="hidden gap-2 md:flex">
+          <StatusSortSelects
+            status={status}
+            sort={sort}
+            onStatus={(value) => {
+              setStatus(value);
+              setPage(0);
+            }}
+            onSort={setSort}
+          />
+        </div>
       </div>
 
       {categoriesQuery.isLoading ? (
@@ -286,106 +286,85 @@ export function FinanceCategoriesPage() {
           description="Thêm danh mục hoặc chạy script seed nếu đây là lần đầu."
         />
       ) : (
-        <div className="rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Danh mục</TableHead>
-                <TableHead>Loại</TableHead>
-                <TableHead className="text-right">Giao dịch</TableHead>
-                <TableHead className="text-right">Tổng tiền</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pageRows.map((row) => {
-                const Icon = categoryIcon(row.icon);
-                const stat = usage.get(row.key) ?? { count: 0, amount: 0 };
-                return (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="flex size-9 items-center justify-center rounded-lg text-white"
-                          style={{ backgroundColor: row.color }}
-                        >
-                          <Icon className="size-4" />
-                        </span>
-                        <span>
-                          <span className="block font-medium">{row.name}</span>
-                          {row.description ? (
-                            <span className="block text-xs text-muted-foreground">
-                              {row.description}
-                            </span>
-                          ) : null}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{row.type === "income" ? "Thu nhập" : "Chi tiêu"}</TableCell>
-                    <TableCell className="text-right">{stat.count}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(stat.amount)}</TableCell>
-                    <TableCell>
-                      <Badge variant={row.isActive ? "default" : "secondary"}>
-                        {row.isActive ? "Đang hoạt động" : "Tạm dừng"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Can permission={PERMISSIONS.FINANCE_TRANSACTION_UPDATE}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label="Thao tác">
-                              <MoreHorizontal className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(row)}>Sửa</DropdownMenuItem>
-                            {row.isActive ? (
-                              <DropdownMenuItem onClick={() => setPendingDelete(row)}>
-                                Ngừng hoạt động
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem onClick={() => setPendingDelete(row)}>
-                                Xóa
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </Can>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          <div className="flex items-center justify-between border-t px-3 py-2 text-sm">
-            <span className="text-muted-foreground">
-              {filtered.length} danh mục
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={safePage === 0}
-                onClick={() => setPage(safePage - 1)}
-              >
-                Trước
-              </Button>
-              <span>
-                {safePage + 1}/{pageCount}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={safePage + 1 >= pageCount}
-                onClick={() => setPage(safePage + 1)}
-              >
-                Sau
-              </Button>
-            </div>
+        <>
+          <div className="space-y-2 md:hidden">
+            {pageRows.map((row) => (
+              <CategoryCard
+                key={row.id}
+                row={row}
+                stat={usage.get(row.key) ?? { count: 0, amount: 0 }}
+                onEdit={() => openEdit(row)}
+                onRemove={() => setPendingDelete(row)}
+              />
+            ))}
           </div>
-        </div>
+          <div className="hidden rounded-xl border md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Danh mục</TableHead>
+                  <TableHead>Loại</TableHead>
+                  <TableHead className="text-right">Giao dịch</TableHead>
+                  <TableHead className="text-right">Tổng tiền</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead className="w-24 text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pageRows.map((row) => {
+                  const Icon = categoryIcon(row.icon);
+                  const stat = usage.get(row.key) ?? { count: 0, amount: 0 };
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <CategoryIdentity row={row} icon={Icon} />
+                      </TableCell>
+                      <TableCell>
+                        <TypePill type={row.type} />
+                      </TableCell>
+                      <TableCell className="text-right">{stat.count}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(stat.amount)}</TableCell>
+                      <TableCell>
+                        <StatusPill active={row.isActive} />
+                      </TableCell>
+                      <TableCell>
+                        <RowActions
+                          active={row.isActive}
+                          onEdit={() => openEdit(row)}
+                          onRemove={() => setPendingDelete(row)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <PaginationBar
+            from={filtered.length === 0 ? 0 : safePage * PAGE_SIZE + 1}
+            to={Math.min(filtered.length, safePage * PAGE_SIZE + pageRows.length)}
+            total={filtered.length}
+            page={safePage}
+            pageCount={pageCount}
+            onPage={setPage}
+          />
+        </>
       )}
+
+      <FilterSheet
+        open={filterOpen}
+        status={draftStatus}
+        sort={draftSort}
+        onStatus={setDraftStatus}
+        onSort={setDraftSort}
+        onClose={() => setFilterOpen(false)}
+        onApply={() => {
+          setStatus(draftStatus);
+          setSort(draftSort);
+          setPage(0);
+          setFilterOpen(false);
+        }}
+      />
 
       <CategoryDrawer
         open={draft !== null}
@@ -405,6 +384,13 @@ export function FinanceCategoriesPage() {
   );
 }
 
+function txShare(part: number, total: number): string {
+  if (total <= 0) return "0% giao dịch";
+  const pct = (part / total) * 100;
+  const text = Number.isInteger(pct) ? String(pct) : pct.toFixed(1);
+  return `${text}% giao dịch`;
+}
+
 function StatCard({
   label,
   value,
@@ -415,11 +401,283 @@ function StatCard({
   hint: string;
 }) {
   return (
-    <div className="rounded-xl border p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-2xl font-semibold">{value}</p>
+    <div className="rounded-xl border p-3 md:p-4">
+      <p className="truncate text-xs text-muted-foreground md:text-sm">{label}</p>
+      <p className="text-xl font-semibold md:text-2xl">{value}</p>
       <p className="text-xs text-muted-foreground">{hint}</p>
     </div>
+  );
+}
+
+function StatusSortSelects({
+  status,
+  sort,
+  onStatus,
+  onSort,
+}: {
+  status: StatusFilter;
+  sort: SortKey;
+  onStatus: (value: StatusFilter) => void;
+  onSort: (value: SortKey) => void;
+}) {
+  return (
+    <>
+      <Select value={status} onValueChange={(value) => onStatus(value as StatusFilter)}>
+        <SelectTrigger className="w-[180px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Tất cả trạng thái</SelectItem>
+          <SelectItem value="active">Đang hoạt động</SelectItem>
+          <SelectItem value="paused">Tạm dừng</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={sort} onValueChange={(value) => onSort(value as SortKey)}>
+        <SelectTrigger className="w-[180px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="default">Mặc định</SelectItem>
+          <SelectItem value="name">Tên</SelectItem>
+          <SelectItem value="count">Số giao dịch</SelectItem>
+          <SelectItem value="amount">Tổng tiền</SelectItem>
+        </SelectContent>
+      </Select>
+    </>
+  );
+}
+
+function CategoryIdentity({
+  row,
+  icon: Icon,
+}: {
+  row: FinanceCategoryRecord;
+  icon: ReturnType<typeof categoryIcon>;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <span
+        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-white"
+        style={{ backgroundColor: row.color }}
+      >
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate font-medium">{row.name}</span>
+        {row.description ? (
+          <span className="block truncate text-xs text-muted-foreground">{row.description}</span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+function TypePill({ type }: { type: FinanceTransactionType }) {
+  const income = type === "income";
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded-full px-2 py-0.5 text-xs",
+        income ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-600",
+      )}
+    >
+      {income ? "Thu nhập" : "Chi tiêu"}
+    </span>
+  );
+}
+
+function StatusPill({ active }: { active: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded-full px-2 py-0.5 text-xs",
+        active ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-600",
+      )}
+    >
+      {active ? "Đang hoạt động" : "Tạm dừng"}
+    </span>
+  );
+}
+
+function RowActions({
+  active,
+  onEdit,
+  onRemove,
+}: {
+  active: boolean;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Can permission={PERMISSIONS.FINANCE_TRANSACTION_UPDATE}>
+      <div className="flex justify-end gap-1">
+        <Button type="button" variant="ghost" size="icon" aria-label="Sửa" onClick={onEdit}>
+          <Pencil className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={active ? "Ngừng hoạt động" : "Xóa"}
+          onClick={onRemove}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+    </Can>
+  );
+}
+
+function CategoryCard({
+  row,
+  stat,
+  onEdit,
+  onRemove,
+}: {
+  row: FinanceCategoryRecord;
+  stat: { count: number; amount: number };
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const Icon = categoryIcon(row.icon);
+  return (
+    <article className="rounded-xl border p-3">
+      <div className="flex items-start justify-between gap-2">
+        <CategoryIdentity row={row} icon={Icon} />
+        <RowActions active={row.isActive} onEdit={onEdit} onRemove={onRemove} />
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <TypePill type={row.type} />
+        <span className="text-muted-foreground">{stat.count} giao dịch</span>
+        <span className="ml-auto font-medium">{formatCurrency(stat.amount)}</span>
+      </div>
+      <div className="mt-2">
+        <StatusPill active={row.isActive} />
+      </div>
+    </article>
+  );
+}
+
+function PaginationBar({
+  from,
+  to,
+  total,
+  page,
+  pageCount,
+  onPage,
+}: {
+  from: number;
+  to: number;
+  total: number;
+  page: number;
+  pageCount: number;
+  onPage: (page: number) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <span className="text-muted-foreground">
+        Hiển thị {from}–{to} trong {total} danh mục
+      </span>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" disabled={page === 0} onClick={() => onPage(page - 1)}>
+          Trước
+        </Button>
+        <span>
+          {page + 1}/{pageCount}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page + 1 >= pageCount}
+          onClick={() => onPage(page + 1)}
+        >
+          Sau
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function FilterSheet({
+  open,
+  status,
+  sort,
+  onStatus,
+  onSort,
+  onClose,
+  onApply,
+}: {
+  open: boolean;
+  status: StatusFilter;
+  sort: SortKey;
+  onStatus: (value: StatusFilter) => void;
+  onSort: (value: SortKey) => void;
+  onClose: () => void;
+  onApply: () => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
+      <SheetContent side="bottom" className="md:hidden">
+        <SheetHeader>
+          <SheetTitle>Bộ lọc</SheetTitle>
+          <SheetDescription>Trạng thái và cách sắp xếp danh mục.</SheetDescription>
+        </SheetHeader>
+        <div className="space-y-4 px-4 pb-4">
+          <div className="space-y-2">
+            <Label>Trạng thái</Label>
+            <div className="grid gap-2">
+              {(
+                [
+                  ["all", "Tất cả trạng thái"],
+                  ["active", "Đang hoạt động"],
+                  ["paused", "Tạm dừng"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left text-sm",
+                    status === value && "border-foreground",
+                  )}
+                  onClick={() => onStatus(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Sắp xếp</Label>
+            <div className="grid gap-2">
+              {(
+                [
+                  ["default", "Mặc định"],
+                  ["name", "Tên"],
+                  ["count", "Số giao dịch"],
+                  ["amount", "Tổng tiền"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left text-sm",
+                    sort === value && "border-foreground",
+                  )}
+                  onClick={() => onSort(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Button type="button" className="w-full" onClick={onApply}>
+            Áp dụng
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -442,10 +700,13 @@ function CategoryDrawer({
 }) {
   const createMutation = useCreateFinanceCategoryMutation();
   const updateMutation = useUpdateFinanceCategoryMutation();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const pending = createMutation.isPending || updateMutation.isPending;
-  const icons = CATEGORY_ICON_OPTIONS.filter((item) =>
-    item.name.toLowerCase().includes(iconQuery.trim().toLowerCase()),
-  );
+
+  function close() {
+    setPickerOpen(false);
+    onClose();
+  }
 
   async function save() {
     if (!draft) return;
@@ -465,132 +726,203 @@ function CategoryDrawer({
         await createMutation.mutateAsync(body);
         toast.success("Đã thêm danh mục");
       }
-      onClose();
+      close();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không lưu được danh mục");
     }
   }
 
   return (
-    <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
-      <SheetContent className="flex w-full flex-col overflow-y-auto sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle>{editing ? "Sửa danh mục" : "Thêm danh mục"}</SheetTitle>
-          <SheetDescription>Tên hiển thị trên giao dịch và báo cáo.</SheetDescription>
-        </SheetHeader>
-        {draft ? (
-          <div className="space-y-4 px-4">
-            <div className="space-y-2">
-              <Label htmlFor="category-name">Tên</Label>
-              <Input
-                id="category-name"
-                value={draft.name}
-                onChange={(e) => onChange({ ...draft, name: e.target.value })}
+    <Sheet open={open} onOpenChange={(next) => !next && close()}>
+      <SheetContent className="flex h-full w-full max-w-none flex-col gap-0 p-0 sm:max-w-none md:max-w-md">
+        {pickerOpen && draft ? (
+          <>
+            <SheetHeader className="p-4">
+              <SheetTitle>Chọn biểu tượng và màu sắc</SheetTitle>
+              <SheetDescription>Chọn icon và màu cho danh mục.</SheetDescription>
+            </SheetHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4">
+              <IconColorFields
+                draft={draft}
+                iconQuery={iconQuery}
+                onIconQuery={onIconQuery}
+                onChange={onChange}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Loại</Label>
-              <div className="inline-flex rounded-full border p-1">
-                {(
-                  [
-                    ["income", "Thu nhập"],
-                    ["expense", "Chi tiêu"],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={cn(
-                      "rounded-full px-3 py-1 text-sm",
-                      draft.type === value && "bg-foreground text-background",
-                    )}
-                    onClick={() => onChange({ ...draft, type: value })}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Biểu tượng</Label>
-              <Input
-                placeholder="Tìm biểu tượng"
-                value={iconQuery}
-                onChange={(e) => onIconQuery(e.target.value)}
-              />
-              <div className="grid grid-cols-6 gap-2">
-                {icons.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.name}
-                      type="button"
-                      aria-label={item.name}
-                      className={cn(
-                        "flex size-9 items-center justify-center rounded-md border",
-                        draft.icon === item.name && "border-foreground",
-                      )}
-                      onClick={() => onChange({ ...draft, icon: item.name })}
-                    >
-                      <Icon className="size-4" />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Màu</Label>
-              <div className="flex flex-wrap gap-2">
-                {CATEGORY_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    aria-label={color}
-                    className={cn(
-                      "size-7 rounded-full border-2",
-                      draft.color === color ? "border-foreground" : "border-transparent",
-                    )}
-                    style={{ backgroundColor: color }}
-                    onClick={() => onChange({ ...draft, color })}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <Label>Đang hoạt động</Label>
-              <Button
-                type="button"
-                variant={draft.isActive ? "default" : "outline"}
-                size="sm"
-                onClick={() => onChange({ ...draft, isActive: !draft.isActive })}
-              >
-                {draft.isActive ? "Bật" : "Tắt"}
+            <SheetFooter className="p-4">
+              <Button type="button" className="w-full" onClick={() => setPickerOpen(false)}>
+                Áp dụng
               </Button>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category-desc">Mô tả</Label>
-              <Textarea
-                id="category-desc"
-                maxLength={200}
-                value={draft.description}
-                onChange={(e) => onChange({ ...draft, description: e.target.value })}
-              />
-              <p className="text-right text-xs text-muted-foreground">
-                {draft.description.length}/200
-              </p>
-            </div>
-          </div>
-        ) : null}
-        <SheetFooter className="px-4 pb-4">
-          <Button type="button" onClick={save} disabled={pending || !draft?.name.trim()}>
-            Lưu danh mục
-          </Button>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Hủy
-          </Button>
-        </SheetFooter>
+            </SheetFooter>
+          </>
+        ) : (
+          <>
+            <SheetHeader className="p-4">
+              <SheetTitle>{editing ? "Sửa danh mục" : "Thêm danh mục"}</SheetTitle>
+              <SheetDescription>Tên hiển thị trên giao dịch và báo cáo.</SheetDescription>
+            </SheetHeader>
+            {draft ? (
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category-name">Tên</Label>
+                  <Input
+                    id="category-name"
+                    value={draft.name}
+                    onChange={(e) => onChange({ ...draft, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Loại</Label>
+                  <div className="inline-flex rounded-full border p-1">
+                    {(
+                      [
+                        ["income", "Thu nhập"],
+                        ["expense", "Chi tiêu"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={cn(
+                          "rounded-full px-3 py-1 text-sm",
+                          draft.type === value && "bg-foreground text-background",
+                        )}
+                        onClick={() => onChange({ ...draft, type: value })}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-xl border p-3 text-left md:hidden"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <span
+                    className="flex size-10 items-center justify-center rounded-lg text-white"
+                    style={{ backgroundColor: draft.color }}
+                  >
+                    {(() => {
+                      const Icon = categoryIcon(draft.icon);
+                      return <Icon className="size-4" />;
+                    })()}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-medium">Biểu tượng và màu</span>
+                    <span className="block text-xs text-muted-foreground">{draft.icon}</span>
+                  </span>
+                </button>
+                <div className="hidden md:block">
+                  <IconColorFields
+                    draft={draft}
+                    iconQuery={iconQuery}
+                    onIconQuery={onIconQuery}
+                    onChange={onChange}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Đang hoạt động</Label>
+                  <Button
+                    type="button"
+                    variant={draft.isActive ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => onChange({ ...draft, isActive: !draft.isActive })}
+                  >
+                    {draft.isActive ? "Bật" : "Tắt"}
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category-desc">Mô tả</Label>
+                  <Textarea
+                    id="category-desc"
+                    maxLength={200}
+                    value={draft.description}
+                    onChange={(e) => onChange({ ...draft, description: e.target.value })}
+                  />
+                  <p className="text-right text-xs text-muted-foreground">
+                    {draft.description.length}/200
+                  </p>
+                </div>
+              </div>
+            ) : null}
+            <SheetFooter className="p-4">
+              <Button type="button" onClick={save} disabled={pending || !draft?.name.trim()}>
+                Lưu danh mục
+              </Button>
+              <Button type="button" variant="outline" onClick={close}>
+                Hủy
+              </Button>
+            </SheetFooter>
+          </>
+        )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+function IconColorFields({
+  draft,
+  iconQuery,
+  onIconQuery,
+  onChange,
+}: {
+  draft: Draft;
+  iconQuery: string;
+  onIconQuery: (value: string) => void;
+  onChange: (draft: Draft) => void;
+}) {
+  const icons = CATEGORY_ICON_OPTIONS.filter((item) =>
+    item.name.toLowerCase().includes(iconQuery.trim().toLowerCase()),
+  );
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Biểu tượng</Label>
+        <Input
+          placeholder="Tìm biểu tượng"
+          value={iconQuery}
+          onChange={(e) => onIconQuery(e.target.value)}
+        />
+        <div className="grid grid-cols-6 gap-2">
+          {icons.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.name}
+                type="button"
+                aria-label={item.name}
+                className={cn(
+                  "flex size-9 items-center justify-center rounded-md border",
+                  draft.icon === item.name && "border-foreground",
+                )}
+                onClick={() => onChange({ ...draft, icon: item.name })}
+              >
+                <Icon className="size-4" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Màu</Label>
+        <div className="flex flex-wrap gap-2">
+          {CATEGORY_COLORS.map((color) => (
+            <button
+              key={color}
+              type="button"
+              aria-label={color}
+              className={cn(
+                "size-7 rounded-full border-2",
+                draft.color === color ? "border-foreground" : "border-transparent",
+              )}
+              style={{ backgroundColor: color }}
+              onClick={() => onChange({ ...draft, color })}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -629,17 +961,22 @@ function DeleteCategoryDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {row?.isActive ? "Ngừng hoạt động danh mục?" : "Xóa danh mục?"}
+            {row?.isActive ? "Xác nhận ngừng hoạt động" : "Xác nhận xóa danh mục"}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {row?.isActive
-              ? `${row.name} sẽ không hiện trong form giao dịch mới. Giao dịch cũ vẫn giữ tên này.`
-              : "Nếu danh mục đã gắn giao dịch, hệ thống chỉ tạm dừng thay vì xóa hẳn."}
+              ? `Danh mục "${row.name}" sẽ không hiện khi thêm giao dịch mới. Giao dịch cũ vẫn giữ tên này.`
+              : `Bạn có chắc muốn xóa danh mục "${row?.name ?? ""}"? Nếu đã có giao dịch, hệ thống chỉ tạm dừng.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Hủy</AlertDialogCancel>
-          <AlertDialogAction onClick={confirm}>Xác nhận</AlertDialogAction>
+          <AlertDialogAction
+            className="bg-destructive text-white hover:bg-destructive/90"
+            onClick={confirm}
+          >
+            {row?.isActive ? "Ngừng hoạt động" : "Xóa danh mục"}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

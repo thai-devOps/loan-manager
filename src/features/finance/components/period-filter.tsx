@@ -36,60 +36,61 @@ export function PeriodFilter({
   id?: string;
 }) {
   const showPayday = isSalaryCyclePreset(preset);
+  const rangeLabel = `${formatDateDisplay(from)} – ${formatDateDisplay(to)}`;
 
   return (
     <div
-      className={cn(
-        "flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end",
-        className,
-      )}
+      className={cn("flex flex-nowrap items-center gap-1.5", className)}
+      title={
+        showPayday
+          ? `Từ ngày lương đến trước kỳ lương tiếp theo: ${rangeLabel}`
+          : rangeLabel
+      }
     >
-      <div className="flex flex-wrap items-center gap-2">
+      <Select
+        value={preset}
+        onValueChange={(v) => onPresetChange(v as DateRangePreset)}
+      >
+        <SelectTrigger
+          id={id}
+          aria-label="Khoảng thời gian"
+          className="h-8 w-[9.75rem] shrink-0 px-2 text-xs md:text-sm"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {DATE_RANGE_PRESET_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {showPayday && (
         <Select
-          value={preset}
-          onValueChange={(v) => onPresetChange(v as DateRangePreset)}
+          value={String(salaryPayday)}
+          onValueChange={(v) => onSalaryPaydayChange(Number(v))}
         >
           <SelectTrigger
-            id={id}
-            aria-label="Khoảng thời gian"
-            className="w-full min-w-[10.5rem] sm:w-[12.5rem]"
+            id={`${id}-payday`}
+            aria-label="Ngày nhận lương"
+            className="h-8 w-[6.75rem] shrink-0 px-2 text-xs md:text-sm"
           >
-            <SelectValue />
+            <SelectValue placeholder="Ngày lương" />
           </SelectTrigger>
           <SelectContent>
-            {DATE_RANGE_PRESET_OPTIONS.map((opt) => (
+            {SALARY_PAYDAY_OPTIONS.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-
-        {showPayday && (
-          <Select
-            value={String(salaryPayday)}
-            onValueChange={(v) => onSalaryPaydayChange(Number(v))}
-          >
-            <SelectTrigger
-              id={`${id}-payday`}
-              aria-label="Ngày nhận lương"
-              className="w-full min-w-[8.5rem] sm:w-[9.5rem]"
-            >
-              <SelectValue placeholder="Ngày lương" />
-            </SelectTrigger>
-            <SelectContent>
-              {SALARY_PAYDAY_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      </div>
+      )}
 
       {preset === "custom" && (
-        <div className="flex flex-wrap items-center gap-2">
+        <>
           <DatePicker
             id={`${id}-from`}
             value={from}
@@ -97,9 +98,9 @@ export function PeriodFilter({
               const nextTo = v > to ? v : to;
               onCustomRangeChange(v, nextTo);
             }}
-            className="w-[9.5rem]"
+            className="h-8 w-[8.25rem] shrink-0 px-2 text-xs"
           />
-          <span className="text-sm text-muted-foreground">đến</span>
+          <span className="text-xs text-muted-foreground">–</span>
           <DatePicker
             id={`${id}-to`}
             value={to}
@@ -107,17 +108,14 @@ export function PeriodFilter({
               const nextFrom = v < from ? v : from;
               onCustomRangeChange(nextFrom, v);
             }}
-            className="w-[9.5rem]"
+            className="h-8 w-[8.25rem] shrink-0 px-2 text-xs"
           />
-        </div>
+        </>
       )}
 
-      {showPayday && (
-        <p className="text-xs text-muted-foreground sm:basis-full sm:text-right">
-          Từ ngày lương đến trước kỳ lương tiếp theo:{" "}
-          {formatDateDisplay(from)} – {formatDateDisplay(to)}
-        </p>
-      )}
+      <span className="hidden whitespace-nowrap text-xs text-muted-foreground xl:inline">
+        {rangeLabel}
+      </span>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { FeatureSubNav } from "@/components/layout/feature-sub-nav";
@@ -112,6 +112,16 @@ export function FinanceLayout() {
   );
 
   const feature = getFeatureById("finance");
+  const hidePeriod = useLocation().pathname.endsWith("/finance/categories");
+  const periodProps = {
+    preset,
+    from: range.from,
+    to: range.to,
+    salaryPayday,
+    onPresetChange: setPreset,
+    onCustomRangeChange: setCustomRange,
+    onSalaryPaydayChange,
+  };
 
   return (
     <FinanceMonthContext.Provider value={ctx}>
@@ -121,31 +131,34 @@ export function FinanceLayout() {
             title="Tài chính"
             description="Theo dõi thu chi cá nhân theo thời gian"
             actions={
-              <Can permission={PERMISSIONS.FINANCE_TRANSACTION_CREATE}>
-                <Button
-                  size="sm"
-                  onClick={() => ctx.openCreate("expense")}
-                  className="gap-1.5"
-                >
-                  <Plus className="size-4" />
-                  <span className="hidden sm:inline">Thêm giao dịch</span>
-                  <span className="sm:hidden">Thêm</span>
-                </Button>
-              </Can>
+              <>
+                <div className="hidden md:block">
+                  {hidePeriod ? null : (
+                    <PeriodFilter id="period-filter-header" {...periodProps} />
+                  )}
+                </div>
+                <Can permission={PERMISSIONS.FINANCE_TRANSACTION_CREATE}>
+                  <Button
+                    size="sm"
+                    onClick={() => ctx.openCreate("expense")}
+                    className="gap-1.5"
+                  >
+                    <Plus className="size-4" />
+                    <span className="hidden sm:inline">Thêm giao dịch</span>
+                    <span className="sm:hidden">Thêm</span>
+                  </Button>
+                </Can>
+              </>
             }
           />
         }
         subNav={<FeatureSubNav items={feature.nav} />}
       >
-        <PeriodFilter
-          preset={preset}
-          from={range.from}
-          to={range.to}
-          salaryPayday={salaryPayday}
-          onPresetChange={setPreset}
-          onCustomRangeChange={setCustomRange}
-          onSalaryPaydayChange={onSalaryPaydayChange}
-        />
+        {hidePeriod ? null : (
+          <div className="mb-2 overflow-x-auto md:hidden">
+            <PeriodFilter id="period-filter-mobile" {...periodProps} />
+          </div>
+        )}
 
         <Outlet context={outletContext} />
 
