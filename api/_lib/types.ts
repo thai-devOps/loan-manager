@@ -76,6 +76,22 @@ export interface FinanceTransaction {
   updatedAt: string;
 }
 
+export interface FinanceCategoryDoc {
+  _id?: string;
+  id: string;
+  key: string;
+  name: string;
+  nameNormalized: string;
+  description?: string;
+  type: FinanceTransactionType;
+  icon: string;
+  color: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ManualAssetType = "cash" | "bank" | "wallet" | "gold" | "other";
 
 export type GoldType = "9999" | "18k" | "other";

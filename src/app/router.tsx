@@ -130,6 +130,11 @@ const FinanceTransactionsPage = lazy(() =>
     default: m.FinanceTransactionsPage,
   })),
 );
+const FinanceCategoriesPage = lazy(() =>
+  import("@/features/finance/finance-categories-page").then((m) => ({
+    default: m.FinanceCategoriesPage,
+  })),
+);
 const AssetsLayout = lazy(() =>
   import("@/features/assets/assets-layout").then((m) => ({
     default: m.AssetsLayout,
@@ -905,6 +910,10 @@ export const router = createBrowserRouter([
                       {
                         path: "transactions",
                         element: <FinanceTransactionsPage />,
+                      },
+                      {
+                        path: "categories",
+                        element: <FinanceCategoriesPage />,
                       },
                     ],
                   },

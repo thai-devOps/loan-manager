@@ -6,6 +6,7 @@ import type { Transaction } from "./types.js";
 import type {
   AssetSettings,
   AssetSnapshot,
+  FinanceCategoryDoc,
   FinanceTransaction,
   GoldPlan,
   GoldPurchase,
@@ -67,6 +68,16 @@ async function ensureIndexes(db: Db): Promise<void> {
     db.collection("transactions").createIndex({ transactionDate: 1 }),
     db.collection("finance_transactions").createIndex({ date: 1 }),
     db.collection("finance_transactions").createIndex({ type: 1 }),
+    db.collection("finance_transactions").createIndex({ category: 1 }),
+    db
+      .collection("finance_categories")
+      .createIndex({ type: 1, isActive: 1, sortOrder: 1 }),
+    db
+      .collection("finance_categories")
+      .createIndex({ type: 1, key: 1 }, { unique: true }),
+    db
+      .collection("finance_categories")
+      .createIndex({ type: 1, nameNormalized: 1 }, { unique: true }),
     db.collection("assets").createIndex({ type: 1 }),
     db.collection("gold_purchases").createIndex({ purchaseDate: 1 }),
     db.collection("gold_purchases").createIndex({ type: 1 }),
@@ -191,6 +202,12 @@ export async function financeTransactionsCol(): Promise<
   Collection<FinanceTransaction>
 > {
   return (await getDb()).collection<FinanceTransaction>("finance_transactions");
+}
+
+export async function financeCategoriesCol(): Promise<
+  Collection<FinanceCategoryDoc>
+> {
+  return (await getDb()).collection<FinanceCategoryDoc>("finance_categories");
 }
 
 export async function assetsCol(): Promise<Collection<ManualAsset>> {

@@ -46,6 +46,14 @@ npm run dev
 
 Public ride site: http://localhost:5173/ride
 
+Danh mục thu chi nằm trên MongoDB (`finance_categories`). Lần đầu, seed slug cũ (không ghi đè tên/icon/màu đã sửa):
+
+```bash
+node scripts/seed-finance-categories.mjs
+```
+
+Script đọc `MONGODB_URI` từ `.env`. Không chạy tự động khi mở app.
+
 ## Build
 
 ```bash

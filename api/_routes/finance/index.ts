@@ -3,46 +3,29 @@ import { randomUUID } from "node:crypto";
 import { PERMISSIONS } from "../../_lib/access/catalog.js";
 import { requirePermission } from "../../_lib/auth.js";
 import { methodNotAllowed, readJsonBody, withHandler } from "../../_lib/http.js";
+import { assertActiveCategory } from "../../_lib/finance-categories.js";
 import { financeTransactionsCol, stripDoc } from "../../_lib/mongo.js";
 import type {
   FinanceTransaction,
   FinanceTransactionType,
 } from "../../_lib/types.js";
 
-const INCOME_CATEGORIES = new Set([
-  "salary",
-  "bonus",
-  "business",
-  "other_income",
-]);
-const EXPENSE_CATEGORIES = new Set([
-  "housing",
-  "food",
-  "transport",
-  "family",
-  "shopping",
-  "bills",
-  "electricity",
-  "water",
-  "wifi",
-  "entertainment",
-  "health",
-  "other_expense",
-]);
-
 function isValidDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function validateBody(body: {
-  type?: string;
-  category?: string;
-  amount?: number;
-  date?: string;
-  description?: string;
-  note?: string;
-  paymentMethod?: string;
-}): {
+async function validateBody(
+  body: {
+    type?: string;
+    category?: string;
+    amount?: number;
+    date?: string;
+    description?: string;
+    note?: string;
+    paymentMethod?: string;
+  },
+  allowCategoryKey?: string,
+): Promise<{
   type: FinanceTransactionType;
   category: string;
   amount: number;
@@ -50,16 +33,16 @@ function validateBody(body: {
   description: string;
   note?: string;
   paymentMethod?: string;
-} {
+}> {
   const type = body.type === "income" || body.type === "expense" ? body.type : null;
   if (!type) {
     throw new Error("Loại giao dịch không hợp lệ");
   }
   const category = (body.category ?? "").trim();
-  const allowed = type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  if (!category || !allowed.has(category)) {
+  if (!category) {
     throw new Error("Danh mục không hợp lệ");
   }
+  await assertActiveCategory(type, category, allowCategoryKey);
   const amount = Number(body.amount);
   if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
     throw new Error("Số tiền phải là số nguyên lớn hơn 0");
@@ -127,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         note?: string;
         paymentMethod?: string;
       }>(req);
-      const parsed = validateBody(body);
+      const parsed = await validateBody(body);
       const now = new Date().toISOString();
       const id = randomUUID();
       const row: FinanceTransaction = {
@@ -158,7 +141,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         note?: string;
         paymentMethod?: string;
       }>(req);
-      const parsed = validateBody(body);
+      const current = await col.findOne({ id });
+      if (!current) {
+        res.status(404).json({ error: "Không tìm thấy giao dịch" });
+        return;
+      }
+      const parsed = await validateBody(body, current.category);
       const result = await col.findOneAndUpdate(
         { id },
         {

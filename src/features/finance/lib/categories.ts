@@ -1,45 +1,46 @@
-import type {
-  FinanceCategory,
-  FinanceExpenseCategory,
-  FinanceIncomeCategory,
-  FinanceTransactionType,
-} from "@/types/finance";
+import type { FinanceCategoryRecord, FinanceTransactionType } from "@/types/finance";
 
-export const INCOME_CATEGORIES: {
-  value: FinanceIncomeCategory;
-  label: string;
-}[] = [
-  { value: "salary", label: "Lương" },
-  { value: "bonus", label: "Thưởng" },
-  { value: "business", label: "Kinh doanh" },
-  { value: "other_income", label: "Thu nhập khác" },
-];
+const FALLBACK_LABELS: Record<string, string> = {
+  salary: "Lương",
+  bonus: "Thưởng",
+  business: "Kinh doanh",
+  other_income: "Thu nhập khác",
+  housing: "Nhà ở",
+  food: "Ăn uống",
+  transport: "Đi lại",
+  family: "Gia đình",
+  shopping: "Mua sắm",
+  bills: "Hóa đơn",
+  electricity: "Hóa đơn điện",
+  water: "Hóa đơn nước",
+  wifi: "Hóa đơn wifi",
+  entertainment: "Giải trí",
+  health: "Sức khỏe",
+  other_expense: "Khác",
+};
 
-export const EXPENSE_CATEGORIES: {
-  value: FinanceExpenseCategory;
-  label: string;
-}[] = [
-  { value: "housing", label: "Nhà ở" },
-  { value: "food", label: "Ăn uống" },
-  { value: "transport", label: "Đi lại" },
-  { value: "family", label: "Gia đình" },
-  { value: "shopping", label: "Mua sắm" },
-  { value: "bills", label: "Hóa đơn" },
-  { value: "electricity", label: "Hóa đơn điện" },
-  { value: "water", label: "Hóa đơn nước" },
-  { value: "wifi", label: "Hóa đơn wifi" },
-  { value: "entertainment", label: "Giải trí" },
-  { value: "health", label: "Sức khỏe" },
-  { value: "other_expense", label: "Khác" },
-];
-
-export function categoriesForType(type: FinanceTransactionType) {
-  return type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+export function categoryLabel(
+  category: string,
+  rows?: FinanceCategoryRecord[] | null,
+): string {
+  const hit = rows?.find((row) => row.key === category);
+  if (hit) return hit.name;
+  if (rows) return category;
+  return FALLBACK_LABELS[category] ?? category;
 }
 
-export function categoryLabel(category: FinanceCategory | string): string {
-  const all = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES];
-  return all.find((c) => c.value === category)?.label ?? category;
+export function categoriesForType(
+  type: FinanceTransactionType,
+  rows: FinanceCategoryRecord[] | undefined,
+  currentKey?: string,
+) {
+  const list = (rows ?? []).filter(
+    (row) => row.type === type && (row.isActive || row.key === currentKey),
+  );
+  return list
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "vi"))
+    .map((row) => ({ value: row.key, label: row.name }));
 }
 
 export const PAYMENT_METHODS = [

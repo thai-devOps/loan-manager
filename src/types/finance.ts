@@ -1,26 +1,20 @@
 export type FinanceTransactionType = "income" | "expense";
 
-export type FinanceIncomeCategory =
-  | "salary"
-  | "bonus"
-  | "business"
-  | "other_income";
+export type FinanceCategory = string;
 
-export type FinanceExpenseCategory =
-  | "housing"
-  | "food"
-  | "transport"
-  | "family"
-  | "shopping"
-  | "bills"
-  | "electricity"
-  | "water"
-  | "wifi"
-  | "entertainment"
-  | "health"
-  | "other_expense";
-
-export type FinanceCategory = FinanceIncomeCategory | FinanceExpenseCategory;
+export interface FinanceCategoryRecord {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  type: FinanceTransactionType;
+  icon: string;
+  color: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface FinanceTransaction {
   _id?: string;

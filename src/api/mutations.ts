@@ -1,8 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  createFinanceCategory,
+  deleteFinanceCategory,
   importBackup,
   resetDatabase,
   seedDemo,
+  updateFinanceCategory,
 } from "@/api/endpoints";
 import { queryKeys } from "@/api/query-keys";
 import { assetRepository } from "@/db/repositories/assetRepository";
@@ -12,7 +15,7 @@ import { loanRepository } from "@/db/repositories/loanRepository";
 import { requestSync } from "@/sync/syncManager";
 import type { BorrowerFormValues } from "@/schemas/borrower.schema";
 import type { LoanFormValues } from "@/schemas/loan.schema";
-import type { FinanceTransaction } from "@/types/finance";
+import type { FinanceCategoryRecord, FinanceTransaction } from "@/types/finance";
 import type {
   AssetSettings,
   GoldPlan,
@@ -180,6 +183,52 @@ export function useDeleteFinanceTransactionMutation() {
   const invalidate = useInvalidateFinance();
   return useMutation({
     mutationFn: (id: string) => financeRepository.remove(id),
+    onSuccess: () => invalidate(),
+  });
+}
+
+function useInvalidateFinanceCategories() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.categories }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all }),
+    ]);
+}
+
+export function useCreateFinanceCategoryMutation() {
+  const invalidate = useInvalidateFinanceCategories();
+  return useMutation({
+    mutationFn: (
+      body: Parameters<typeof createFinanceCategory>[0],
+    ) => createFinanceCategory(body),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateFinanceCategoryMutation() {
+  const invalidate = useInvalidateFinanceCategories();
+  return useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: Partial<
+        Pick<
+          FinanceCategoryRecord,
+          "name" | "description" | "type" | "icon" | "color" | "isActive"
+        >
+      >;
+    }) => updateFinanceCategory(id, body),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteFinanceCategoryMutation() {
+  const invalidate = useInvalidateFinanceCategories();
+  return useMutation({
+    mutationFn: (id: string) => deleteFinanceCategory(id),
     onSuccess: () => invalidate(),
   });
 }

@@ -100,6 +100,15 @@ export const API_ROUTES: ApiRoute[] = [
     load: () => import("../_routes/transactions/index.js"),
   },
   {
+    pattern: /^\/api\/finance\/categories\/?$/,
+    load: () => import("../_routes/finance/categories/index.js"),
+  },
+  {
+    pattern: /^\/api\/finance\/categories\/([^/]+)\/?$/,
+    load: () => import("../_routes/finance/categories/[id].js"),
+    params: (m) => ({ id: m[1]! }),
+  },
+  {
     pattern: /^\/api\/finance\/?$/,
     load: () => import("../_routes/finance/index.js"),
   },

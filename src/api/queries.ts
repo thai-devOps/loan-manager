@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchAssetSnapshots, fetchGoldPricesLatest, fetchGoldTypes, syncSchedules } from "@/api/endpoints";
+import { fetchAssetSnapshots, fetchFinanceCategories, fetchGoldPricesLatest, fetchGoldTypes, syncSchedules } from "@/api/endpoints";
 import { queryKeys } from "@/api/query-keys";
 import { assetRepository } from "@/db/repositories/assetRepository";
 import { borrowerRepository } from "@/db/repositories/borrowerRepository";
@@ -136,6 +136,13 @@ export function useFinanceTransactionsQuery(params?: {
     queryKey: key,
     queryFn: () => financeRepository.list(params),
     enabled: dbReady && isDbOpen(),
+  });
+}
+
+export function useFinanceCategoriesQuery() {
+  return useQuery({
+    queryKey: queryKeys.finance.categories,
+    queryFn: fetchFinanceCategories,
   });
 }
 

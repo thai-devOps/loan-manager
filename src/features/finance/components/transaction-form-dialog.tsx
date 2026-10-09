@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { MoneyInput } from "@/features/finance/components/money-input";
 import { DatePicker } from "@/components/ui/date-picker";
+import { useFinanceCategoriesQuery } from "@/api/queries";
 import {
   categoriesForType,
   PAYMENT_METHODS,
@@ -31,10 +32,7 @@ import {
   financeTransactionSchema,
   type FinanceTransactionFormValues,
 } from "@/schemas/finance.schema";
-import type {
-  FinanceCategory,
-  FinanceTransaction,
-} from "@/types/finance";
+import type { FinanceTransaction } from "@/types/finance";
 
 type TransactionFormDialogProps = {
   open: boolean;
@@ -122,6 +120,7 @@ function TransactionFormFields({
 }) {
   const createMutation = useCreateFinanceTransactionMutation();
   const updateMutation = useUpdateFinanceTransactionMutation();
+  const categoriesQuery = useFinanceCategoriesQuery();
   const [error, setError] = useState<string | null>(null);
   const isEdit = Boolean(editing);
 
@@ -131,13 +130,17 @@ function TransactionFormFields({
   });
 
   const type = useWatch({ control: form.control, name: "type" }) ?? defaultType;
-  const categories = categoriesForType(type);
+  const categories = categoriesForType(
+    type,
+    categoriesQuery.data,
+    editing?.category,
+  );
 
   async function onSubmit(values: FinanceTransactionFormValues) {
     setError(null);
     const payload = {
       type: values.type,
-      category: values.category as FinanceCategory,
+      category: values.category,
       amount: values.amount,
       date: values.date,
       description: values.description.trim(),

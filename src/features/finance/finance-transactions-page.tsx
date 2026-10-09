@@ -37,16 +37,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useDeleteFinanceTransactionMutation } from "@/api/mutations";
-import { useFinanceTransactionsQuery } from "@/api/queries";
+import { useFinanceCategoriesQuery, useFinanceTransactionsQuery } from "@/api/queries";
 import { useFinanceMonth } from "@/features/finance/finance-context";
 import { useFinanceOutlet } from "@/features/finance/use-finance-outlet";
 import { Can } from "@/features/auth/can";
 import { PERMISSIONS } from "@/config/permissions";
-import {
-  EXPENSE_CATEGORIES,
-  INCOME_CATEGORIES,
-  categoryLabel,
-} from "@/features/finance/lib/categories";
+import { categoryLabel } from "@/features/finance/lib/categories";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
@@ -56,6 +52,7 @@ export function FinanceTransactionsPage() {
   const { from, to } = useFinanceMonth();
   const { openEdit } = useFinanceOutlet();
   const q = useFinanceTransactionsQuery({ from, to });
+  const categoriesQuery = useFinanceCategoriesQuery();
   const deleteMutation = useDeleteFinanceTransactionMutation();
 
   const [search, setSearch] = useState("");
@@ -66,7 +63,10 @@ export function FinanceTransactionsPage() {
   const [deleting, setDeleting] = useState<FinanceTransaction | null>(null);
 
   const items = q.data ?? EMPTY_ARRAY;
-  const categories = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES];
+  const catalog = categoriesQuery.data;
+  const categories = (catalog ?? []).filter(
+    (row) => typeFilter === "ALL" || row.type === typeFilter,
+  );
 
   const rows = useMemo(() => {
     const qLower = search.trim().toLowerCase();
@@ -80,7 +80,7 @@ export function FinanceTransactionsPage() {
         return (
           t.description.toLowerCase().includes(qLower) ||
           (t.note ?? "").toLowerCase().includes(qLower) ||
-          categoryLabel(t.category).toLowerCase().includes(qLower)
+          categoryLabel(t.category, catalog).toLowerCase().includes(qLower)
         );
       })
       .sort(
@@ -88,7 +88,7 @@ export function FinanceTransactionsPage() {
           b.date.localeCompare(a.date) ||
           b.createdAt.localeCompare(a.createdAt),
       );
-  }, [items, search, typeFilter, categoryFilter]);
+  }, [items, search, typeFilter, categoryFilter, catalog]);
 
   if (q.isError) {
     return (
@@ -134,8 +134,8 @@ export function FinanceTransactionsPage() {
           <SelectContent>
             <SelectItem value="ALL">Tất cả danh mục</SelectItem>
             {categories.map((c) => (
-              <SelectItem key={c.value} value={c.value}>
-                {c.label}
+              <SelectItem key={c.id} value={c.key}>
+                {c.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -161,7 +161,7 @@ export function FinanceTransactionsPage() {
                   )
                 }
                 title={tx.description}
-                subtitle={`${formatDate(tx.createdAt)} · ${categoryLabel(tx.category)}`}
+                subtitle={`${formatDate(tx.createdAt)} · ${categoryLabel(tx.category, catalog)}`}
                 primaryValue={
                   <span
                     className={
@@ -256,7 +256,7 @@ export function FinanceTransactionsPage() {
                         {tx.type === "income" ? "Thu" : "Chi"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{categoryLabel(tx.category)}</TableCell>
+                    <TableCell>{categoryLabel(tx.category, catalog)}</TableCell>
                     <TableCell>
                       <div>
                         <p>{tx.description}</p>

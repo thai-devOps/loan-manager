@@ -4,7 +4,7 @@ import { TablePageSkeleton } from "@/components/common/loading-skeletons";
 import { EmptyState, StatCard } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useFinanceTransactionsQuery } from "@/api/queries";
+import { useFinanceCategoriesQuery, useFinanceTransactionsQuery } from "@/api/queries";
 import { useFinanceMonth } from "@/features/finance/finance-context";
 import { useFinanceOutlet } from "@/features/finance/use-finance-outlet";
 import { categoryLabel } from "@/features/finance/lib/categories";
@@ -21,6 +21,8 @@ export function FinanceIncomePage() {
   const { from, to, preset } = useFinanceMonth();
   const { openCreate } = useFinanceOutlet();
   const q = useFinanceTransactionsQuery({ from, to });
+  const categoriesQuery = useFinanceCategoriesQuery();
+  const catalog = categoriesQuery.data;
   const items = (q.data ?? EMPTY_ARRAY).filter((t) => t.type === "income");
   const total = calculateTotalIncome(items);
   const cats = calculateCategoryTotals(items, "income");
@@ -78,7 +80,7 @@ export function FinanceIncomePage() {
               {cats.map((item) => (
                 <div key={item.category} className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2 text-sm">
-                    <span>{categoryLabel(item.category)}</span>
+                    <span>{categoryLabel(item.category, catalog)}</span>
                     <span className="tabular-nums text-muted-foreground">
                       {formatCurrency(item.amount)} · {item.percent.toFixed(0)}%
                     </span>

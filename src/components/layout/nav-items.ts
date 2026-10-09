@@ -19,6 +19,7 @@ import {
   CalendarCheck,
   LineChart,
   Shield,
+  Tags,
   type LucideIcon,
 } from "lucide-react";
 
@@ -100,6 +101,7 @@ export const APP_FEATURES: AppFeature[] = [
         href: "/finance/transactions",
         icon: ArrowLeftRight,
       },
+      { title: "Danh mục", href: "/finance/categories", icon: Tags },
     ],
   },
   {

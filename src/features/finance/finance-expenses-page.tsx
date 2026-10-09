@@ -30,9 +30,10 @@ import { EMPTY_ARRAY } from "@/lib/empty";
 import { EmptyState } from "@/components/common/status-badges";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useFinanceTransactionsQuery } from "@/api/queries";
+import { useFinanceCategoriesQuery, useFinanceTransactionsQuery } from "@/api/queries";
 import { useFinanceMonth } from "@/features/finance/finance-context";
 import { useFinanceOutlet } from "@/features/finance/use-finance-outlet";
+import { categoryIcon } from "@/features/finance/lib/category-icons";
 import { categoryLabel } from "@/features/finance/lib/categories";
 import {
   calculateCategoryTotals,
@@ -128,15 +129,19 @@ const CATEGORY_STYLE: Record<
   },
 };
 
-function styleFor(category: string) {
-  return (
-    CATEGORY_STYLE[category] ?? {
-      icon: Wallet,
-      color: "#64748b",
-      soft: "bg-muted text-muted-foreground",
-      bar: "bg-muted-foreground/50",
-    }
-  );
+function styleFor(
+  category: string,
+  rows?: { key: string; icon: string; color: string }[] | null,
+) {
+  const row = rows?.find((item) => item.key === category);
+  const fallback = CATEGORY_STYLE[category];
+  return {
+    icon: row ? categoryIcon(row.icon) : (fallback?.icon ?? Wallet),
+    color: row?.color ?? fallback?.color ?? "#64748b",
+    soft: fallback?.soft ?? "bg-muted text-muted-foreground",
+    bar: fallback?.bar ?? "bg-muted-foreground/50",
+    fromApi: Boolean(row),
+  };
 }
 
 export function FinanceExpensesPage() {
@@ -144,6 +149,8 @@ export function FinanceExpensesPage() {
   const { openCreate } = useFinanceOutlet();
   const [view, setView] = useState<"chart" | "list">("chart");
   const q = useFinanceTransactionsQuery({ from, to });
+  const categoriesQuery = useFinanceCategoriesQuery();
+  const catalog = categoriesQuery.data;
   const prevRange = useMemo(
     () => previousEquivalentRange(from, to),
     [from, to],
@@ -290,7 +297,7 @@ export function FinanceExpensesPage() {
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {topCats.map((item) => {
-                const style = styleFor(item.category);
+                const style = styleFor(item.category, catalog);
                 const Icon = style.icon;
                 return (
                   <section
@@ -299,13 +306,18 @@ export function FinanceExpensesPage() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="truncate text-sm text-muted-foreground">
-                        {categoryLabel(item.category)}
+                        {categoryLabel(item.category, catalog)}
                       </p>
                       <span
                         className={cn(
                           "flex size-7 shrink-0 items-center justify-center rounded-lg",
-                          style.soft,
+                          !style.fromApi && style.soft,
                         )}
+                        style={
+                          style.fromApi
+                            ? { backgroundColor: style.color, color: "#fff" }
+                            : undefined
+                        }
                       >
                         <Icon className="size-3.5" />
                       </span>
@@ -373,7 +385,7 @@ export function FinanceExpensesPage() {
                           {cats.map((item) => (
                             <Cell
                               key={item.category}
-                              fill={styleFor(item.category).color}
+                              fill={styleFor(item.category, catalog).color}
                             />
                           ))}
                         </Pie>
@@ -398,11 +410,11 @@ export function FinanceExpensesPage() {
                           <span
                             className="size-2.5 shrink-0 rounded-full"
                             style={{
-                              background: styleFor(item.category).color,
+                              background: styleFor(item.category, catalog).color,
                             }}
                           />
                           <span className="truncate">
-                            {categoryLabel(item.category)}
+                            {categoryLabel(item.category, catalog)}
                           </span>
                         </span>
                         <span className="shrink-0 tabular-nums text-muted-foreground">
@@ -418,7 +430,7 @@ export function FinanceExpensesPage() {
               ) : (
                 <ul className="mt-4 divide-y divide-border text-sm">
                   {cats.map((item) => {
-                    const style = styleFor(item.category);
+                    const style = styleFor(item.category, catalog);
                     const Icon = style.icon;
                     return (
                       <li
@@ -429,13 +441,18 @@ export function FinanceExpensesPage() {
                           <span
                             className={cn(
                               "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                              style.soft,
+                              !style.fromApi && style.soft,
                             )}
+                            style={
+                              style.fromApi
+                                ? { backgroundColor: style.color, color: "#fff" }
+                                : undefined
+                            }
                           >
                             <Icon className="size-4" />
                           </span>
                           <span className="truncate">
-                            {categoryLabel(item.category)}
+                            {categoryLabel(item.category, catalog)}
                           </span>
                         </span>
                         <span className="shrink-0 text-right tabular-nums">
@@ -457,7 +474,7 @@ export function FinanceExpensesPage() {
               <h2 className="text-sm font-semibold">Phân bổ theo danh mục</h2>
               <ul className="mt-4 space-y-4">
                 {cats.map((item) => {
-                  const style = styleFor(item.category);
+                  const style = styleFor(item.category, catalog);
                   const Icon = style.icon;
                   return (
                     <li key={item.category}>
@@ -466,13 +483,18 @@ export function FinanceExpensesPage() {
                           <span
                             className={cn(
                               "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                              style.soft,
+                              !style.fromApi && style.soft,
                             )}
+                            style={
+                              style.fromApi
+                                ? { backgroundColor: style.color, color: "#fff" }
+                                : undefined
+                            }
                           >
                             <Icon className="size-4" />
                           </span>
                           <span className="truncate">
-                            {categoryLabel(item.category)}
+                            {categoryLabel(item.category, catalog)}
                             <span className="text-muted-foreground">
                               {" "}
                               · {item.percent.toFixed(0)}%
@@ -485,8 +507,11 @@ export function FinanceExpensesPage() {
                       </div>
                       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                         <div
-                          className={cn("h-full rounded-full", style.bar)}
-                          style={{ width: `${Math.min(item.percent, 100)}%` }}
+                          className={cn("h-full rounded-full", !style.fromApi && style.bar)}
+                          style={{
+                            width: `${Math.min(item.percent, 100)}%`,
+                            backgroundColor: style.fromApi ? style.color : undefined,
+                          }}
                         />
                       </div>
                     </li>

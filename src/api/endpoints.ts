@@ -1,5 +1,5 @@
 import { apiFetch } from "@/api/client";
-import type { FinanceTransaction } from "@/types/finance";
+import type { FinanceCategoryRecord, FinanceTransaction } from "@/types/finance";
 import type { Borrower } from "@/types/borrower";
 import type { Loan } from "@/types/loan";
 import type { InterestSchedule } from "@/types/interest-schedule";
@@ -235,6 +235,50 @@ export function updateFinanceTransaction(
 export function deleteFinanceTransaction(id: string) {
   return apiFetch<{ ok: boolean }>(
     `/api/finance?id=${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function fetchFinanceCategories() {
+  return apiFetch<FinanceCategoryRecord[]>(
+    "/api/finance/categories?includeInactive=1",
+  );
+}
+
+export function createFinanceCategory(body: {
+  name: string;
+  description?: string;
+  type: "income" | "expense";
+  icon: string;
+  color: string;
+  isActive: boolean;
+}) {
+  return apiFetch<FinanceCategoryRecord>("/api/finance/categories", {
+    method: "POST",
+    body,
+  });
+}
+
+export function updateFinanceCategory(
+  id: string,
+  body: Partial<{
+    name: string;
+    description: string;
+    type: "income" | "expense";
+    icon: string;
+    color: string;
+    isActive: boolean;
+  }>,
+) {
+  return apiFetch<FinanceCategoryRecord>(
+    `/api/finance/categories/${encodeURIComponent(id)}`,
+    { method: "PATCH", body },
+  );
+}
+
+export function deleteFinanceCategory(id: string) {
+  return apiFetch<{ ok: true; deactivated: boolean }>(
+    `/api/finance/categories/${encodeURIComponent(id)}`,
     { method: "DELETE" },
   );
 }

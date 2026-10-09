@@ -1,0 +1,77 @@
+import {
+  Baby,
+  Banknote,
+  Book,
+  Briefcase,
+  Car,
+  Coffee,
+  Droplets,
+  Dumbbell,
+  Film,
+  Fuel,
+  Gamepad2,
+  Gift,
+  GraduationCap,
+  Heart,
+  Home,
+  Landmark,
+  MoreHorizontal,
+  Music,
+  Phone,
+  PiggyBank,
+  Plane,
+  Receipt,
+  Shirt,
+  ShoppingCart,
+  Sparkles,
+  Users,
+  Utensils,
+  Wallet,
+  Wifi,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+import { CATEGORY_ICON_NAMES } from "@shared/finance/category-catalog";
+
+export const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
+  Utensils,
+  ShoppingCart,
+  Car,
+  Home,
+  Zap,
+  Heart,
+  Receipt,
+  MoreHorizontal,
+  Gamepad2,
+  Plane,
+  Book,
+  Wifi,
+  Droplets,
+  Users,
+  Sparkles,
+  Wallet,
+  Briefcase,
+  Gift,
+  Banknote,
+  Coffee,
+  Shirt,
+  Fuel,
+  Phone,
+  Baby,
+  GraduationCap,
+  Dumbbell,
+  Music,
+  Film,
+  PiggyBank,
+  Landmark,
+};
+
+export const CATEGORY_ICON_OPTIONS = CATEGORY_ICON_NAMES.map((name) => ({
+  name,
+  icon: CATEGORY_ICON_MAP[name]!,
+}));
+
+export function categoryIcon(name: string | undefined): LucideIcon {
+  if (name && CATEGORY_ICON_MAP[name]) return CATEGORY_ICON_MAP[name];
+  return Wallet;
+}

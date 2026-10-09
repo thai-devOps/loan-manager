@@ -43,6 +43,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  useFinanceCategoriesQuery,
   useFinanceTransactionsQuery,
   useTransactionsQuery,
 } from "@/api/queries";
@@ -93,6 +94,8 @@ export function FinanceOverviewPage() {
   );
 
   const periodFinanceQ = useFinanceTransactionsQuery({ from, to });
+  const categoriesQuery = useFinanceCategoriesQuery();
+  const catalog = categoriesQuery.data;
   const prevFinanceQ = useFinanceTransactionsQuery({
     from: prevRange.from,
     to: prevRange.to,
@@ -389,8 +392,8 @@ export function FinanceOverviewPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <CategoryBars title="Chi theo danh mục" items={expenseCats} tone="danger" />
-        <CategoryBars title="Thu theo danh mục" items={incomeCats} tone="success" />
+        <CategoryBars title="Chi theo danh mục" items={expenseCats} tone="danger" catalog={catalog} />
+        <CategoryBars title="Thu theo danh mục" items={incomeCats} tone="success" catalog={catalog} />
       </div>
 
       <Card>
@@ -419,7 +422,7 @@ export function FinanceOverviewPage() {
                         {tx.description}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {formatDate(tx.createdAt)} · {categoryLabel(tx.category)}
+                        {formatDate(tx.createdAt)} · {categoryLabel(tx.category, catalog)}
                       </p>
                     </div>
                     <p
@@ -453,7 +456,7 @@ export function FinanceOverviewPage() {
                         <TableCell>{tx.description}</TableCell>
                         <TableCell>
                           <Badge variant="secondary">
-                            {categoryLabel(tx.category)}
+                            {categoryLabel(tx.category, catalog)}
                           </Badge>
                         </TableCell>
                         <TableCell
@@ -550,10 +553,12 @@ function CategoryBars({
   title,
   items,
   tone,
+  catalog,
 }: {
   title: string;
   items: { category: string; amount: number; percent: number }[];
   tone: "success" | "danger";
+  catalog?: Parameters<typeof categoryLabel>[1];
 }) {
   return (
     <Card>
@@ -571,7 +576,7 @@ function CategoryBars({
             {items.map((item) => (
               <div key={item.category} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate">{categoryLabel(item.category)}</span>
+                  <span className="truncate">{categoryLabel(item.category, catalog)}</span>
                   <span className="shrink-0 tabular-nums text-muted-foreground">
                     {formatCurrency(item.amount)} · {item.percent.toFixed(0)}%
                   </span>
