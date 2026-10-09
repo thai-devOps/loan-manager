@@ -114,7 +114,7 @@ function deltaTone(current: number, previous: number, hasPrevious: boolean): "up
 
 export function FinanceOverviewPage() {
   const username = useAuthStore((s) => s.session?.username ?? "");
-  const { month, from, to, preset } = useFinanceMonth();
+  const { from, to, preset } = useFinanceMonth();
   const [chartWindow, setChartWindow] = useState<ChartWindow>("30d");
   const [expenseFocus, setExpenseFocus] = useState("all");
   const [incomeFocus, setIncomeFocus] = useState("all");
