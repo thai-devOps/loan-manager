@@ -110,11 +110,6 @@ const FinanceLayout = lazy(() =>
     default: m.FinanceLayout,
   })),
 );
-const FinanceOverviewPage = lazy(() =>
-  import("@/features/finance/finance-overview-page").then((m) => ({
-    default: m.FinanceOverviewPage,
-  })),
-);
 const FinanceIncomePage = lazy(() =>
   import("@/features/finance/finance-income-page").then((m) => ({
     default: m.FinanceIncomePage,
@@ -133,6 +128,11 @@ const FinanceTransactionsPage = lazy(() =>
 const FinanceCategoriesPage = lazy(() =>
   import("@/features/finance/finance-categories-page").then((m) => ({
     default: m.FinanceCategoriesPage,
+  })),
+);
+const FinanceReportsPage = lazy(() =>
+  import("@/features/finance/finance-reports-page").then((m) => ({
+    default: m.FinanceReportsPage,
   })),
 );
 const AssetsLayout = lazy(() =>
@@ -901,7 +901,7 @@ export const router = createBrowserRouter([
                   {
                     element: <FinanceLayout />,
                     children: [
-                      { index: true, element: <FinanceOverviewPage /> },
+                      { index: true, element: <FinanceReportsPage /> },
                       { path: "income", element: <FinanceIncomePage /> },
                       {
                         path: "expenses",
@@ -914,6 +914,10 @@ export const router = createBrowserRouter([
                       {
                         path: "categories",
                         element: <FinanceCategoriesPage />,
+                      },
+                      {
+                        path: "reports",
+                        element: <Navigate to="/finance" replace />,
                       },
                     ],
                   },

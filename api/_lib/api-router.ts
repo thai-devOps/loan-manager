@@ -109,6 +109,10 @@ export const API_ROUTES: ApiRoute[] = [
     params: (m) => ({ id: m[1]! }),
   },
   {
+    pattern: /^\/api\/finance\/reports\/?$/,
+    load: () => import("../_routes/finance/reports.js"),
+  },
+  {
     pattern: /^\/api\/finance\/?$/,
     load: () => import("../_routes/finance/index.js"),
   },

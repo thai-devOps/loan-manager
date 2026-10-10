@@ -5,6 +5,12 @@ import type { Loan } from "@/types/loan";
 import type { InterestSchedule } from "@/types/interest-schedule";
 import type { Transaction } from "@/types/transaction";
 import type {
+  FinanceReportOverview,
+  FinanceReportTransactionQuery,
+  FinanceReportTransactions,
+  SalaryCycleReport,
+} from "@/features/finance/lib/report-types";
+import type {
   AssetAllocation,
   AssetSettings,
   AssetSnapshot,
@@ -391,6 +397,35 @@ export function fetchGoldPricesLatest(zone?: string) {
 export function fetchGoldTypes(zone?: string) {
   const q = zone ? `?zone=${encodeURIComponent(zone)}` : "";
   return apiFetch<GoldTypesResponse>(`/api/gold/types${q}`);
+}
+
+export function fetchFinanceReportCycles(payday: number) {
+  const sp = new URLSearchParams({ section: "cycles", payday: String(payday) });
+  return apiFetch<SalaryCycleReport>(`/api/finance/reports?${sp.toString()}`);
+}
+
+export function fetchFinanceReportOverview(from: string, to: string) {
+  const sp = new URLSearchParams({ section: "overview", from, to });
+  return apiFetch<FinanceReportOverview>(`/api/finance/reports?${sp.toString()}`);
+}
+
+export function fetchFinanceReportTransactions(
+  params: FinanceReportTransactionQuery,
+) {
+  const sp = new URLSearchParams({
+    section: "transactions",
+    from: params.from,
+    to: params.to,
+    sort: params.sort,
+    dir: params.dir,
+    page: String(params.page),
+    pageSize: String(params.pageSize),
+  });
+  if (params.kind && params.kind !== "all") sp.set("kind", params.kind);
+  if (params.category) sp.set("category", params.category);
+  if (params.paymentMethod) sp.set("paymentMethod", params.paymentMethod);
+  if (params.q) sp.set("q", params.q);
+  return apiFetch<FinanceReportTransactions>(`/api/finance/reports?${sp.toString()}`);
 }
 
 export function fetchGoldPrices(params?: {

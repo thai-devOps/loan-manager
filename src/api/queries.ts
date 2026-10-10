@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchAssetSnapshots, fetchFinanceCategories, fetchGoldPricesLatest, fetchGoldTypes, syncSchedules } from "@/api/endpoints";
+import { fetchAssetSnapshots, fetchFinanceCategories, fetchFinanceReportCycles, fetchFinanceReportOverview, fetchFinanceReportTransactions, fetchGoldPricesLatest, fetchGoldTypes, syncSchedules } from "@/api/endpoints";
+import type { FinanceReportTransactionQuery } from "@/features/finance/lib/report-types";
 import { queryKeys } from "@/api/query-keys";
 import { assetRepository } from "@/db/repositories/assetRepository";
 import { borrowerRepository } from "@/db/repositories/borrowerRepository";
@@ -136,6 +137,42 @@ export function useFinanceTransactionsQuery(params?: {
     queryKey: key,
     queryFn: () => financeRepository.list(params),
     enabled: dbReady && isDbOpen(),
+  });
+}
+
+export function useFinanceReportCyclesQuery(payday: number) {
+  return useQuery({
+    queryKey: queryKeys.finance.report({ section: "cycles", payday }),
+    queryFn: () => fetchFinanceReportCycles(payday),
+    enabled: payday >= 1 && payday <= 28,
+  });
+}
+
+export function useFinanceReportOverviewQuery(from: string, to: string) {
+  return useQuery({
+    queryKey: queryKeys.finance.report({ section: "overview", from, to }),
+    queryFn: () => fetchFinanceReportOverview(from, to),
+    enabled: Boolean(from && to),
+  });
+}
+
+export function useFinanceReportTransactionsQuery(params: FinanceReportTransactionQuery) {
+  return useQuery({
+    queryKey: queryKeys.finance.report({
+      section: "transactions",
+      from: params.from,
+      to: params.to,
+      kind: params.kind,
+      category: params.category,
+      paymentMethod: params.paymentMethod,
+      q: params.q,
+      sort: params.sort,
+      dir: params.dir,
+      page: params.page,
+      pageSize: params.pageSize,
+    }),
+    queryFn: () => fetchFinanceReportTransactions(params),
+    enabled: Boolean(params.from && params.to),
   });
 }
 

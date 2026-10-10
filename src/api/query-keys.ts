@@ -27,6 +27,8 @@ export const queryKeys = {
     month: (month: string) => ["finance", { month }] as const,
     range: (from: string, to: string) => ["finance", { from, to }] as const,
     categories: ["finance-categories"] as const,
+    report: (params: Record<string, string | number | undefined>) =>
+      ["finance", "report", params] as const,
   },
   assets: {
     all: ["assets"] as const,

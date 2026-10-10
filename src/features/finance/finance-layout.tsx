@@ -112,7 +112,11 @@ export function FinanceLayout() {
   );
 
   const feature = getFeatureById("finance");
-  const hidePeriod = useLocation().pathname.endsWith("/finance/categories");
+  const pathname = useLocation().pathname;
+  const hidePeriod =
+    pathname === "/finance" ||
+    pathname.endsWith("/finance/categories") ||
+    pathname.endsWith("/finance/reports");
   const periodProps = {
     preset,
     from: range.from,
